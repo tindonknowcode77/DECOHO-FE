@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
+import { googleClientId } from "@/src/configs/auth";
 import { saveSessionUser } from "../services/session";
 
 type GoogleCredentialResponse = {
@@ -67,7 +68,7 @@ export default function GoogleSignInButton({
   const buttonContainerRef = useRef<HTMLDivElement | null>(null);
   const [isScriptReady, setIsScriptReady] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
+  const clientId = googleClientId;
 
   const handleCredential = useCallback(
     async (response: GoogleCredentialResponse) => {

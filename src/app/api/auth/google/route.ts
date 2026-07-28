@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { googleClientId } from "@/src/configs/auth";
 
 type GoogleTokenInfo = {
   aud?: string;
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { credential?: unknown };
     const credential =
       typeof body.credential === "string" ? body.credential.trim() : "";
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
+    const clientId = googleClientId;
 
     if (!clientId) {
       return NextResponse.json(
