@@ -215,7 +215,7 @@ export default function LoginView() {
       </section>
 
       <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:col-span-5">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-[400px]">
           <Link
             className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-[#646a61] hover:text-[#1f2421]"
             href="/"
@@ -321,7 +321,7 @@ export default function LoginView() {
           <div className="relative my-6 text-center">
             <hr className="border-[#ded6c9]" />
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#f7f3ec] px-3 text-xs font-semibold text-[#646a61]">
-              Hoặc đăng nhập nhanh
+              Hoặc tiếp tục với
             </span>
           </div>
 
