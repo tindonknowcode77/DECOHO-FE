@@ -1,288 +1,373 @@
 "use client";
 
 import Link from "next/link";
+import {
+  Box,
+  Check,
+  ChevronRight,
+  Info,
+  Maximize2,
+  Pause,
+  Play,
+  RotateCcw,
+  ShoppingCart,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import BrandLogo from "@/src/components/common/BrandLogo";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { initialCartItems } from "@/src/features/cart/mock/cartItems";
+import { addCartItem } from "@/src/features/cart/services/cartStorage";
 import type { ShowroomStyleId } from "../types";
 
-type ShowroomPreset = {
-  label: string;
-  description: string;
-  accentName: string;
-  wall: number;
-  wallAlt: number;
-  floor: number;
-  floorLine: number;
-  sofa: number;
-  sofaDark: number;
-  accent: number;
-  rug: number;
-  metal: number;
-  window: number;
-  plant: number;
-};
-
 type ShowroomItemId =
+  | "accentChair"
+  | "barIsland"
   | "coffeeTable"
-  | "floorLamp"
-  | "loungeChair"
-  | "pendant"
-  | "plant"
-  | "rug"
-  | "shelf"
-  | "sofa"
-  | "wallArt";
+  | "diningSet"
+  | "lighting"
+  | "mainSofa"
+  | "pergolaSofa"
+  | "planter";
 
 type ShowroomItemInfo = {
-  sku: string;
   brand: string;
-  name: string;
   category: string;
-  priceVND: number;
-  dimensions: string;
-  material: string;
-  stock: string;
-  leadTime: string;
-  colors: { hex: string; name: string }[];
   description: string;
+  dimensions: string;
   href: string;
+  id: ShowroomItemId;
+  image: string;
+  material: string;
+  name: string;
+  priceVND: number;
+  productId?: string;
+  sku: string;
+  stock: number;
+  swatches: { color: string; name: string }[];
+  zone: string;
 };
 
-type SelectableRegistrar = (root: THREE.Object3D, itemId: ShowroomItemId) => void;
+type ShowroomPreset = {
+  accent: number;
+  accentLabel: string;
+  cloth: number;
+  clothAlt: number;
+  description: string;
+  floor: number;
+  floorLine: number;
+  label: string;
+  metal: number;
+  rug: number;
+  stone: number;
+  wood: number;
+};
+
+type SelectableRegistrar = (
+  root: THREE.Object3D,
+  itemId: ShowroomItemId,
+) => void;
+
+type SceneMaterials = {
+  accent: THREE.MeshStandardMaterial;
+  cloth: THREE.MeshStandardMaterial;
+  clothAlt: THREE.MeshStandardMaterial;
+  dark: THREE.MeshStandardMaterial;
+  floor: THREE.MeshStandardMaterial;
+  floorLine: THREE.MeshStandardMaterial;
+  glass: THREE.MeshPhysicalMaterial;
+  leaf: THREE.MeshStandardMaterial;
+  leafLight: THREE.MeshStandardMaterial;
+  led: THREE.MeshStandardMaterial;
+  metal: THREE.MeshStandardMaterial;
+  pot: THREE.MeshStandardMaterial;
+  rug: THREE.MeshStandardMaterial;
+  stone: THREE.MeshStandardMaterial;
+  white: THREE.MeshStandardMaterial;
+  wood: THREE.MeshStandardMaterial;
+};
+
+type AnimatedLeaf = {
+  mesh: THREE.Mesh;
+  phase: number;
+  rotationZ: number;
+};
 
 const CAMERA_HOME = {
-  position: new THREE.Vector3(5.1, 3.8, 6.6),
-  target: new THREE.Vector3(0, 1.05, -0.55),
+  position: new THREE.Vector3(15, 13, 17),
+  target: new THREE.Vector3(0, 1.25, 0),
 };
 
 const showroomItems: Record<ShowroomItemId, ShowroomItemInfo> = {
-  coffeeTable: {
-    sku: "DCH-TBL-ASH-042",
-    brand: "DECOHO Studio",
-    name: "Ban tra Ash Koto",
-    category: "Ban tra",
-    priceVND: 3200000,
-    dimensions: "120 x 60 x 42 cm",
-    material: "Mat go/da mo, chan thep son tinh dien",
-    stock: "Con 12",
-    leadTime: "3 - 5 ngay",
-    colors: [
-      { hex: "#f1e3c8", name: "Ash tu nhien" },
-      { hex: "#1f2421", name: "Den mo" },
-    ],
-    description: "Mat ban rong cho sofa trung tam, hop voi phong khach can diem nhan gon.",
-    href: "/products/2",
-  },
-  floorLamp: {
-    sku: "DCH-LMP-MORI-170",
-    brand: "Mori Light",
-    name: "Den cay Mori",
-    category: "Den trang tri",
-    priceVND: 2400000,
-    dimensions: "Cao 170 cm",
-    material: "Than kim loai den mo, chup vai linen am",
-    stock: "Con 7",
-    leadTime: "2 - 4 ngay",
-    colors: [
-      { hex: "#1f2421", name: "Den graphite" },
-      { hex: "#f4d7a1", name: "Linen am" },
-    ],
-    description: "Anh sang phu diu, dat canh sofa de tao goc doc sach va thu gian.",
-    href: "/products",
-  },
-  loungeChair: {
-    sku: "DCH-CHR-LIN-088",
-    brand: "DECOHO Living",
-    name: "Ghe thu gian Linen",
-    category: "Ghe don",
-    priceVND: 5800000,
-    dimensions: "75 x 80 x 88 cm",
-    material: "Khung go, nem boc vai linen, chan thep",
-    stock: "Dat truoc",
-    leadTime: "7 - 10 ngay",
-    colors: [
-      { hex: "#d8cfc2", name: "Linen cat" },
-      { hex: "#9d8f7f", name: "Taupe" },
-    ],
-    description: "Ghe don nho gon cho goc tiep khach, co the doi vai theo concept phong.",
-    href: "/products/5",
-  },
-  pendant: {
-    sku: "DCH-PEN-KASA-048",
-    brand: "Kasa Light",
-    name: "Den tha Kasa",
-    category: "Den tha",
-    priceVND: 2900000,
-    dimensions: "Duong kinh 48 cm",
-    material: "Khung kim loai, chup vai day",
-    stock: "Con 9",
-    leadTime: "3 - 5 ngay",
-    colors: [
-      { hex: "#f4d7a1", name: "Kem lua" },
-      { hex: "#4a4f46", name: "Khung den" },
-    ],
-    description: "Nguon sang trung tam tren ban tra, lam phong am hon khi render ban dem.",
-    href: "/products",
-  },
-  plant: {
-    sku: "DCH-DEC-MON-110",
-    brand: "Green Corner",
-    name: "Chau cay Monstera",
-    category: "Cay trang tri",
-    priceVND: 850000,
-    dimensions: "Cao 110 cm",
-    material: "Chau dat nung, cay noi that tan rong",
-    stock: "Con 18",
-    leadTime: "1 - 2 ngay",
-    colors: [
-      { hex: "#326f55", name: "Xanh la" },
-      { hex: "#b56d4d", name: "Dat nung" },
-    ],
-    description: "Mang mau xanh vao goc phong va can bang cac vat lieu go, da, kim loai.",
-    href: "/products",
-  },
-  rug: {
-    sku: "DCH-RUG-KYO-220",
-    brand: "Kyoto Weave",
-    name: "Tham Kyoto",
-    category: "Tham",
-    priceVND: 1850000,
-    dimensions: "220 x 150 cm",
-    material: "Soi day va cotton det phang",
-    stock: "Con 5",
-    leadTime: "2 - 3 ngay",
-    colors: [
-      { hex: "#e8dac5", name: "Cat tu nhien" },
-      { hex: "#cfb57a", name: "Vien det" },
-    ],
-    description: "Gom cum sofa va ban tra thanh mot vung sinh hoat ro rang, am chan hon.",
-    href: "/products/3",
-  },
-  shelf: {
-    sku: "DCH-SHF-ANN-170",
-    brand: "An Nam Home",
-    name: "Ke trung bay An Nam",
-    category: "Ke trang tri",
-    priceVND: 4200000,
-    dimensions: "95 x 32 x 170 cm",
-    material: "Khung go son den, dot ke go veneer",
-    stock: "Con 6",
-    leadTime: "5 - 7 ngay",
-    colors: [
-      { hex: "#1f2421", name: "Den son mo" },
-      { hex: "#b89068", name: "Veneer soi" },
-    ],
-    description: "Dung de trung bay sach, gom va mau vat lieu trong khu tiep khach.",
-    href: "/products/4",
-  },
-  sofa: {
-    sku: "DCH-SOF-SORA-190",
-    brand: "Sora Atelier",
-    name: "Sofa Sora Japandi",
+  mainSofa: {
+    brand: "Luxury Furniture",
     category: "Sofa",
-    priceVND: 8900000,
-    dimensions: "190 x 85 x 78 cm",
-    material: "Khung go soi, nem boc vai linen",
-    stock: "Con 4",
-    leadTime: "7 - 10 ngay",
-    colors: [
-      { hex: "#d8cfc2", name: "Linen cat" },
-      { hex: "#2f6f5e", name: "Goi xanh" },
-      { hex: "#9d8f7f", name: "Tua taupe" },
-    ],
-    description: "Kieu dang thap, ti le rong vua can cho can ho hien dai va phong khach am.",
+    description:
+      "Sofa thấp, đệm sâu và tỷ lệ rộng cho khu tiếp khách trung tâm của pavilion.",
+    dimensions: "285 x 98 x 76 cm",
     href: "/products/1",
-  },
-  wallArt: {
-    sku: "DCH-ART-LAY-090",
-    brand: "Layer Canvas",
-    name: "Tranh canvas Layer",
-    category: "Tranh trang tri",
-    priceVND: 1250000,
-    dimensions: "90 x 70 cm",
-    material: "Canvas day, khung composite den mo",
-    stock: "Con 11",
-    leadTime: "2 - 4 ngay",
-    colors: [
-      { hex: "#2f6f5e", name: "Xanh tram" },
-      { hex: "#f4d7a1", name: "Be diem" },
+    id: "mainSofa",
+    image: "/images/product-space/organic-calm.png",
+    material: "Khung gỗ, nệm mousse nhiều lớp, vải linen chống bám bụi",
+    name: "Sofa Nordic Lounge",
+    priceVND: 25900000,
+    productId: "1",
+    sku: "DCH-SOF-001",
+    stock: 15,
+    swatches: [
+      { color: "#d8d3c9", name: "Linen kem" },
+      { color: "#898d89", name: "Xám khói" },
+      { color: "#263b31", name: "Xanh rêu" },
     ],
-    description: "Diem nhan mau tren nen tuong, giup can bang bo sofa va he den.",
+    zone: "Central lounge",
+  },
+  accentChair: {
+    brand: "Cozy Home",
+    category: "Ghế",
+    description:
+      "Ghế thư giãn ôm lưng, bố trí vòng quanh bàn trà để tạo cụm trò chuyện.",
+    dimensions: "82 x 86 x 78 cm",
+    href: "/products/13",
+    id: "accentChair",
+    image: "/images/product-space/urban-warmth.png",
+    material: "Khung thép sơn tĩnh điện, nệm bọc vải bouclé",
+    name: "Ghế thư giãn Bouclé",
+    priceVND: 4750000,
+    productId: "13",
+    sku: "DCH-CHR-013",
+    stock: 30,
+    swatches: [
+      { color: "#c9c5bc", name: "Bouclé đá" },
+      { color: "#777b78", name: "Xám graphite" },
+    ],
+    zone: "Central lounge",
+  },
+  coffeeTable: {
+    brand: "Stone Living",
+    category: "Bàn trà",
+    description:
+      "Cụm bàn đá bo tròn tạo tâm nhìn mềm giữa các khối ghế có đường nét mạnh.",
+    dimensions: "120 x 72 x 40 cm",
+    href: "/products/18",
+    id: "coffeeTable",
+    image: "/images/product-space/organic-calm.png",
+    material: "Đá tự nhiên hoàn thiện mờ, chân thép sơn đen",
+    name: "Bộ bàn trà đá Japandi",
+    priceVND: 12500000,
+    productId: "18",
+    sku: "DCH-TBL-018",
+    stock: 11,
+    swatches: [
+      { color: "#e5dfd5", name: "Travertine sáng" },
+      { color: "#353936", name: "Đá graphite" },
+    ],
+    zone: "Central lounge",
+  },
+  diningSet: {
+    brand: "DECOHO Contract",
+    category: "Bàn ăn",
+    description:
+      "Bàn ăn sáu chỗ với mặt đá mỏng, phù hợp khu hospitality và sân vườn có mái.",
+    dimensions: "220 x 96 x 75 cm",
     href: "/products",
+    id: "diningSet",
+    image: "/images/product-space/soft-evening.png",
+    material: "Mặt đá ceramic, khung thép, ghế bọc vải ngoài trời",
+    name: "Bộ bàn ăn Terrace 06",
+    priceVND: 28900000,
+    sku: "DCH-DIN-006",
+    stock: 6,
+    swatches: [
+      { color: "#e8e1d6", name: "Đá ivory" },
+      { color: "#343936", name: "Khung đen" },
+    ],
+    zone: "Dining terrace",
+  },
+  barIsland: {
+    brand: "DECOHO Studio",
+    category: "Quầy bar",
+    description:
+      "Đảo bar là điểm chuyển tiếp giữa khu bếp mở, bàn ăn và không gian tiếp khách.",
+    dimensions: "320 x 92 x 105 cm",
+    href: "/products",
+    id: "barIsland",
+    image: "/images/decoho-home-interior-v2.png",
+    material: "Đá quartz, veneer sồi hun khói và khung kim loại",
+    name: "Quầy bar Modular",
+    priceVND: 42600000,
+    sku: "DCH-BAR-320",
+    stock: 3,
+    swatches: [
+      { color: "#252a27", name: "Graphite" },
+      { color: "#c5b59d", name: "Sồi hun khói" },
+    ],
+    zone: "Open kitchen",
+  },
+  pergolaSofa: {
+    brand: "DECOHO Outdoor",
+    category: "Sofa ngoài trời",
+    description:
+      "Cụm sofa riêng dưới pergola, có mái lam và cây xanh bao quanh để tạo sự riêng tư.",
+    dimensions: "245 x 92 x 74 cm",
+    href: "/products/1",
+    id: "pergolaSofa",
+    image: "/images/product-space/organic-calm.png",
+    material: "Khung nhôm, vải outdoor chống UV, đệm thoát nước",
+    name: "Sofa Pergola Haven",
+    priceVND: 31800000,
+    productId: "1",
+    sku: "DCH-OUT-245",
+    stock: 8,
+    swatches: [
+      { color: "#d7d0c4", name: "Sand" },
+      { color: "#777b75", name: "Smoke" },
+    ],
+    zone: "Garden pergola",
+  },
+  lighting: {
+    brand: "Lumi Decor",
+    category: "Đèn",
+    description:
+      "Cụm đèn phân tử ánh sáng ấm tạo điểm nhấn phía trên quầy bar và bàn ăn.",
+    dimensions: "120 x 85 x 62 cm",
+    href: "/products/16",
+    id: "lighting",
+    image: "/images/product-space/urban-warmth.png",
+    material: "Thép sơn đen, chụp thủy tinh opal, LED 3000K",
+    name: "Đèn chùm phân tử",
+    priceVND: 7200000,
+    productId: "16",
+    sku: "DCH-LGT-016",
+    stock: 14,
+    swatches: [
+      { color: "#202522", name: "Đen mờ" },
+      { color: "#e4bd78", name: "Ánh sáng ấm" },
+    ],
+    zone: "Open kitchen",
+  },
+  planter: {
+    brand: "Green Corner",
+    category: "Cây trang trí",
+    description:
+      "Cụm cây nhiều tầng lá làm mềm cấu trúc thép và phân chia các khu chức năng.",
+    dimensions: "Cao 140 - 220 cm",
+    href: "/products",
+    id: "planter",
+    image: "/images/decoho-home-hero-v2.png",
+    material: "Chậu composite, cây nhiệt đới và hệ tưới nhỏ giọt",
+    name: "Cụm cây Tropical Layer",
+    priceVND: 6800000,
+    sku: "DCH-GRN-220",
+    stock: 12,
+    swatches: [
+      { color: "#315641", name: "Xanh rừng" },
+      { color: "#63805d", name: "Xanh non" },
+    ],
+    zone: "Landscape edge",
   },
 };
 
 const showroomPresets: Record<ShowroomStyleId, ShowroomPreset> = {
   japandi: {
+    accent: 0xc59a58,
+    accentLabel: "Garden pavilion",
+    cloth: 0xb8b7b0,
+    clothAlt: 0x777a75,
+    description: "Đá sáng, kim loại đen, vải xám và cây nhiệt đới.",
+    floor: 0xd7d1c6,
+    floorLine: 0xb8b0a4,
     label: "Japandi",
-    description: "Go sang, vai tho, cay xanh va anh sang diu.",
-    accentName: "am toi gian",
-    wall: 0xf2eadf,
-    wallAlt: 0xe7dccb,
-    floor: 0xb89068,
-    floorLine: 0x8b6746,
-    sofa: 0xd8cfc2,
-    sofaDark: 0x9d8f7f,
-    accent: 0x2f6f5e,
-    rug: 0xe8dac5,
-    metal: 0x4a4f46,
-    window: 0x9eb8c4,
-    plant: 0x2f6f5e,
+    metal: 0x202522,
+    rug: 0x8f8c82,
+    stone: 0xe6e0d6,
+    wood: 0x967759,
   },
   indochine: {
+    accent: 0xc48a43,
+    accentLabel: "Tropical lounge",
+    cloth: 0xb28f73,
+    clothAlt: 0x66584b,
+    description: "Gỗ nâu, đồng ấm, xanh đậm và vật liệu thủ công.",
+    floor: 0xc8b99f,
+    floorLine: 0x9f8c73,
     label: "Indochine",
-    description: "Gam tram, may dan, xanh sau va diem nhan dong.",
-    accentName: "sang trong Dong Duong",
-    wall: 0xf1e5cf,
-    wallAlt: 0xd7c39a,
-    floor: 0x83583f,
-    floorLine: 0x5d3c2e,
-    sofa: 0xb98562,
-    sofaDark: 0x6c4a35,
-    accent: 0x0f4c4c,
-    rug: 0xcfb57a,
-    metal: 0xc28a3f,
-    window: 0x466d73,
-    plant: 0x1f5a41,
+    metal: 0x282821,
+    rug: 0x88755e,
+    stone: 0xd8c7aa,
+    wood: 0x75513b,
   },
   modern: {
+    accent: 0xe0a65c,
+    accentLabel: "Urban gallery",
+    cloth: 0xa9afb0,
+    clothAlt: 0x555e5e,
+    description: "Bê tông sáng, graphite và ánh đèn tuyến tính.",
+    floor: 0xc5c7c3,
+    floorLine: 0x9da19d,
     label: "Modern",
-    description: "Net gon, sofa mau lanh, den kim loai va tham am.",
-    accentName: "thanh lich hien dai",
-    wall: 0xf4f1ea,
-    wallAlt: 0xd9dee2,
-    floor: 0x8f9692,
-    floorLine: 0x676f6b,
-    sofa: 0xaeb8bd,
-    sofaDark: 0x59656a,
-    accent: 0xbc5b42,
-    rug: 0xd6c6a8,
-    metal: 0x28313a,
-    window: 0x8fb3c6,
-    plant: 0x326f55,
+    metal: 0x171c1d,
+    rug: 0x777d7b,
+    stone: 0xd9d9d4,
+    wood: 0x6f6255,
   },
 };
 
-function standardMaterial(color: number, roughness = 0.75, metalness = 0) {
+function material(color: number, roughness = 0.72, metalness = 0) {
   return new THREE.MeshStandardMaterial({ color, metalness, roughness });
+}
+
+function createMaterials(preset: ShowroomPreset): SceneMaterials {
+  return {
+    accent: material(preset.accent, 0.56, 0.1),
+    cloth: material(preset.cloth, 0.92),
+    clothAlt: material(preset.clothAlt, 0.9),
+    dark: material(0x343936, 0.82),
+    floor: material(preset.floor, 0.72),
+    floorLine: material(preset.floorLine, 0.86),
+    glass: new THREE.MeshPhysicalMaterial({
+      color: 0xaeb8b4,
+      metalness: 0,
+      opacity: 0.18,
+      roughness: 0.14,
+      side: THREE.DoubleSide,
+      transparent: true,
+      transmission: 0.45,
+    }),
+    leaf: material(0x315641, 0.9),
+    leafLight: material(0x63805d, 0.88),
+    led: new THREE.MeshStandardMaterial({
+      color: 0xf2c57f,
+      emissive: 0xe6a84d,
+      emissiveIntensity: 2.2,
+      roughness: 0.42,
+    }),
+    metal: material(preset.metal, 0.36, 0.62),
+    pot: material(0x454b47, 0.74, 0.08),
+    rug: material(preset.rug, 0.98),
+    stone: material(preset.stone, 0.58, 0.04),
+    white: material(0xf2eee7, 0.82),
+    wood: material(preset.wood, 0.68),
+  };
 }
 
 function addBox(
   parent: THREE.Object3D,
   size: [number, number, number],
   position: [number, number, number],
-  material: THREE.Material,
-  options: { castShadow?: boolean; receiveShadow?: boolean } = {},
+  meshMaterial: THREE.Material,
+  options: {
+    castShadow?: boolean;
+    receiveShadow?: boolean;
+    rotation?: [number, number, number];
+  } = {},
 ) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), meshMaterial);
   mesh.position.set(...position);
+  mesh.rotation.set(...(options.rotation ?? [0, 0, 0]));
   mesh.castShadow = options.castShadow ?? true;
   mesh.receiveShadow = options.receiveShadow ?? true;
   parent.add(mesh);
-
   return mesh;
 }
 
@@ -290,29 +375,24 @@ function addRoundedBox(
   parent: THREE.Object3D,
   size: [number, number, number],
   position: [number, number, number],
-  material: THREE.Material,
+  meshMaterial: THREE.Material,
   options: {
     castShadow?: boolean;
     radius?: number;
     receiveShadow?: boolean;
-    segments?: number;
+    rotation?: [number, number, number];
   } = {},
 ) {
+  const radius = Math.min(options.radius ?? 0.1, Math.min(...size) * 0.45);
   const mesh = new THREE.Mesh(
-    new RoundedBoxGeometry(
-      size[0],
-      size[1],
-      size[2],
-      options.segments ?? 4,
-      options.radius ?? 0.08,
-    ),
-    material,
+    new RoundedBoxGeometry(size[0], size[1], size[2], 4, radius),
+    meshMaterial,
   );
   mesh.position.set(...position);
+  mesh.rotation.set(...(options.rotation ?? [0, 0, 0]));
   mesh.castShadow = options.castShadow ?? true;
   mesh.receiveShadow = options.receiveShadow ?? true;
   parent.add(mesh);
-
   return mesh;
 }
 
@@ -322,19 +402,771 @@ function addCylinder(
   radiusBottom: number,
   height: number,
   position: [number, number, number],
-  material: THREE.Material,
-  options: { castShadow?: boolean; receiveShadow?: boolean; segments?: number } = {},
+  meshMaterial: THREE.Material,
+  options: {
+    castShadow?: boolean;
+    radialSegments?: number;
+    receiveShadow?: boolean;
+    rotation?: [number, number, number];
+  } = {},
 ) {
   const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, options.segments ?? 32),
-    material,
+    new THREE.CylinderGeometry(
+      radiusTop,
+      radiusBottom,
+      height,
+      options.radialSegments ?? 28,
+    ),
+    meshMaterial,
   );
   mesh.position.set(...position);
+  mesh.rotation.set(...(options.rotation ?? [0, 0, 0]));
   mesh.castShadow = options.castShadow ?? true;
   mesh.receiveShadow = options.receiveShadow ?? true;
   parent.add(mesh);
-
   return mesh;
+}
+
+function createSofa(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+  rotationY: number,
+  width = 3,
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  group.rotation.y = rotationY;
+  parent.add(group);
+
+  addRoundedBox(group, [width, 0.38, 1.02], [0, 0.38, 0], materials.dark, {
+    radius: 0.14,
+  });
+  addRoundedBox(
+    group,
+    [width - 0.22, 0.24, 0.82],
+    [0, 0.68, 0.04],
+    materials.cloth,
+    { radius: 0.12 },
+  );
+  addRoundedBox(
+    group,
+    [width - 0.14, 0.82, 0.24],
+    [0, 0.92, -0.45],
+    materials.clothAlt,
+    { radius: 0.1, rotation: [-0.09, 0, 0] },
+  );
+  addRoundedBox(
+    group,
+    [0.25, 0.66, 1.03],
+    [-width / 2 - 0.02, 0.66, 0],
+    materials.clothAlt,
+    { radius: 0.1 },
+  );
+  addRoundedBox(
+    group,
+    [0.25, 0.66, 1.03],
+    [width / 2 + 0.02, 0.66, 0],
+    materials.clothAlt,
+    { radius: 0.1 },
+  );
+
+  const cushionCount = Math.max(2, Math.round(width / 1.05));
+  for (let index = 0; index < cushionCount; index += 1) {
+    const x = (index - (cushionCount - 1) / 2) * (width / cushionCount);
+    addRoundedBox(
+      group,
+      [width / cushionCount - 0.1, 0.52, 0.16],
+      [x, 1.02, -0.29],
+      index === 1 ? materials.white : materials.cloth,
+      { radius: 0.07, rotation: [-0.12, 0, 0] },
+    );
+  }
+
+  addRoundedBox(group, [0.48, 0.42, 0.13], [-0.58, 1.04, -0.11], materials.accent, {
+    radius: 0.08,
+    rotation: [-0.08, 0.08, -0.05],
+  });
+
+  for (const x of [-width / 2 + 0.28, width / 2 - 0.28]) {
+    for (const z of [-0.34, 0.34]) {
+      addCylinder(group, 0.035, 0.045, 0.3, [x, 0.15, z], materials.metal, {
+        radialSegments: 12,
+      });
+    }
+  }
+
+  return group;
+}
+
+function createArmchair(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+  rotationY: number,
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  group.rotation.y = rotationY;
+  parent.add(group);
+
+  addRoundedBox(group, [1.12, 0.3, 0.94], [0, 0.45, 0], materials.dark, {
+    radius: 0.14,
+  });
+  addRoundedBox(group, [0.94, 0.2, 0.78], [0, 0.66, 0.04], materials.cloth, {
+    radius: 0.12,
+  });
+  addRoundedBox(group, [1.02, 0.74, 0.22], [0, 0.9, -0.4], materials.clothAlt, {
+    radius: 0.1,
+    rotation: [-0.12, 0, 0],
+  });
+  addRoundedBox(group, [0.19, 0.57, 0.92], [-0.62, 0.62, 0], materials.clothAlt, {
+    radius: 0.09,
+  });
+  addRoundedBox(group, [0.19, 0.57, 0.92], [0.62, 0.62, 0], materials.clothAlt, {
+    radius: 0.09,
+  });
+
+  for (const x of [-0.42, 0.42]) {
+    for (const z of [-0.3, 0.3]) {
+      addCylinder(group, 0.03, 0.045, 0.38, [x, 0.19, z], materials.metal, {
+        radialSegments: 10,
+      });
+    }
+  }
+
+  return group;
+}
+
+function createCoffeeTable(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  parent.add(group);
+
+  const base = addCylinder(group, 0.55, 0.72, 0.3, [0, 0.2, 0], materials.metal, {
+    radialSegments: 40,
+  });
+  base.scale.x = 1.35;
+  const top = addCylinder(group, 0.76, 0.76, 0.1, [0, 0.48, 0], materials.stone, {
+    radialSegments: 48,
+  });
+  top.scale.x = 1.38;
+
+  const sideTop = addCylinder(
+    group,
+    0.42,
+    0.42,
+    0.08,
+    [0.92, 0.61, -0.22],
+    materials.wood,
+    { radialSegments: 40 },
+  );
+  sideTop.scale.x = 1.15;
+  addCylinder(group, 0.16, 0.29, 0.52, [0.92, 0.3, -0.22], materials.metal, {
+    radialSegments: 32,
+  });
+
+  addCylinder(group, 0.13, 0.17, 0.16, [-0.28, 0.62, 0], materials.pot);
+  addRoundedBox(group, [0.42, 0.04, 0.28], [0.32, 0.56, 0.16], materials.accent, {
+    radius: 0.02,
+  });
+  addRoundedBox(group, [0.38, 0.035, 0.26], [0.32, 0.61, 0.16], materials.white, {
+    radius: 0.02,
+  });
+  return group;
+}
+
+function createDiningSet(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+  rotationY: number,
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  group.rotation.y = rotationY;
+  parent.add(group);
+
+  addRoundedBox(group, [3.5, 0.14, 1.22], [0, 0.84, 0], materials.stone, {
+    radius: 0.08,
+  });
+  for (const x of [-1.35, 1.35]) {
+    addBox(group, [0.12, 0.76, 0.92], [x, 0.43, 0], materials.metal);
+  }
+
+  const chairPositions: [number, number, number, number][] = [
+    [-1.15, 0, -1.02, 0],
+    [0, 0, -1.02, 0],
+    [1.15, 0, -1.02, 0],
+    [-1.15, 0, 1.02, Math.PI],
+    [0, 0, 1.02, Math.PI],
+    [1.15, 0, 1.02, Math.PI],
+  ];
+
+  for (const [x, y, z, rotation] of chairPositions) {
+    const chair = new THREE.Group();
+    chair.position.set(x, y, z);
+    chair.rotation.y = rotation;
+    group.add(chair);
+    addRoundedBox(chair, [0.62, 0.14, 0.58], [0, 0.52, 0], materials.cloth, {
+      radius: 0.08,
+    });
+    addRoundedBox(chair, [0.66, 0.68, 0.12], [0, 0.82, -0.27], materials.clothAlt, {
+      radius: 0.07,
+      rotation: [-0.08, 0, 0],
+    });
+    for (const legX of [-0.23, 0.23]) {
+      for (const legZ of [-0.19, 0.19]) {
+        addCylinder(chair, 0.022, 0.03, 0.49, [legX, 0.25, legZ], materials.metal, {
+          radialSegments: 8,
+        });
+      }
+    }
+  }
+
+  for (const x of [-0.9, 0, 0.9]) {
+    addCylinder(group, 0.13, 0.18, 0.035, [x, 0.94, 0], materials.white, {
+      radialSegments: 28,
+    });
+    addCylinder(group, 0.035, 0.05, 0.12, [x + 0.22, 0.98, 0.12], materials.glass, {
+      radialSegments: 16,
+    });
+  }
+
+  return group;
+}
+
+function createBar(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  parent.add(group);
+
+  addRoundedBox(group, [3.85, 0.92, 0.92], [0, 0.72, 0], materials.metal, {
+    radius: 0.08,
+  });
+  addRoundedBox(group, [4.12, 0.15, 1.08], [0, 1.24, 0], materials.stone, {
+    radius: 0.06,
+  });
+  addBox(group, [3.15, 0.04, 0.035], [0, 0.61, 0.48], materials.led, {
+    castShadow: false,
+  });
+
+  for (let index = 0; index < 4; index += 1) {
+    const x = -1.42 + index * 0.95;
+    addCylinder(group, 0.25, 0.25, 0.12, [x, 0.8, 1.02], materials.cloth, {
+      radialSegments: 28,
+    });
+    addCylinder(group, 0.035, 0.045, 0.76, [x, 0.39, 1.02], materials.metal, {
+      radialSegments: 10,
+    });
+    addCylinder(group, 0.22, 0.28, 0.06, [x, 0.04, 1.02], materials.metal, {
+      radialSegments: 24,
+    });
+  }
+
+  addCylinder(group, 0.18, 0.22, 0.24, [-1.1, 1.44, -0.08], materials.pot);
+  addRoundedBox(group, [0.7, 0.035, 0.42], [0.65, 1.35, 0], materials.wood, {
+    radius: 0.02,
+  });
+  return group;
+}
+
+function createMolecularLight(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  parent.add(group);
+
+  addCylinder(group, 0.025, 0.025, 1.5, [0, 0.74, 0], materials.metal, {
+    radialSegments: 10,
+  });
+
+  const arms: [number, number, number][] = [
+    [-0.85, -0.12, 0.1],
+    [0.82, 0.02, -0.2],
+    [-0.45, -0.42, -0.68],
+    [0.48, -0.32, 0.68],
+  ];
+
+  for (const [x, y, z] of arms) {
+    const length = Math.sqrt(x * x + z * z);
+    const arm = addCylinder(
+      group,
+      0.022,
+      0.022,
+      length,
+      [x / 2, y, z / 2],
+      materials.metal,
+      { radialSegments: 8 },
+    );
+    arm.rotation.z = Math.PI / 2;
+    arm.rotation.y = Math.atan2(z, x);
+    const globe = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 20, 14),
+      materials.led,
+    );
+    globe.position.set(x, y, z);
+    globe.castShadow = false;
+    group.add(globe);
+    const light = new THREE.PointLight(0xffd99a, 0.65, 4, 1.8);
+    light.position.set(x, y, z);
+    group.add(light);
+  }
+
+  return group;
+}
+
+function createTree(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+  scale: number,
+  animatedLeaves: AnimatedLeaf[],
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  group.scale.setScalar(scale);
+  parent.add(group);
+
+  addCylinder(group, 0.12, 0.2, 1.9, [0, 1.05, 0], materials.wood, {
+    radialSegments: 12,
+  });
+  addCylinder(group, 0.48, 0.58, 0.48, [0, 0.28, 0], materials.pot, {
+    radialSegments: 32,
+  });
+
+  const leafPositions: [number, number, number, number][] = [
+    [0, 2.2, 0, 0],
+    [-0.48, 2.02, 0.08, 0.8],
+    [0.45, 2.08, -0.12, 1.6],
+    [-0.24, 2.47, -0.2, 2.4],
+    [0.28, 2.54, 0.16, 3.2],
+    [0.05, 2.84, 0, 4],
+  ];
+
+  for (const [x, y, z, phase] of leafPositions) {
+    const mesh = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.58, 1),
+      phase % 1.6 === 0 ? materials.leafLight : materials.leaf,
+    );
+    mesh.position.set(x, y, z);
+    mesh.scale.set(1.05, 0.78, 0.92);
+    mesh.rotation.z = phase * 0.08;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    animatedLeaves.push({
+      mesh,
+      phase,
+      rotationZ: mesh.rotation.z,
+    });
+  }
+
+  return group;
+}
+
+function createPlanterStrip(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+  rotationY: number,
+  length: number,
+  animatedLeaves: AnimatedLeaf[],
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  group.rotation.y = rotationY;
+  parent.add(group);
+
+  addRoundedBox(group, [length, 0.54, 0.62], [0, 0.28, 0], materials.pot, {
+    radius: 0.1,
+  });
+  addRoundedBox(group, [length - 0.18, 0.08, 0.5], [0, 0.56, 0], materials.dark, {
+    radius: 0.05,
+  });
+
+  const count = Math.max(3, Math.round(length / 0.72));
+  for (let index = 0; index < count; index += 1) {
+    const x = -length / 2 + 0.36 + index * ((length - 0.72) / Math.max(count - 1, 1));
+    const leaf = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 12, 8),
+      index % 2 === 0 ? materials.leaf : materials.leafLight,
+    );
+    leaf.scale.set(0.52, 1.2 + (index % 3) * 0.18, 0.34);
+    leaf.position.set(x, 0.95 + (index % 2) * 0.12, 0);
+    leaf.rotation.z = index % 2 === 0 ? -0.26 : 0.26;
+    leaf.castShadow = true;
+    group.add(leaf);
+    animatedLeaves.push({
+      mesh: leaf,
+      phase: index * 0.7,
+      rotationZ: leaf.rotation.z,
+    });
+  }
+  return group;
+}
+
+function createRailing(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  axis: "x" | "z",
+  length: number,
+  position: [number, number, number],
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  parent.add(group);
+
+  const postCount = Math.floor(length / 1.45) + 1;
+  for (let index = 0; index < postCount; index += 1) {
+    const offset = -length / 2 + (index / (postCount - 1)) * length;
+    addBox(
+      group,
+      [0.055, 1.0, 0.055],
+      axis === "x" ? [offset, 0.5, 0] : [0, 0.5, offset],
+      materials.metal,
+    );
+  }
+
+  for (const height of [0.42, 0.98]) {
+    addBox(
+      group,
+      axis === "x" ? [length, 0.055, 0.055] : [0.055, 0.055, length],
+      [0, height, 0],
+      materials.metal,
+    );
+  }
+}
+
+function createPergola(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+  position: [number, number, number],
+  width: number,
+  depth: number,
+  height: number,
+) {
+  const group = new THREE.Group();
+  group.position.set(...position);
+  parent.add(group);
+
+  for (const x of [-width / 2, width / 2]) {
+    for (const z of [-depth / 2, depth / 2]) {
+      addBox(group, [0.1, height, 0.1], [x, height / 2, z], materials.metal);
+    }
+  }
+
+  addBox(group, [width + 0.16, 0.13, 0.13], [0, height, -depth / 2], materials.metal);
+  addBox(group, [width + 0.16, 0.13, 0.13], [0, height, depth / 2], materials.metal);
+  addBox(group, [0.13, 0.13, depth + 0.16], [-width / 2, height, 0], materials.metal);
+  addBox(group, [0.13, 0.13, depth + 0.16], [width / 2, height, 0], materials.metal);
+
+  for (let index = 0; index < 12; index += 1) {
+    const x = -width / 2 + 0.2 + index * ((width - 0.4) / 11);
+    addBox(group, [0.055, 0.07, depth], [x, height - 0.03, 0], materials.metal, {
+      castShadow: false,
+    });
+  }
+  return group;
+}
+
+function createBackKitchen(
+  parent: THREE.Object3D,
+  materials: SceneMaterials,
+) {
+  const group = new THREE.Group();
+  group.position.set(4.65, 0.35, -4.55);
+  parent.add(group);
+
+  addRoundedBox(group, [3.2, 3.45, 0.62], [0, 1.72, 0], materials.metal, {
+    radius: 0.07,
+  });
+  addRoundedBox(group, [2.7, 1.22, 0.16], [0, 2.12, 0.36], materials.wood, {
+    radius: 0.03,
+  });
+  addRoundedBox(group, [2.55, 0.08, 0.36], [0, 1.48, 0.43], materials.stone, {
+    radius: 0.03,
+  });
+
+  for (const x of [-0.92, -0.3, 0.32, 0.94]) {
+    addCylinder(group, 0.07, 0.09, 0.36, [x, 1.72, 0.52], materials.glass, {
+      radialSegments: 12,
+    });
+  }
+  for (let index = 0; index < 8; index += 1) {
+    addBox(
+      group,
+      [0.1, 0.42 + (index % 3) * 0.1, 0.12],
+      [-1.05 + index * 0.3, 2.15, 0.47],
+      index % 2 === 0 ? materials.accent : materials.white,
+    );
+  }
+
+  addBox(group, [2.6, 0.035, 0.035], [0, 1.55, 0.58], materials.led, {
+    castShadow: false,
+  });
+  return group;
+}
+
+function buildIsometricShowroom(
+  scene: THREE.Scene,
+  preset: ShowroomPreset,
+  registerSelectable: SelectableRegistrar,
+) {
+  const materials = createMaterials(preset);
+  const animatedLeaves: AnimatedLeaf[] = [];
+  const animatedPendants: THREE.Group[] = [];
+  const pavilion = new THREE.Group();
+  scene.add(pavilion);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(52, 52),
+    new THREE.MeshStandardMaterial({
+      color: 0xb9bcba,
+      roughness: 1,
+    }),
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.62;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  addRoundedBox(pavilion, [15.2, 0.62, 11.8], [0, -0.2, 0], materials.dark, {
+    radius: 0.42,
+  });
+  addRoundedBox(pavilion, [14.72, 0.2, 11.32], [0, 0.22, 0], materials.floor, {
+    radius: 0.3,
+    receiveShadow: true,
+  });
+
+  for (let index = -6; index <= 6; index += 1) {
+    addBox(
+      pavilion,
+      [0.018, 0.018, 11.05],
+      [index * 1.05, 0.33, 0],
+      materials.floorLine,
+      { castShadow: false },
+    );
+  }
+  for (let index = -5; index <= 5; index += 1) {
+    addBox(
+      pavilion,
+      [14.45, 0.018, 0.018],
+      [0, 0.34, index * 1.0],
+      materials.floorLine,
+      { castShadow: false },
+    );
+  }
+
+  const edgeLights: {
+    position: [number, number, number];
+    size: [number, number, number];
+  }[] = [
+    { position: [0, 0.05, 5.65], size: [13.5, 0.055, 0.055] },
+    { position: [0, 0.05, -5.65], size: [13.5, 0.055, 0.055] },
+    { position: [-7.32, 0.05, 0], size: [0.055, 0.055, 10.4] },
+    { position: [7.32, 0.05, 0], size: [0.055, 0.055, 10.4] },
+  ];
+
+  for (const { position, size } of edgeLights) {
+    addBox(pavilion, size, position, materials.led, { castShadow: false });
+  }
+
+  createRailing(pavilion, materials, "x", 4.8, [-4.6, 0.35, 5.38]);
+  createRailing(pavilion, materials, "x", 4.2, [4.95, 0.35, 5.38]);
+  createRailing(pavilion, materials, "z", 4.7, [7.15, 0.35, 2.85]);
+  createRailing(pavilion, materials, "z", 3.9, [-7.15, 0.35, 3.2]);
+
+  createPergola(pavilion, materials, [-4.8, 0.34, -1.1], 4.2, 5.0, 3.55);
+  createPergola(pavilion, materials, [1.1, 0.34, -3.45], 7.0, 3.7, 4.55);
+
+  addBox(pavilion, [6.8, 0.07, 3.5], [1.1, 4.87, -3.45], materials.glass, {
+    castShadow: false,
+  });
+  for (let index = 0; index < 17; index += 1) {
+    const x = -2.15 + index * 0.4;
+    addBox(
+      pavilion,
+      [0.085, 0.08, 3.45],
+      [x, 4.92, -3.45],
+      materials.metal,
+      { castShadow: false },
+    );
+  }
+
+  for (let index = 0; index < 20; index += 1) {
+    const x = -2.2 + index * 0.24;
+    addBox(
+      pavilion,
+      [0.055, 3.55, 0.055],
+      [x, 2.12, -5.18],
+      materials.metal,
+    );
+  }
+
+  const centralRug = addRoundedBox(
+    pavilion,
+    [6.3, 0.06, 4.4],
+    [0, 0.39, 2.5],
+    materials.rug,
+    { castShadow: false, radius: 0.18, receiveShadow: true },
+  );
+  centralRug.rotation.y = -0.03;
+  const mainSofa = createSofa(pavilion, materials, [0, 0.34, 1.05], 0, 3.25);
+  registerSelectable(mainSofa, "mainSofa");
+
+  const coffeeTable = createCoffeeTable(pavilion, materials, [0, 0.34, 3.18]);
+  registerSelectable(coffeeTable, "coffeeTable");
+
+  const leftChair = createArmchair(pavilion, materials, [-2.45, 0.34, 3.1], Math.PI / 2);
+  registerSelectable(leftChair, "accentChair");
+  createArmchair(pavilion, materials, [2.45, 0.34, 3.1], -Math.PI / 2);
+  createArmchair(pavilion, materials, [-1.55, 0.34, 4.45], Math.PI);
+  createArmchair(pavilion, materials, [1.55, 0.34, 4.45], Math.PI);
+
+  const pergolaRug = addRoundedBox(
+    pavilion,
+    [3.5, 0.05, 3.6],
+    [-4.72, 0.38, -0.7],
+    materials.rug,
+    { castShadow: false, radius: 0.16 },
+  );
+  pergolaRug.rotation.y = 0.03;
+  const pergolaSofa = createSofa(
+    pavilion,
+    materials,
+    [-5.68, 0.34, -1.05],
+    Math.PI / 2,
+    2.45,
+  );
+  registerSelectable(pergolaSofa, "pergolaSofa");
+  createArmchair(pavilion, materials, [-4.02, 0.34, -2.0], -0.2);
+  addCylinder(pavilion, 0.52, 0.52, 0.08, [-4.35, 0.78, 0.2], materials.stone, {
+    radialSegments: 40,
+  });
+  addCylinder(pavilion, 0.18, 0.32, 0.44, [-4.35, 0.56, 0.2], materials.metal, {
+    radialSegments: 32,
+  });
+
+  const diningSet = createDiningSet(
+    pavilion,
+    materials,
+    [4.65, 0.34, 0.65],
+    Math.PI / 2,
+  );
+  registerSelectable(diningSet, "diningSet");
+
+  const barIsland = createBar(pavilion, materials, [0.6, 0.34, -2.7]);
+  registerSelectable(barIsland, "barIsland");
+  createBackKitchen(pavilion, materials);
+
+  const molecularLight = createMolecularLight(
+    pavilion,
+    materials,
+    [0.55, 3.86, -2.65],
+  );
+  registerSelectable(molecularLight, "lighting");
+  animatedPendants.push(molecularLight);
+
+  const floorLamp = new THREE.Group();
+  floorLamp.position.set(2.7, 0.34, 4.35);
+  pavilion.add(floorLamp);
+  addCylinder(floorLamp, 0.22, 0.3, 0.08, [0, 0.04, 0], materials.metal);
+  addCylinder(floorLamp, 0.025, 0.025, 1.75, [0, 0.9, 0], materials.metal, {
+    radialSegments: 10,
+  });
+  addCylinder(floorLamp, 0.28, 0.42, 0.62, [0, 1.84, 0], materials.led, {
+    radialSegments: 32,
+  });
+  const floorGlow = new THREE.PointLight(0xffd49a, 1.4, 4.4, 1.8);
+  floorGlow.position.set(0, 1.58, 0);
+  floorLamp.add(floorGlow);
+
+  const planter = createTree(
+    pavilion,
+    materials,
+    [6.15, 0.34, -4.35],
+    1.1,
+    animatedLeaves,
+  );
+  registerSelectable(planter, "planter");
+  createTree(pavilion, materials, [-6.2, 0.34, -4.4], 0.92, animatedLeaves);
+  createTree(pavilion, materials, [-6.3, 0.34, 4.25], 0.72, animatedLeaves);
+  createTree(pavilion, materials, [6.15, 0.34, 4.25], 0.7, animatedLeaves);
+
+  createPlanterStrip(
+    pavilion,
+    materials,
+    [-4.3, 0.34, 5.0],
+    0,
+    3.2,
+    animatedLeaves,
+  );
+  createPlanterStrip(
+    pavilion,
+    materials,
+    [4.55, 0.34, 5.0],
+    0,
+    2.8,
+    animatedLeaves,
+  );
+  createPlanterStrip(
+    pavilion,
+    materials,
+    [-6.72, 0.34, 1.3],
+    Math.PI / 2,
+    2.6,
+    animatedLeaves,
+  );
+  createPlanterStrip(
+    pavilion,
+    materials,
+    [6.7, 0.34, -1.8],
+    Math.PI / 2,
+    2.6,
+    animatedLeaves,
+  );
+
+  const warmLights: [number, number, number][] = [
+    [-4.8, 3.1, -1.2],
+    [-2.0, 3.9, -3.4],
+    [3.5, 3.9, -3.4],
+    [5.3, 2.7, 0.4],
+  ];
+  for (const [x, y, z] of warmLights) {
+    const light = new THREE.PointLight(0xffd39a, 0.72, 5.2, 1.9);
+    light.position.set(x, y, z);
+    pavilion.add(light);
+  }
+
+  return {
+    animatedLeaves,
+    animatedPendants,
+    ledMaterial: materials.led,
+  };
+}
+
+function findShowroomItemId(object: THREE.Object3D) {
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    const itemId = current.userData.showroomItemId;
+    if (typeof itemId === "string" && itemId in showroomItems) {
+      return itemId as ShowroomItemId;
+    }
+    current = current.parent;
+  }
+  return null;
 }
 
 function disposeScene(scene: THREE.Scene) {
@@ -344,9 +1176,8 @@ function disposeScene(scene: THREE.Scene) {
   scene.traverse((object) => {
     if (object instanceof THREE.Mesh) {
       geometries.add(object.geometry);
-
       if (Array.isArray(object.material)) {
-        object.material.forEach((material) => materials.add(material));
+        object.material.forEach((entry) => materials.add(entry));
       } else {
         materials.add(object.material);
       }
@@ -354,304 +1185,55 @@ function disposeScene(scene: THREE.Scene) {
   });
 
   geometries.forEach((geometry) => geometry.dispose());
-  materials.forEach((material) => material.dispose());
+  materials.forEach((entry) => entry.dispose());
 }
 
-function findShowroomItemId(object: THREE.Object3D) {
-  let current: THREE.Object3D | null = object;
-
-  while (current) {
-    const itemId = current.userData.showroomItemId;
-
-    if (typeof itemId === "string" && itemId in showroomItems) {
-      return itemId as ShowroomItemId;
-    }
-
-    current = current.parent;
-  }
-
-  return null;
-}
-
-function buildRoom(
-  scene: THREE.Scene,
-  preset: ShowroomPreset,
-  registerSelectable: SelectableRegistrar,
-) {
-  const wall = standardMaterial(preset.wall, 0.9);
-  const wallAlt = standardMaterial(preset.wallAlt, 0.92);
-  const floor = standardMaterial(preset.floor, 0.7);
-  const floorLine = standardMaterial(preset.floorLine, 0.82);
-  const sofa = standardMaterial(preset.sofa, 0.86);
-  const sofaDark = standardMaterial(preset.sofaDark, 0.84);
-  const accent = standardMaterial(preset.accent, 0.74);
-  const rug = standardMaterial(preset.rug, 0.95);
-  const metal = standardMaterial(preset.metal, 0.42, 0.18);
-  const glass = new THREE.MeshStandardMaterial({
-    color: preset.window,
-    emissive: preset.window,
-    emissiveIntensity: 0.18,
-    metalness: 0.05,
-    roughness: 0.22,
-  });
-  const plant = standardMaterial(preset.plant, 0.78);
-  const clay = standardMaterial(0xb56d4d, 0.85);
-  const shade = standardMaterial(0xf4d7a1, 0.72);
-  const bookWhite = standardMaterial(0xf8f3ea, 0.8);
-  const woodTop = standardMaterial(0xf1e3c8, 0.62);
-  const seam = standardMaterial(0x7a6f64, 0.88);
-  const darkWood = standardMaterial(0x2c2e29, 0.68);
-
-  addBox(scene, [9.4, 0.14, 7.2], [0, -0.07, 0], floor, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-
-  for (let index = -4; index <= 4; index += 1) {
-    addBox(scene, [0.025, 0.012, 7.15], [index, 0.014, 0], floorLine, {
-      castShadow: false,
-      receiveShadow: true,
-    });
-  }
-
-  for (let index = -3; index <= 3; index += 1) {
-    addBox(scene, [9.35, 0.012, 0.025], [0, 0.018, index], floorLine, {
-      castShadow: false,
-      receiveShadow: true,
-    });
-  }
-
-  addBox(scene, [9.4, 3.6, 0.16], [0, 1.78, -3.56], wall, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  addBox(scene, [0.16, 3.6, 7.2], [-4.62, 1.78, 0], wallAlt, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  addBox(scene, [0.16, 3.6, 7.2], [4.62, 1.78, 0], wall, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  addBox(scene, [9.4, 0.16, 0.2], [0, 0.22, -3.42], floorLine, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  addBox(scene, [0.18, 0.16, 7.05], [-4.48, 0.22, 0], floorLine, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  addBox(scene, [0.18, 0.16, 7.05], [4.48, 0.22, 0], floorLine, {
-    castShadow: false,
-    receiveShadow: true,
-  });
-
-  addBox(scene, [2.4, 1.25, 0.08], [-2.45, 2.3, -3.45], glass, {
-    castShadow: false,
-    receiveShadow: false,
-  });
-  addBox(scene, [2.52, 0.08, 0.12], [-2.45, 2.96, -3.38], metal);
-  addBox(scene, [2.52, 0.08, 0.12], [-2.45, 1.64, -3.38], metal);
-  addBox(scene, [0.08, 1.38, 0.12], [-3.75, 2.3, -3.38], metal);
-  addBox(scene, [0.08, 1.38, 0.12], [-1.15, 2.3, -3.38], metal);
-  addBox(scene, [0.08, 1.25, 0.12], [-2.45, 2.3, -3.35], metal);
-  addBox(scene, [2.4, 0.06, 0.12], [-2.45, 2.3, -3.34], metal);
-
-  const wallArtGroup = new THREE.Group();
-  wallArtGroup.position.set(2.65, 2.22, -3.44);
-  scene.add(wallArtGroup);
-  addBox(wallArtGroup, [1.35, 0.9, 0.08], [0, 0, 0], accent);
-  addBox(wallArtGroup, [1.55, 1.1, 0.08], [0, 0, 0.04], metal);
-  addBox(wallArtGroup, [0.9, 0.07, 0.1], [0, 0, 0.1], shade);
-  registerSelectable(wallArtGroup, "wallArt");
-
-  const rugMesh = addRoundedBox(scene, [4.4, 0.055, 2.75], [0.05, 0.04, 0.78], rug, {
-    castShadow: false,
-    radius: 0.12,
-    receiveShadow: true,
-  });
-  addBox(scene, [4.5, 0.024, 0.055], [0.05, 0.09, -0.6], standardMaterial(0xd9c49e, 0.9), {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  addBox(scene, [4.5, 0.024, 0.055], [0.05, 0.09, 2.16], standardMaterial(0xd9c49e, 0.9), {
-    castShadow: false,
-    receiveShadow: true,
-  });
-  registerSelectable(rugMesh, "rug");
-
-  const sofaGroup = new THREE.Group();
-  scene.add(sofaGroup);
-  addRoundedBox(sofaGroup, [3.5, 0.42, 1.12], [0, 0.46, -1.82], sofa, { radius: 0.16 });
-  addRoundedBox(sofaGroup, [3.66, 1.04, 0.3], [0, 0.9, -2.34], sofaDark, {
-    radius: 0.14,
-  });
-  addRoundedBox(sofaGroup, [0.34, 0.78, 1.2], [-1.96, 0.64, -1.82], sofaDark, {
-    radius: 0.12,
-  });
-  addRoundedBox(sofaGroup, [0.34, 0.78, 1.2], [1.96, 0.64, -1.82], sofaDark, {
-    radius: 0.12,
-  });
-  addRoundedBox(sofaGroup, [0.98, 0.18, 0.86], [-1.08, 0.78, -1.62], sofa, {
-    radius: 0.12,
-  });
-  addRoundedBox(sofaGroup, [0.98, 0.18, 0.86], [0, 0.78, -1.62], sofa, { radius: 0.12 });
-  addRoundedBox(sofaGroup, [0.98, 0.18, 0.86], [1.08, 0.78, -1.62], sofa, {
-    radius: 0.12,
-  });
-  addBox(sofaGroup, [0.025, 0.035, 0.92], [-0.54, 0.9, -1.62], seam);
-  addBox(sofaGroup, [0.025, 0.035, 0.92], [0.54, 0.9, -1.62], seam);
-  addRoundedBox(sofaGroup, [0.58, 0.44, 0.13], [-0.92, 1.14, -2.16], accent, {
-    radius: 0.08,
-  });
-  addRoundedBox(sofaGroup, [0.52, 0.38, 0.13], [0.15, 1.1, -2.16], rug, { radius: 0.08 });
-  addRoundedBox(sofaGroup, [0.46, 0.34, 0.13], [1.05, 1.08, -2.16], sofa, {
-    radius: 0.08,
-  });
-  addCylinder(sofaGroup, 0.045, 0.06, 0.34, [-1.38, 0.18, -1.35], darkWood, { segments: 12 });
-  addCylinder(sofaGroup, 0.045, 0.06, 0.34, [1.38, 0.18, -1.35], darkWood, { segments: 12 });
-  addCylinder(sofaGroup, 0.045, 0.06, 0.34, [-1.38, 0.18, -2.2], darkWood, { segments: 12 });
-  addCylinder(sofaGroup, 0.045, 0.06, 0.34, [1.38, 0.18, -2.2], darkWood, { segments: 12 });
-  registerSelectable(sofaGroup, "sofa");
-
-  const tableGroup = new THREE.Group();
-  scene.add(tableGroup);
-  const tableFrame = addCylinder(tableGroup, 0.74, 0.74, 0.1, [0.12, 0.5, 0.48], metal, {
-    segments: 48,
-  });
-  tableFrame.scale.x = 1.48;
-  const tableTop = addCylinder(tableGroup, 0.66, 0.66, 0.09, [0.12, 0.6, 0.48], woodTop, {
-    segments: 48,
-  });
-  tableTop.scale.x = 1.42;
-  addCylinder(tableGroup, 0.045, 0.045, 0.48, [-0.72, 0.23, 0.1], metal, { segments: 16 });
-  addCylinder(tableGroup, 0.045, 0.045, 0.48, [0.96, 0.23, 0.1], metal, { segments: 16 });
-  addCylinder(tableGroup, 0.045, 0.045, 0.48, [-0.72, 0.23, 0.86], metal, { segments: 16 });
-  addCylinder(tableGroup, 0.045, 0.045, 0.48, [0.96, 0.23, 0.86], metal, { segments: 16 });
-  addRoundedBox(tableGroup, [0.5, 0.07, 0.33], [-0.28, 0.68, 0.35], accent, { radius: 0.03 });
-  addRoundedBox(tableGroup, [0.45, 0.055, 0.28], [-0.24, 0.75, 0.34], bookWhite, {
-    radius: 0.03,
-  });
-  addCylinder(tableGroup, 0.16, 0.2, 0.18, [0.65, 0.73, 0.58], clay);
-  registerSelectable(tableGroup, "coffeeTable");
-
-  const loungeChair = new THREE.Group();
-  loungeChair.rotation.y = -0.5;
-  loungeChair.position.set(2.9, 0, 0.52);
-  scene.add(loungeChair);
-  addRoundedBox(loungeChair, [1.05, 0.38, 0.92], [0, 0.38, 0], sofa, { radius: 0.14 });
-  addRoundedBox(loungeChair, [1.12, 0.78, 0.22], [0, 0.74, -0.48], sofaDark, {
-    radius: 0.11,
-  });
-  addRoundedBox(loungeChair, [0.22, 0.6, 0.92], [-0.65, 0.52, 0], sofaDark, {
-    radius: 0.1,
-  });
-  addRoundedBox(loungeChair, [0.22, 0.6, 0.92], [0.65, 0.52, 0], sofaDark, {
-    radius: 0.1,
-  });
-  addCylinder(loungeChair, 0.04, 0.04, 0.46, [-0.42, 0.18, 0.28], metal, { segments: 12 });
-  addCylinder(loungeChair, 0.04, 0.04, 0.46, [0.42, 0.18, 0.28], metal, { segments: 12 });
-  registerSelectable(loungeChair, "loungeChair");
-
-  const shelf = new THREE.Group();
-  shelf.position.set(-3.72, 0, 1.35);
-  shelf.rotation.y = Math.PI / 2;
-  scene.add(shelf);
-  addBox(shelf, [1.65, 0.1, 0.32], [0, 0.72, 0], metal);
-  addBox(shelf, [1.65, 0.1, 0.32], [0, 1.32, 0], metal);
-  addBox(shelf, [1.65, 0.1, 0.32], [0, 1.92, 0], metal);
-  addBox(shelf, [0.1, 1.48, 0.32], [-0.86, 1.32, 0], metal);
-  addBox(shelf, [0.1, 1.48, 0.32], [0.86, 1.32, 0], metal);
-  addRoundedBox(shelf, [0.36, 0.48, 0.26], [-0.42, 1.0, 0], accent, { radius: 0.04 });
-  addRoundedBox(shelf, [0.3, 0.42, 0.26], [0.24, 1.58, 0], rug, { radius: 0.04 });
-  addBox(shelf, [0.08, 0.5, 0.24], [-0.02, 0.98, 0], bookWhite);
-  addBox(shelf, [0.08, 0.42, 0.24], [0.1, 0.94, 0], clay);
-  addBox(shelf, [0.08, 0.46, 0.24], [0.22, 0.96, 0], standardMaterial(0x2f6f5e, 0.78));
-  addCylinder(shelf, 0.13, 0.16, 0.22, [0.56, 2.18, 0], clay);
-  registerSelectable(shelf, "shelf");
-
-  const lamp = new THREE.Group();
-  lamp.position.set(-3.32, 0, -0.88);
-  scene.add(lamp);
-  addCylinder(lamp, 0.22, 0.32, 0.1, [0, 0.05, 0], metal);
-  addCylinder(lamp, 0.035, 0.035, 1.72, [0, 0.9, 0], metal, { segments: 16 });
-  addCylinder(lamp, 0.36, 0.5, 0.48, [0, 1.92, 0], shade, { segments: 32 });
-  const lampGlow = new THREE.PointLight(0xffd9a3, 1.2, 4.2, 1.5);
-  lampGlow.position.set(-3.32, 1.72, -0.88);
-  lampGlow.castShadow = true;
-  scene.add(lampGlow);
-  registerSelectable(lamp, "floorLamp");
-
-  const plantGroup = new THREE.Group();
-  plantGroup.position.set(3.54, 0, -2.4);
-  scene.add(plantGroup);
-  addCylinder(plantGroup, 0.32, 0.42, 0.54, [0, 0.27, 0], clay);
-  addCylinder(plantGroup, 0.055, 0.07, 0.9, [0, 0.95, 0], standardMaterial(0x7b5a3f, 0.8), {
-    segments: 12,
-  });
-
-  for (let index = 0; index < 9; index += 1) {
-    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 12), plant);
-    const angle = (index / 9) * Math.PI * 2;
-    leaf.scale.set(0.55, 0.18, 1.0);
-    leaf.position.set(Math.cos(angle) * 0.38, 1.18 + (index % 3) * 0.12, Math.sin(angle) * 0.38);
-    leaf.rotation.set(0.2, angle, -0.35);
-    leaf.castShadow = true;
-    leaf.receiveShadow = true;
-    plantGroup.add(leaf);
-  }
-  registerSelectable(plantGroup, "plant");
-
-  const ceilingRail = addBox(scene, [5.8, 0.08, 0.12], [0.5, 3.38, -1.16], metal, {
-    castShadow: false,
-    receiveShadow: false,
-  });
-  ceilingRail.rotation.y = 0.02;
-
-  const pendant = new THREE.Group();
-  pendant.position.set(1.2, 0, 0.12);
-  scene.add(pendant);
-  addCylinder(pendant, 0.018, 0.018, 1.05, [0, 2.82, 0], metal, { segments: 12 });
-  addCylinder(pendant, 0.34, 0.48, 0.36, [0, 2.22, 0], shade, { segments: 36 });
-  const pendantLight = new THREE.PointLight(0xffedcc, 0.95, 4.6, 1.65);
-  pendantLight.position.set(1.2, 2.05, 0.12);
-  scene.add(pendantLight);
-  registerSelectable(pendant, "pendant");
-
-  return { pendant };
-}
-
-function formatPrice(priceVND: number) {
-  return `${new Intl.NumberFormat("vi-VN").format(priceVND)} VND`;
+function formatPrice(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    currency: "VND",
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(value);
 }
 
 export default function RoomShowroom3D() {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const autoRotateRef = useRef(true);
-  const selectedItemRef = useRef<ShowroomItemId>("sofa");
+  const selectedItemRef = useRef<ShowroomItemId | null>(null);
+  const addedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeStyle, setActiveStyle] = useState<ShowroomStyleId>("japandi");
   const [isAutoRotating, setIsAutoRotating] = useState(true);
-  const [selectedItemId, setSelectedItemId] = useState<ShowroomItemId>("sofa");
+  const [isSceneReady, setIsSceneReady] = useState(false);
+  const [selectedItemId, setSelectedItemId] =
+    useState<ShowroomItemId | null>(null);
+  const [addedItemId, setAddedItemId] = useState<ShowroomItemId | null>(null);
 
   const activePreset = showroomPresets[activeStyle];
-  const selectedItem = showroomItems[selectedItemId];
+  const selectedItem = selectedItemId
+    ? showroomItems[selectedItemId]
+    : null;
 
-  const selectShowroomItem = useCallback((itemId: ShowroomItemId) => {
-    selectedItemRef.current = itemId;
-    setSelectedItemId(itemId);
-  }, []);
+  const selectShowroomItem = useCallback(
+    (itemId: ShowroomItemId | null) => {
+      selectedItemRef.current = itemId;
+      setSelectedItemId(itemId);
+    },
+    [],
+  );
 
   const resetView = useCallback(() => {
     const camera = cameraRef.current;
     const controls = controlsRef.current;
-
-    if (!camera || !controls) {
-      return;
-    }
+    if (!camera || !controls) return;
 
     camera.position.copy(CAMERA_HOME.position);
+    camera.zoom =
+      typeof camera.userData.homeZoom === "number"
+        ? camera.userData.homeZoom
+        : 1;
+    camera.updateProjectionMatrix();
     controls.target.copy(CAMERA_HOME.target);
     controls.update();
   }, []);
@@ -660,124 +1242,164 @@ export default function RoomShowroom3D() {
     setIsAutoRotating((current) => {
       const next = !current;
       autoRotateRef.current = next;
-
-      if (controlsRef.current) {
-        controlsRef.current.autoRotate = next;
-      }
-
+      if (controlsRef.current) controlsRef.current.autoRotate = next;
       return next;
     });
   }, []);
 
-  useEffect(() => {
-    autoRotateRef.current = isAutoRotating;
+  function changeStyle(style: ShowroomStyleId) {
+    setIsSceneReady(false);
+    setActiveStyle(style);
+  }
 
-    if (controlsRef.current) {
-      controlsRef.current.autoRotate = isAutoRotating;
-    }
-  }, [isAutoRotating]);
+  function addSelectedItemToCart() {
+    if (!selectedItem) return;
+
+    addCartItem(
+      {
+        category: selectedItem.category,
+        dimensions: selectedItem.dimensions,
+        id: selectedItem.productId
+          ? `catalog-${selectedItem.productId}`
+          : `showroom-${selectedItem.id}`,
+        image: selectedItem.image,
+        material: selectedItem.material,
+        name: selectedItem.name,
+        priceVND: selectedItem.priceVND,
+        productHref: selectedItem.href,
+        quantity: 1,
+        source: "catalog",
+        stock: selectedItem.stock,
+        style: activePreset.label,
+      },
+      initialCartItems,
+    );
+    setAddedItemId(selectedItem.id);
+
+    if (addedResetTimer.current) clearTimeout(addedResetTimer.current);
+    addedResetTimer.current = setTimeout(() => setAddedItemId(null), 2200);
+  }
+
+  useEffect(
+    () => () => {
+      if (addedResetTimer.current) clearTimeout(addedResetTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const container = containerRef.current;
-
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
     const mountNode = container;
     const scene = new THREE.Scene();
     const pointer = new THREE.Vector2();
-    const raycaster = new THREE.Raycaster();
     const pointerStart = new THREE.Vector2();
+    const raycaster = new THREE.Raycaster();
     const selectableMeshes: THREE.Object3D[] = [];
     const selectableRoots = new Map<ShowroomItemId, THREE.Object3D>();
-    scene.background = new THREE.Color(0xece3d6);
-    scene.fog = new THREE.Fog(0xece3d6, 10, 18);
+    scene.background = new THREE.Color(0xb9bcba);
+    scene.fog = new THREE.Fog(0xb9bcba, 27, 44);
 
     const width = Math.max(mountNode.clientWidth, 320);
-    const height = Math.max(mountNode.clientHeight, 480);
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+    const height = Math.max(mountNode.clientHeight, 560);
+    const camera = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 100);
     camera.position.copy(CAMERA_HOME.position);
     camera.lookAt(CAMERA_HOME.target);
     cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+      preserveDrawingBuffer: true,
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.08;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.domElement.setAttribute("aria-label", "Phong mau 3D DECOHO");
-    renderer.domElement.setAttribute("data-testid", "showroom-canvas");
     renderer.domElement.className = "block h-full w-full";
     renderer.domElement.style.cursor = "grab";
     renderer.domElement.style.touchAction = "none";
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Showroom nội thất isometric 3D DECOHO",
+    );
+    renderer.domElement.setAttribute("data-testid", "showroom-canvas");
     mountNode.replaceChildren(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+    controls.dampingFactor = 0.075;
+    controls.enablePan = false;
     controls.autoRotate = autoRotateRef.current;
-    controls.autoRotateSpeed = 0.45;
-    controls.minDistance = 3.2;
-    controls.maxDistance = 10;
-    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.autoRotateSpeed = 0.24;
+    controls.minPolarAngle = 0.45;
+    controls.maxPolarAngle = 1.28;
+    controls.minAzimuthAngle = -1.2;
+    controls.maxAzimuthAngle = 1.2;
+    controls.minZoom = 0.72;
+    controls.maxZoom = 2.2;
     controls.target.copy(CAMERA_HOME.target);
     controls.update();
     controlsRef.current = controls;
 
-    const hemisphere = new THREE.HemisphereLight(0xfff5e5, 0x586158, 1.15);
+    const hemisphere = new THREE.HemisphereLight(0xf8f2e9, 0x4d5650, 1.6);
     scene.add(hemisphere);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 2.6);
-    sun.position.set(-3.2, 5.8, 4.8);
+    const sun = new THREE.DirectionalLight(0xfff7e9, 3.4);
+    sun.position.set(-9, 16, 11);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
-    sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 18;
-    sun.shadow.camera.left = -7;
-    sun.shadow.camera.right = 7;
-    sun.shadow.camera.top = 7;
-    sun.shadow.camera.bottom = -7;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 45;
+    sun.shadow.camera.left = -12;
+    sun.shadow.camera.right = 12;
+    sun.shadow.camera.top = 12;
+    sun.shadow.camera.bottom = -12;
+    sun.shadow.bias = -0.00035;
     scene.add(sun);
 
-    const fillLight = new THREE.DirectionalLight(0xffdfb6, 1.15);
-    fillLight.position.set(4.6, 3.4, 4);
-    scene.add(fillLight);
+    const rim = new THREE.DirectionalLight(0xcfe1d7, 1.1);
+    rim.position.set(10, 8, -10);
+    scene.add(rim);
 
-    function registerSelectable(root: THREE.Object3D, itemId: ShowroomItemId) {
+    function registerSelectable(
+      root: THREE.Object3D,
+      itemId: ShowroomItemId,
+    ) {
       selectableRoots.set(itemId, root);
       root.userData.showroomItemId = itemId;
-
       root.traverse((object) => {
         object.userData.showroomItemId = itemId;
-
-        if (object instanceof THREE.Mesh) {
-          selectableMeshes.push(object);
-        }
+        if (object instanceof THREE.Mesh) selectableMeshes.push(object);
       });
     }
 
+    const markerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xf2bd69,
+      depthTest: false,
+      opacity: 0.96,
+      transparent: true,
+    });
     const selectionMarker = new THREE.Mesh(
-      new THREE.TorusGeometry(0.52, 0.025, 16, 72),
-      new THREE.MeshBasicMaterial({
-        color: 0xf3c87b,
-        depthTest: false,
-        transparent: true,
-        opacity: 0.95,
-      }),
+      new THREE.TorusGeometry(1, 0.035, 12, 72),
+      markerMaterial,
     );
-    selectionMarker.renderOrder = 20;
     selectionMarker.rotation.x = Math.PI / 2;
+    selectionMarker.renderOrder = 50;
     selectionMarker.visible = false;
     scene.add(selectionMarker);
 
-    function focusSelection(itemId: ShowroomItemId) {
-      const root = selectableRoots.get(itemId);
+    function focusSelection(itemId: ShowroomItemId | null) {
+      if (!itemId) {
+        selectionMarker.visible = false;
+        return;
+      }
 
+      const root = selectableRoots.get(itemId);
       if (!root) {
         selectionMarker.visible = false;
         return;
@@ -786,26 +1408,19 @@ export default function RoomShowroom3D() {
       const bounds = new THREE.Box3().setFromObject(root);
       const center = bounds.getCenter(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
-      const scale = Math.max(size.x, size.z, 0.9);
-      selectionMarker.position.set(center.x, bounds.max.y + 0.16, center.z);
-      selectionMarker.scale.set(scale, scale, scale);
+      const markerScale = Math.max(size.x, size.z, 0.9) * 0.58;
+      selectionMarker.position.set(center.x, 0.45, center.z);
+      selectionMarker.scale.set(markerScale, markerScale, markerScale);
       selectionMarker.visible = true;
     }
 
-    function getIntersectedItem(event: PointerEvent) {
+    function intersectedItem(event: PointerEvent) {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-
-      const intersections = raycaster.intersectObjects(selectableMeshes, true);
-      const firstHit = intersections[0];
-
-      if (!firstHit) {
-        return null;
-      }
-
-      return findShowroomItemId(firstHit.object);
+      const intersection = raycaster.intersectObjects(selectableMeshes, true)[0];
+      return intersection ? findShowroomItemId(intersection.object) : null;
     }
 
     function handlePointerDown(event: PointerEvent) {
@@ -814,24 +1429,19 @@ export default function RoomShowroom3D() {
     }
 
     function handlePointerMove(event: PointerEvent) {
-      const itemId = getIntersectedItem(event);
-      renderer.domElement.style.cursor = itemId ? "pointer" : "grab";
+      renderer.domElement.style.cursor = intersectedItem(event)
+        ? "pointer"
+        : "grab";
     }
 
     function handlePointerUp(event: PointerEvent) {
-      const movement = pointerStart.distanceTo(new THREE.Vector2(event.clientX, event.clientY));
+      const movement = pointerStart.distanceTo(
+        new THREE.Vector2(event.clientX, event.clientY),
+      );
       renderer.domElement.style.cursor = "grab";
+      if (movement > 7) return;
 
-      if (movement > 7) {
-        return;
-      }
-
-      const itemId = getIntersectedItem(event);
-
-      if (!itemId) {
-        return;
-      }
-
+      const itemId = intersectedItem(event);
       autoRotateRef.current = false;
       controls.autoRotate = false;
       setIsAutoRotating(false);
@@ -839,34 +1449,59 @@ export default function RoomShowroom3D() {
       focusSelection(itemId);
     }
 
-    const { pendant } = buildRoom(scene, activePreset, registerSelectable);
+    const { animatedLeaves, animatedPendants, ledMaterial } =
+      buildIsometricShowroom(scene, activePreset, registerSelectable);
     focusSelection(selectedItemRef.current);
-    const clock = new THREE.Clock();
+
+    function resize() {
+      const nextWidth = Math.max(mountNode.clientWidth, 320);
+      const nextHeight = Math.max(mountNode.clientHeight, 560);
+      const aspect = nextWidth / nextHeight;
+      const viewWidth = aspect < 0.8 ? 16.8 : 19.5;
+      const viewHeight = viewWidth / aspect;
+      camera.left = -viewWidth / 2;
+      camera.right = viewWidth / 2;
+      camera.top = viewHeight / 2;
+      camera.bottom = -viewHeight / 2;
+      camera.zoom = aspect < 0.8 ? 1.08 : 1;
+      camera.userData.homeZoom = camera.zoom;
+      camera.updateProjectionMatrix();
+      renderer.setSize(nextWidth, nextHeight);
+    }
+
+    resize();
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(mountNode);
 
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
     renderer.domElement.addEventListener("pointerup", handlePointerUp);
 
-    function resize() {
-      const nextWidth = Math.max(mountNode.clientWidth, 320);
-      const nextHeight = Math.max(mountNode.clientHeight, 480);
-
-      camera.aspect = nextWidth / nextHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(nextWidth, nextHeight);
-    }
-
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(mountNode);
-
+    const clock = new THREE.Clock();
     let frameId = 0;
+    let didReportReady = false;
 
     function animate() {
       const elapsed = clock.getElapsedTime();
-      pendant.rotation.y = Math.sin(elapsed * 0.45) * 0.12;
+      for (const leaf of animatedLeaves) {
+        leaf.mesh.rotation.z =
+          leaf.rotationZ + Math.sin(elapsed * 0.62 + leaf.phase) * 0.025;
+      }
+      for (let index = 0; index < animatedPendants.length; index += 1) {
+        animatedPendants[index].rotation.y =
+          Math.sin(elapsed * 0.32 + index) * 0.025;
+      }
+      ledMaterial.emissiveIntensity = 2.05 + Math.sin(elapsed * 0.55) * 0.12;
+      markerMaterial.opacity = 0.76 + Math.sin(elapsed * 2.2) * 0.2;
       controls.autoRotate = autoRotateRef.current;
       controls.update();
       renderer.render(scene, camera);
+
+      if (!didReportReady) {
+        didReportReady = true;
+        window.requestAnimationFrame(() => setIsSceneReady(true));
+      }
+
       frameId = window.requestAnimationFrame(animate);
     }
 
@@ -881,7 +1516,6 @@ export default function RoomShowroom3D() {
       controls.dispose();
       disposeScene(scene);
       renderer.dispose();
-
       if (renderer.domElement.parentElement === mountNode) {
         mountNode.removeChild(renderer.domElement);
       }
@@ -889,185 +1523,221 @@ export default function RoomShowroom3D() {
   }, [activePreset, selectShowroomItem]);
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-[#ece3d6] text-[#1f2421]">
-      <section className="relative h-[calc(100vh-4rem)] min-h-[680px] overflow-hidden lg:min-h-[760px]">
+    <main className="min-h-[calc(100svh-4rem)] bg-[#b9bcba] text-[#1f2421]">
+      <section className="relative h-[calc(100svh-4rem)] min-h-[680px] overflow-hidden">
         <div
-          aria-label="Khong gian phong mau 3D"
+          aria-label="Không gian showroom isometric 3D"
           className="absolute inset-0"
           ref={containerRef}
         />
 
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(31,36,33,0.34),rgba(31,36,33,0.08)_45%,rgba(236,227,214,0.08))]" />
+        {!isSceneReady && (
+          <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[#b9bcba]">
+            <div className="flex items-center gap-3 rounded-md border border-white/55 bg-white/80 px-4 py-3 text-sm font-bold shadow-lg backdrop-blur">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#2f6f5e] border-t-transparent" />
+              Đang dựng showroom 3D...
+            </div>
+          </div>
+        )}
 
-        <div className="pointer-events-none absolute left-4 top-5 z-10 max-w-[min(520px,calc(100%-2rem))] text-white sm:left-8 sm:top-8">
-          <BrandLogo className="h-12 w-40" theme="light" variant="horizontal" />
-          <h1 className="mt-3 max-w-[12ch] text-4xl font-black leading-[1.02] sm:text-5xl lg:text-6xl">
-            Phong mau 3D
-          </h1>
-          <p className="mt-4 max-w-md text-sm font-medium leading-6 text-white/85 sm:text-base">
-            Tuong tac truc tiep voi phong khach mau, doi concept noi that va xem bo cuc
-            truoc khi chon san pham.
-          </p>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-[#aeb1af]/75 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#aeb1af]/75 to-transparent" />
+
+        <div className="absolute left-4 top-4 z-20 sm:left-6 sm:top-6">
+          <Link
+            className="inline-flex items-center gap-3 rounded-md border border-white/55 bg-white/82 px-3 py-2 shadow-lg backdrop-blur transition hover:bg-white"
+            href="/"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#1f2421] text-[#f0bd65]">
+              <Box className="h-5 w-5" />
+            </span>
+            <span>
+              <span className="block text-sm font-black tracking-[0.08em]">DECOHO 3D</span>
+              <span className="block text-[10px] font-bold uppercase text-[#6a706b]">
+                Isometric pavilion
+              </span>
+            </span>
+          </Link>
         </div>
 
-        <div className="absolute right-4 top-5 z-20 w-[min(360px,calc(100%-2rem))] rounded-md border border-white/35 bg-white/88 p-3 shadow-2xl shadow-black/15 backdrop-blur sm:right-8 sm:top-8">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b46f2c]">
-                Phong cach
-              </p>
-              <h2 className="mt-1 text-lg font-black text-[#1f2421]">{activePreset.label}</h2>
-            </div>
-            <span className="rounded-md bg-[#1f2421] px-2.5 py-1 text-xs font-bold text-[#f3c87b]">
-              {activePreset.accentName}
-            </span>
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
+          <button
+            aria-label={isAutoRotating ? "Dừng tự xoay" : "Bật tự xoay"}
+            className="grid h-11 w-11 place-items-center rounded-md border border-white/55 bg-white/82 text-[#1f2421] shadow-lg backdrop-blur transition hover:bg-white"
+            onClick={toggleAutoRotate}
+            title={isAutoRotating ? "Dừng tự xoay" : "Bật tự xoay"}
+            type="button"
+          >
+            {isAutoRotating ? (
+              <Pause className="h-5 w-5" />
+            ) : (
+              <Play className="h-5 w-5" />
+            )}
+          </button>
+          <button
+            aria-label="Đặt lại góc nhìn"
+            className="grid h-11 w-11 place-items-center rounded-md border border-white/55 bg-white/82 text-[#1f2421] shadow-lg backdrop-blur transition hover:bg-white"
+            onClick={resetView}
+            title="Đặt lại góc nhìn"
+            type="button"
+          >
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <Link
+            aria-label="Mở toàn bộ sản phẩm"
+            className="hidden h-11 items-center gap-2 rounded-md bg-[#1f2421] px-4 text-sm font-bold text-white shadow-lg transition hover:bg-[#2f6f5e] sm:inline-flex"
+            href="/products"
+          >
+            Sản phẩm
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {!selectedItem && (
+          <div className="pointer-events-none absolute bottom-20 left-1/2 z-20 hidden -translate-x-1/2 rounded-md border border-white/45 bg-[#1f2421]/78 px-4 py-2 text-xs font-bold text-white shadow-xl backdrop-blur md:flex md:items-center md:gap-2">
+            <Maximize2 className="h-4 w-4 text-[#f0bd65]" />
+            Kéo để xoay · cuộn để zoom · bấm vào nội thất
           </div>
+        )}
 
-          <p className="mt-2 text-sm leading-5 text-[#5b615a]">{activePreset.description}</p>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {Object.entries(showroomPresets).map(([styleId, preset]) => (
+        {!selectedItem && (
+          <div className="absolute bottom-5 left-4 z-20 flex max-w-[calc(100%-2rem)] items-center gap-1 rounded-md border border-white/55 bg-white/84 p-1 shadow-xl backdrop-blur sm:bottom-6 sm:left-6">
+            {(Object.entries(showroomPresets) as [
+              ShowroomStyleId,
+              ShowroomPreset,
+            ][]).map(([styleId, preset]) => (
               <button
-                className={`rounded-md border px-3 py-2 text-xs font-bold transition ${
+                className={`h-9 rounded-md px-3 text-xs font-bold transition ${
                   activeStyle === styleId
-                    ? "border-[#1f2421] bg-[#1f2421] text-white"
-                    : "border-[#ded6c9] bg-white text-[#51564f] hover:border-[#d89b47]"
+                    ? "bg-[#1f2421] text-white"
+                    : "text-[#555c57] hover:bg-white"
                 }`}
                 key={styleId}
-                onClick={() => setActiveStyle(styleId as ShowroomStyleId)}
+                onClick={() => changeStyle(styleId)}
                 type="button"
               >
                 {preset.label}
               </button>
             ))}
           </div>
+        )}
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button
-              className="rounded-md bg-[#2f6f5e] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#285f51]"
-              onClick={toggleAutoRotate}
-              type="button"
-            >
-              {isAutoRotating ? "Dung xoay" : "Tu xoay"}
-            </button>
-            <button
-              className="rounded-md border border-[#ded6c9] bg-white px-3 py-2 text-sm font-bold text-[#1f2421] transition hover:bg-[#f7f3ec]"
-              onClick={resetView}
-              type="button"
-            >
-              Reset goc nhin
-            </button>
+        {!selectedItem && (
+          <div className="pointer-events-none absolute bottom-5 right-4 z-20 hidden rounded-md border border-white/55 bg-white/84 px-3 py-2 text-right shadow-xl backdrop-blur sm:bottom-6 sm:right-6 sm:block">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#a76227]">
+              {activePreset.accentLabel}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[#5b615d]">
+              8 nhóm nội thất có thể chọn
+            </p>
           </div>
-        </div>
+        )}
 
-        <aside className="absolute left-4 top-[304px] z-20 w-[min(360px,calc(100%-2rem))] rounded-md border border-white/35 bg-white/90 p-3 shadow-2xl shadow-black/15 backdrop-blur sm:left-8 sm:top-[294px]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b46f2c]">
-                Dang chon
+        {selectedItem && (
+          <aside className="absolute inset-x-3 bottom-3 z-40 max-h-[calc(100%-5.5rem)] overflow-y-auto rounded-lg border border-white/60 bg-white/94 p-4 shadow-[0_24px_70px_rgba(31,36,33,.28)] backdrop-blur sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-20 sm:w-[350px] sm:p-5">
+            <button
+              aria-label="Đóng thông tin sản phẩm"
+              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md text-[#646a61] transition hover:bg-[#f2eee7] hover:text-[#1f2421]"
+              onClick={() => selectShowroomItem(null)}
+              title="Đóng"
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="pr-9">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#a76227]">
+                {selectedItem.zone}
               </p>
-              <h2 className="mt-1 text-lg font-black leading-tight text-[#1f2421]">
+              <h1 className="mt-2 text-xl font-black leading-tight">
                 {selectedItem.name}
-              </h2>
-              <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-[#8a7662]">
-                {selectedItem.brand} | {selectedItem.sku}
+              </h1>
+              <p className="mt-1 text-[11px] font-bold uppercase text-[#767c77]">
+                {selectedItem.brand} · {selectedItem.sku}
               </p>
             </div>
-            <span className="rounded-md bg-[#f7f3ec] px-2.5 py-1 text-xs font-bold text-[#2f6f5e]">
-              {selectedItem.category}
-            </span>
-          </div>
 
-          <p className="mt-2 text-sm leading-5 text-[#5b615a]">{selectedItem.description}</p>
+            <p className="mt-4 text-sm leading-6 text-[#5d645f]">
+              {selectedItem.description}
+            </p>
 
-          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-md border border-[#eee7dc] bg-white px-2.5 py-2">
-              <dt className="font-bold uppercase tracking-wide text-[#8a7662]">Gia</dt>
-              <dd className="mt-1 font-black text-[#1f2421]">
-                {formatPrice(selectedItem.priceVND)}
-              </dd>
+            <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-[#e5ded2] bg-[#e5ded2]">
+              <div className="bg-[#faf8f4] p-3">
+                <p className="text-[10px] font-bold uppercase text-[#7b817c]">
+                  Giá tham khảo
+                </p>
+                <p className="mt-1 text-base font-black">
+                  {formatPrice(selectedItem.priceVND)}
+                </p>
+              </div>
+              <div className="bg-[#faf8f4] p-3">
+                <p className="text-[10px] font-bold uppercase text-[#7b817c]">
+                  Tồn kho
+                </p>
+                <p className="mt-1 text-base font-black">
+                  {selectedItem.stock} sản phẩm
+                </p>
+              </div>
             </div>
-            <div className="rounded-md border border-[#eee7dc] bg-white px-2.5 py-2">
-              <dt className="font-bold uppercase tracking-wide text-[#8a7662]">Kich thuoc</dt>
-              <dd className="mt-1 font-black text-[#1f2421]">{selectedItem.dimensions}</dd>
-            </div>
-          </dl>
 
-          <dl className="mt-2 hidden grid-cols-2 gap-2 text-xs sm:grid">
-            <div className="rounded-md border border-[#eee7dc] bg-white px-2.5 py-2">
-              <dt className="font-bold uppercase tracking-wide text-[#8a7662]">Ton kho</dt>
-              <dd className="mt-1 font-black text-[#1f2421]">{selectedItem.stock}</dd>
-            </div>
-            <div className="rounded-md border border-[#eee7dc] bg-white px-2.5 py-2">
-              <dt className="font-bold uppercase tracking-wide text-[#8a7662]">Giao hang</dt>
-              <dd className="mt-1 font-black text-[#1f2421]">{selectedItem.leadTime}</dd>
-            </div>
-          </dl>
+            <dl className="mt-4 space-y-3 text-xs">
+              <div className="flex justify-between gap-4 border-b border-[#eee8de] pb-3">
+                <dt className="text-[#737974]">Kích thước</dt>
+                <dd className="text-right font-bold">{selectedItem.dimensions}</dd>
+              </div>
+              <div className="flex justify-between gap-4 border-b border-[#eee8de] pb-3">
+                <dt className="shrink-0 text-[#737974]">Vật liệu</dt>
+                <dd className="text-right font-bold leading-5">
+                  {selectedItem.material}
+                </dd>
+              </div>
+            </dl>
 
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-[#eee7dc] bg-white px-2.5 py-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-[#8a7662]">Mau</span>
-            <div className="flex min-w-0 flex-wrap justify-end gap-1.5">
-              {selectedItem.colors.map((color) => (
-                <span
-                  aria-label={color.name}
-                  className="h-5 w-5 rounded-full border border-[#ded6c9] shadow-sm"
-                  key={color.name}
-                  style={{ backgroundColor: color.hex }}
-                  title={color.name}
-                />
-              ))}
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <span className="text-xs font-bold text-[#737974]">Màu hoàn thiện</span>
+              <div className="flex gap-2">
+                {selectedItem.swatches.map((swatch) => (
+                  <span
+                    aria-label={swatch.name}
+                    className="h-6 w-6 rounded-full border-2 border-white shadow-[0_0_0_1px_#d7cfc2]"
+                    key={swatch.name}
+                    style={{ backgroundColor: swatch.color }}
+                    title={swatch.name}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
 
-          <p className="mt-3 rounded-md border border-[#eee7dc] bg-white px-2.5 py-2 text-xs font-semibold leading-5 text-[#51564f]">
-            {selectedItem.material}
-          </p>
-
-          <Link
-            className="mt-3 inline-flex w-full items-center justify-center rounded-md bg-[#1f2421] px-4 py-2 text-sm font-black text-white transition hover:bg-[#2f6f5e]"
-            href={selectedItem.href}
-          >
-            Xem san pham
-          </Link>
-        </aside>
-
-        <div className="absolute bottom-4 left-4 right-4 z-20 flex flex-col gap-3 rounded-md border border-white/35 bg-[#1f2421]/88 p-3 text-white shadow-2xl shadow-black/20 backdrop-blur sm:bottom-8 sm:left-8 sm:right-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid grid-cols-3 gap-3 text-center sm:min-w-[420px]">
-            <div>
-              <p className="text-lg font-black text-[#f3c87b]">3</p>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                concept
-              </p>
+            <div className="mt-5 grid grid-cols-[1fr_44px] gap-2">
+              <button
+                className={`inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-black transition ${
+                  addedItemId === selectedItem.id
+                    ? "bg-[#2f6f5e] text-white"
+                    : "bg-[#d89b47] text-[#1f2421] hover:bg-[#e4aa55]"
+                }`}
+                onClick={addSelectedItemToCart}
+                type="button"
+              >
+                {addedItemId === selectedItem.id ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <ShoppingCart className="h-4 w-4" />
+                )}
+                {addedItemId === selectedItem.id
+                  ? "Đã thêm vào giỏ"
+                  : "Thêm vào giỏ"}
+              </button>
+              <Link
+                aria-label={`Xem chi tiết ${selectedItem.name}`}
+                className="grid h-11 w-11 place-items-center rounded-md border border-[#d9d1c5] text-[#2f6f5e] transition hover:border-[#2f6f5e] hover:bg-[#eef6f2]"
+                href={selectedItem.href}
+                title="Xem chi tiết"
+              >
+                <Info className="h-5 w-5" />
+              </Link>
             </div>
-            <div>
-              <p className="text-lg font-black text-[#f3c87b]">8+</p>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                vat dung
-              </p>
-            </div>
-            <div>
-              <p className="text-lg font-black text-[#f3c87b]">360</p>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                goc xem
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Link
-              className="rounded-md bg-[#d89b47] px-4 py-2 text-sm font-black text-[#1f2421] transition hover:bg-[#e3ab5c]"
-              href="/products"
-            >
-              Chon san pham
-            </Link>
-            <Link
-              className="rounded-md border border-white/35 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10"
-              href="/process"
-            >
-              Xem quy trinh
-            </Link>
-          </div>
-        </div>
+          </aside>
+        )}
       </section>
     </main>
   );

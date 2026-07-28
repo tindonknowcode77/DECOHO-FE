@@ -10,13 +10,13 @@ import {
   demoAdminSessionUser,
 } from "@/src/features/admin/mock/adminDemo";
 import { demoStoreCredentials, demoStoreSessionUser } from "@/src/features/store/mock/storeDemo";
+import GoogleSignInButton from "./GoogleSignInButton";
 import { saveSessionUser } from "../services/session";
 import type { LoginFormState } from "../types";
 
 type IconName = "arrow" | "home" | "lock" | "mail" | "shield" | "spark";
 
-const heroImage =
-  "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&q=85&w=1400";
+const heroImage = "/images/decoho-home-interior-v2.png";
 
 function Icon({ name }: { name: IconName }) {
   const paths = {
@@ -37,29 +37,6 @@ function Icon({ name }: { name: IconName }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="2"
-      />
-    </svg>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24">
-      <path
-        d="M21.6 12.2c0-.7-.1-1.3-.2-1.9h-9.2v3.7h5.3a4.5 4.5 0 0 1-2 2.9v2.4h3.2c1.9-1.7 2.9-4.2 2.9-7.1Z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12.2 21.8c2.7 0 5-0.9 6.6-2.5l-3.2-2.4c-.9.6-2 .9-3.4.9a5.9 5.9 0 0 1-5.5-4H3.4v2.5a10 10 0 0 0 8.8 5.5Z"
-        fill="#34A853"
-      />
-      <path
-        d="M6.7 13.8a6 6 0 0 1 0-3.7V7.6H3.4a10 10 0 0 0 0 8.7l3.3-2.5Z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12.2 6.1c1.5 0 2.8.5 3.8 1.5l2.9-2.9a9.8 9.8 0 0 0-6.7-2.6 10 10 0 0 0-8.8 5.5l3.3 2.5a5.9 5.9 0 0 1 5.5-4Z"
-        fill="#EA4335"
       />
     </svg>
   );
@@ -349,6 +326,18 @@ export default function LoginView() {
           </div>
 
           <div className="grid gap-3">
+            <GoogleSignInButton
+              onError={setError}
+              remember={form.remember}
+            />
+
+            <div className="relative py-1 text-center">
+              <hr className="border-[#ded6c9]" />
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#f7f3ec] px-3 text-[10px] font-bold uppercase text-[#7b7f78]">
+                Tài khoản demo
+              </span>
+            </div>
+
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#ecd5ab] bg-[#fff7e8] px-4 text-xs font-bold uppercase text-[#8a5d25] transition hover:bg-[#fbe9c3]"
               id="demo-login-btn"
@@ -384,27 +373,6 @@ export default function LoginView() {
               <strong>{demoStoreCredentials.password}</strong>
             </p> */}
 
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#ded6c9] bg-white text-xs font-bold"
-                type="button"
-              >
-                <GoogleIcon />
-                Google
-              </button>
-              <button
-                className="inline-flex h-11 items-center justify-center rounded-md border border-[#ded6c9] bg-white text-xs font-bold text-[#1877f2]"
-                type="button"
-              >
-                Facebook
-              </button>
-              <button
-                className="inline-flex h-11 items-center justify-center rounded-md border border-[#ded6c9] bg-white text-xs font-bold"
-                type="button"
-              >
-                Apple
-              </button>
-            </div>
           </div>
 
           <p className="mt-8 text-center text-sm text-[#646a61]">

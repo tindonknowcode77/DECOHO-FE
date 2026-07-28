@@ -10,8 +10,7 @@ import type { RegisterFormState } from "../types";
 
 type IconName = "arrow" | "check" | "home" | "lock" | "mail" | "shield" | "spark" | "user";
 
-const heroImage =
-  "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&q=85&w=1400";
+const heroImage = "/images/decoho-home-interior-v2.png";
 
 function Icon({ name }: { name: IconName }) {
   const paths = {
