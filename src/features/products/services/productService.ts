@@ -38,14 +38,13 @@ const FALLBACK_IMAGES = [
   "/images/decoho-home-hero-v2.png",
 ];
 
-function getApiUrl() {
-  const url = process.env.NEXT_PUBLIC_PRODUCTS_API_URL?.trim();
+const DEFAULT_PRODUCTS_API_URL =
+  "https://670f544b3e715186165759aa.mockapi.io/DECOHO";
 
-  if (!url) {
-    throw new Error(
-      "Thiếu biến NEXT_PUBLIC_PRODUCTS_API_URL trong file .env.",
-    );
-  }
+function getApiUrl() {
+  const url =
+    process.env.NEXT_PUBLIC_PRODUCTS_API_URL?.trim() ||
+    DEFAULT_PRODUCTS_API_URL;
 
   return url.replace(/\/+$/, "");
 }
