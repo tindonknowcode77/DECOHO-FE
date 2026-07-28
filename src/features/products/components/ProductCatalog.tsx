@@ -1,10 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
-import { products, styleOptions } from "../mock/products";
+import { initialCartItems } from "@/src/features/cart/mock/cartItems";
+import { addCartItem } from "@/src/features/cart/services/cartStorage";
+import ProductImage from "./ProductImage";
+import { getProducts } from "../services/productService";
 import type { Product } from "../types";
 
 type ViewMode = "grid" | "list";
@@ -22,10 +24,8 @@ function Icon({
 }: {
   name:
     | "arrow"
-    | "bag"
     | "cart"
     | "check"
-    | "close"
     | "filter"
     | "grid"
     | "heart"
@@ -37,10 +37,8 @@ function Icon({
 }) {
   const paths = {
     arrow: "M5 12h14m-6-6 6 6-6 6",
-    bag: "M6 8h12l-1 13H7L6 8Zm3 0a3 3 0 0 1 6 0",
     cart: "M6 6h15l-1.5 8.5H8L6 3H3m5 16.5h.01M18 19.5h.01",
     check: "m5 12 4 4L19 6",
-    close: "M6 6l12 12M18 6 6 18",
     filter: "M4 6h16M7 12h10m-7 6h4",
     grid: "M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z",
     heart:
@@ -84,27 +82,84 @@ function ProductStatusBadge({ product }: { product: Product }) {
   };
 
   return (
-    <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${classes[product.status]}`}>
+    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ${classes[product.status]}`}>
       {labels[product.status]}
     </span>
   );
 }
 
 export default function ProductCatalog() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStyle, setSelectedStyle] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState<SortOption>("default");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [maxBudget, setMaxBudget] = useState(25000000);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadProducts() {
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        const apiProducts = await getProducts(controller.signal);
+        setProducts(apiProducts);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách sản phẩm.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadProducts();
+
+    return () => controller.abort();
+  }, [reloadToken]);
+
   const categories = useMemo(
     () => ["all", ...Array.from(new Set(products.map((product) => product.category)))],
-    [],
+    [products],
   );
+
+  const styleOptions = useMemo(() => {
+    const styles = new Map<string, string>();
+
+    products.forEach((product) => {
+      styles.set(product.style, product.styleName);
+    });
+
+    return [
+      { id: "all", label: "Tất cả phong cách" },
+      ...Array.from(styles, ([id, label]) => ({ id, label })),
+    ];
+  }, [products]);
+
+  const budgetCeiling = useMemo(() => {
+    const highestPrice = Math.max(
+      30000000,
+      ...products.map((product) => product.priceVND),
+    );
+
+    return Math.ceil(highestPrice / 500000) * 500000;
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -139,7 +194,7 @@ export default function ProductCatalog() {
 
         return 0;
       });
-  }, [maxBudget, searchTerm, selectedCategory, selectedStyle, sortBy]);
+  }, [maxBudget, products, searchTerm, selectedCategory, selectedStyle, sortBy]);
 
   function toggleFavorite(productId: string) {
     setFavorites((current) => ({
@@ -149,11 +204,28 @@ export default function ProductCatalog() {
   }
 
   function addToCart(product: Product) {
-    setNotice(`${product.name} đã được ghi nhận. Giỏ hàng demo sẽ nối API ở bước sau.`);
+    addCartItem(
+      {
+        id: `catalog-${product.id}`,
+        category: product.category,
+        dimensions: product.dimensions,
+        image: product.image,
+        material: product.material,
+        name: product.name,
+        priceVND: product.priceVND,
+        productHref: `/products/${product.id}`,
+        quantity: 1,
+        source: "catalog",
+        stock: product.stock,
+        style: product.styleName,
+      },
+      initialCartItems,
+    );
+    setNotice(`${product.name} đã được thêm vào giỏ hàng.`);
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f3ec] px-5 py-10 text-[#1f2421] sm:px-8">
+    <main className="min-h-screen bg-[#f6f1e9] px-5 py-10 text-[#1f2421] sm:px-8">
       <section className="mx-auto max-w-7xl">
         <div className="flex flex-col justify-between gap-6 border-b border-[#ded6c9] pb-7 lg:flex-row lg:items-end">
           <div>
@@ -169,30 +241,30 @@ export default function ProductCatalog() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              className="inline-flex items-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-4 py-2 text-sm font-bold text-[#1f2421]"
+              className="inline-flex h-11 items-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-4 text-sm font-bold text-[#1f2421] shadow-sm transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
               href="/cart"
             >
               Giỏ hàng
               <Icon name="cart" />
             </Link>
             <Link
-              className="inline-flex items-center gap-2 rounded-md bg-[#2f6f5e] px-4 py-2 text-sm font-bold text-white"
-              href="/ai"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#2f6f5e] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#285f51]"
+              href="/product-space"
             >
-              Gợi ý bằng AI
+              Xem Product Space
               <Icon name="arrow" />
             </Link>
           </div>
         </div>
 
-        <section className="mt-8 rounded-md border border-[#ded6c9] bg-white p-5 shadow-sm">
+        <section className="mt-8 rounded-lg border border-[#ded6c9] bg-white p-5 shadow-[0_14px_40px_rgba(57,45,29,.08)]">
           <div className="grid gap-4 lg:grid-cols-[1fr_180px_180px_170px]">
             <label className="relative block">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6f746d]">
                 <Icon name="search" />
               </span>
               <input
-                className="h-12 w-full rounded-md border border-[#ded6c9] bg-[#fbf7ef] pl-10 pr-4 text-sm outline-none focus:border-[#2f6f5e]"
+                className="h-12 w-full rounded-md border border-[#ded6c9] bg-[#fcfaf6] pl-10 pr-4 text-sm outline-none transition focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/10"
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Tìm sofa, bàn trà, đèn, chất liệu..."
                 type="search"
@@ -201,7 +273,7 @@ export default function ProductCatalog() {
             </label>
 
             <select
-              className="h-12 rounded-md border border-[#ded6c9] bg-[#fbf7ef] px-3 text-sm font-semibold outline-none focus:border-[#2f6f5e]"
+              className="h-12 rounded-md border border-[#ded6c9] bg-[#fcfaf6] px-3 text-sm font-semibold outline-none transition focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/10"
               onChange={(event) => setSelectedStyle(event.target.value)}
               value={selectedStyle}
             >
@@ -213,7 +285,7 @@ export default function ProductCatalog() {
             </select>
 
             <select
-              className="h-12 rounded-md border border-[#ded6c9] bg-[#fbf7ef] px-3 text-sm font-semibold outline-none focus:border-[#2f6f5e]"
+              className="h-12 rounded-md border border-[#ded6c9] bg-[#fcfaf6] px-3 text-sm font-semibold outline-none transition focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/10"
               onChange={(event) => setSelectedCategory(event.target.value)}
               value={selectedCategory}
             >
@@ -225,7 +297,7 @@ export default function ProductCatalog() {
             </select>
 
             <select
-              className="h-12 rounded-md border border-[#ded6c9] bg-[#fbf7ef] px-3 text-sm font-semibold outline-none focus:border-[#2f6f5e]"
+              className="h-12 rounded-md border border-[#ded6c9] bg-[#fcfaf6] px-3 text-sm font-semibold outline-none transition focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/10"
               onChange={(event) => setSortBy(event.target.value as SortOption)}
               value={sortBy}
             >
@@ -247,7 +319,7 @@ export default function ProductCatalog() {
               </span>
               <input
                 className="accent-[#2f6f5e]"
-                max={30000000}
+                max={budgetCeiling}
                 min={1500000}
                 onChange={(event) => setMaxBudget(Number(event.target.value))}
                 step={500000}
@@ -260,10 +332,10 @@ export default function ProductCatalog() {
               <p className="text-sm font-semibold text-[#646a61]">
                 {filteredProducts.length} sản phẩm phù hợp
               </p>
-              <div className="flex rounded-md border border-[#ded6c9] bg-[#fbf7ef] p-1">
+              <div className="flex rounded-lg border border-[#ded6c9] bg-[#f6f1e9] p-1">
                 <button
                   aria-label="Xem dạng lưới"
-                  className={`rounded p-2 ${viewMode === "grid" ? "bg-white text-[#2f6f5e] shadow-sm" : "text-[#646a61]"}`}
+                  className={`grid h-9 w-9 place-items-center rounded-md transition ${viewMode === "grid" ? "bg-white text-[#2f6f5e] shadow-sm" : "text-[#646a61] hover:text-[#2f6f5e]"}`}
                   onClick={() => setViewMode("grid")}
                   type="button"
                 >
@@ -271,7 +343,7 @@ export default function ProductCatalog() {
                 </button>
                 <button
                   aria-label="Xem dạng danh sách"
-                  className={`rounded p-2 ${viewMode === "list" ? "bg-white text-[#2f6f5e] shadow-sm" : "text-[#646a61]"}`}
+                  className={`grid h-9 w-9 place-items-center rounded-md transition ${viewMode === "list" ? "bg-white text-[#2f6f5e] shadow-sm" : "text-[#646a61] hover:text-[#2f6f5e]"}`}
                   onClick={() => setViewMode("list")}
                   type="button"
                 >
@@ -283,7 +355,7 @@ export default function ProductCatalog() {
         </section>
 
         {notice && (
-          <div className="mt-5 flex items-center justify-between gap-4 rounded-md border border-[#b7dfc4] bg-[#eefbf2] p-4 text-sm text-[#23643b]">
+          <div className="mt-5 flex items-center justify-between gap-4 rounded-lg border border-[#b7dfc4] bg-[#eefbf2] p-4 text-sm text-[#23643b] shadow-sm">
             <span className="flex items-center gap-2">
               <Icon name="check" />
               {notice}
@@ -294,8 +366,42 @@ export default function ProductCatalog() {
           </div>
         )}
 
-        {filteredProducts.length === 0 ? (
-          <section className="mt-8 rounded-md border border-[#ded6c9] bg-white p-10 text-center shadow-sm">
+        {isLoading ? (
+          <section
+            aria-label="Đang tải sản phẩm"
+            className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+          >
+            {[0, 1, 2].map((item) => (
+              <div
+                className="overflow-hidden rounded-lg border border-[#ded6c9] bg-white shadow-sm"
+                key={item}
+              >
+                <div className="h-64 animate-pulse bg-[#e8e0d4]" />
+                <div className="space-y-3 p-5">
+                  <div className="h-4 w-24 animate-pulse bg-[#e8e0d4]" />
+                  <div className="h-6 w-3/4 animate-pulse bg-[#e8e0d4]" />
+                  <div className="h-4 w-full animate-pulse bg-[#eee8de]" />
+                </div>
+              </div>
+            ))}
+          </section>
+        ) : loadError ? (
+          <section className="mt-8 rounded-lg border border-[#e1b8ae] bg-[#fff7f4] p-8 text-center shadow-sm">
+            <h2 className="text-xl font-bold text-[#8f2f24]">
+              Không tải được sản phẩm
+            </h2>
+            <p className="mt-3 text-sm text-[#745c57]">{loadError}</p>
+            <button
+              className="mt-5 inline-flex items-center gap-2 rounded-md bg-[#1f2421] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
+              onClick={() => setReloadToken((value) => value + 1)}
+              type="button"
+            >
+              Thử tải lại
+              <Icon name="arrow" />
+            </button>
+          </section>
+        ) : filteredProducts.length === 0 ? (
+          <section className="mt-8 rounded-lg border border-[#ded6c9] bg-white p-10 text-center shadow-sm">
             <h2 className="text-2xl font-bold">Chưa có sản phẩm phù hợp</h2>
             <p className="mt-3 text-sm text-[#646a61]">
               Hãy thử tăng ngân sách, đổi phong cách hoặc xóa bớt từ khóa tìm kiếm.
@@ -312,16 +418,15 @@ export default function ProductCatalog() {
             {filteredProducts.map((product) =>
               viewMode === "grid" ? (
                 <article
-                  className="group overflow-hidden rounded-md border border-[#ded6c9] bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="group overflow-hidden rounded-lg border border-[#ded6c9] bg-white shadow-[0_8px_24px_rgba(57,45,29,.07)] transition duration-300 hover:-translate-y-1 hover:border-[#c8bba7] hover:shadow-[0_18px_38px_rgba(57,45,29,.13)]"
                   key={product.id}
                 >
-                  <button
+                  <Link
                     className="block w-full text-left"
-                    onClick={() => setSelectedProduct(product)}
-                    type="button"
+                    href={`/products/${product.id}`}
                   >
                     <div className="relative h-64 overflow-hidden bg-[#eee7dc]">
-                      <Image
+                      <ProductImage
                         alt={product.name}
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                         height={420}
@@ -335,10 +440,10 @@ export default function ProductCatalog() {
                     </div>
                     <div className="p-5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded bg-[#f7f3ec] px-2 py-1 text-xs font-bold uppercase text-[#6f746d]">
+                        <span className="rounded-full bg-[#f7f3ec] px-2.5 py-1 text-[11px] font-bold uppercase text-[#6f746d]">
                           {product.category}
                         </span>
-                        <span className="rounded bg-[#eef6f2] px-2 py-1 text-xs font-bold uppercase text-[#2f6f5e]">
+                        <span className="rounded-full bg-[#eef6f2] px-2.5 py-1 text-[11px] font-bold uppercase text-[#2f6f5e]">
                           {product.styleName}
                         </span>
                       </div>
@@ -357,11 +462,11 @@ export default function ProductCatalog() {
                         </p>
                       </div>
                     </div>
-                  </button>
+                  </Link>
 
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-t border-[#eee7dc] p-4">
+                  <div className="grid grid-cols-[1fr_40px_40px] gap-2 border-t border-[#eee7dc] bg-[#fcfaf6] p-4">
                     <button
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1f2421] px-3 py-2 text-sm font-bold text-white"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#1f2421] px-3 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
                       onClick={() => addToCart(product)}
                       type="button"
                     >
@@ -370,33 +475,31 @@ export default function ProductCatalog() {
                     </button>
                     <button
                       aria-label={`Yêu thích ${product.name}`}
-                      className={`rounded-md border px-3 py-2 ${favorites[product.id] ? "border-[#bc3d2b] bg-[#fff1ee] text-[#bc3d2b]" : "border-[#ded6c9] text-[#646a61]"}`}
+                      className={`grid h-10 w-10 place-items-center rounded-md border transition ${favorites[product.id] ? "border-[#bc3d2b] bg-[#fff1ee] text-[#bc3d2b]" : "border-[#ded6c9] bg-white text-[#646a61] hover:border-[#bc3d2b] hover:text-[#bc3d2b]"}`}
                       onClick={() => toggleFavorite(product.id)}
                       type="button"
                     >
                       <Icon name="heart" />
                     </button>
-                    <button
+                    <Link
                       aria-label={`Xem thông tin ${product.name}`}
-                      className="rounded-md border border-[#ded6c9] px-3 py-2 text-[#646a61]"
-                      onClick={() => setSelectedProduct(product)}
-                      type="button"
+                      className="grid h-10 w-10 place-items-center rounded-md border border-[#ded6c9] bg-white text-[#646a61] transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
+                      href={`/products/${product.id}`}
                     >
                       <Icon name="info" />
-                    </button>
+                    </Link>
                   </div>
                 </article>
               ) : (
                 <article
-                  className="grid gap-4 rounded-md border border-[#ded6c9] bg-white p-4 shadow-sm md:grid-cols-[160px_1fr_auto]"
+                  className="grid gap-4 rounded-lg border border-[#ded6c9] bg-white p-4 shadow-[0_8px_24px_rgba(57,45,29,.07)] transition hover:border-[#c8bba7] hover:shadow-md md:grid-cols-[160px_1fr_auto]"
                   key={product.id}
                 >
-                  <button
+                  <Link
                     className="relative h-40 overflow-hidden rounded-md bg-[#eee7dc]"
-                    onClick={() => setSelectedProduct(product)}
-                    type="button"
+                    href={`/products/${product.id}`}
                   >
-                    <Image
+                    <ProductImage
                       alt={product.name}
                       className="h-full w-full object-cover"
                       height={220}
@@ -407,14 +510,14 @@ export default function ProductCatalog() {
                     <div className="absolute left-2 top-2">
                       <ProductStatusBadge product={product} />
                     </div>
-                  </button>
+                  </Link>
 
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-[#f7f3ec] px-2 py-1 text-xs font-bold uppercase text-[#6f746d]">
+                      <span className="rounded-full bg-[#f7f3ec] px-2.5 py-1 text-[11px] font-bold uppercase text-[#6f746d]">
                         {product.category}
                       </span>
-                      <span className="rounded bg-[#eef6f2] px-2 py-1 text-xs font-bold uppercase text-[#2f6f5e]">
+                      <span className="rounded-full bg-[#eef6f2] px-2.5 py-1 text-[11px] font-bold uppercase text-[#2f6f5e]">
                         {product.styleName}
                       </span>
                       <span className="flex items-center gap-1 text-xs font-bold text-[#b46f2c]">
@@ -422,13 +525,12 @@ export default function ProductCatalog() {
                         {product.rating} ({product.reviewsCount})
                       </span>
                     </div>
-                    <button
+                    <Link
                       className="mt-3 text-left text-xl font-bold hover:text-[#2f6f5e]"
-                      onClick={() => setSelectedProduct(product)}
-                      type="button"
+                      href={`/products/${product.id}`}
                     >
                       {product.name}
-                    </button>
+                    </Link>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#646a61]">
                       {product.description}
                     </p>
@@ -441,19 +543,18 @@ export default function ProductCatalog() {
                     <p className="text-xl font-bold">{formatPrice(product.priceVND)}</p>
                     <div className="flex gap-2">
                       <button
-                        className="rounded-md bg-[#1f2421] px-3 py-2 text-sm font-bold text-white"
+                        className="h-10 rounded-md bg-[#1f2421] px-4 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
                         onClick={() => addToCart(product)}
                         type="button"
                       >
                         Thêm
                       </button>
-                      <button
-                        className="rounded-md border border-[#ded6c9] px-3 py-2 text-[#646a61]"
-                        onClick={() => setSelectedProduct(product)}
-                        type="button"
+                      <Link
+                        className="grid h-10 w-10 place-items-center rounded-md border border-[#ded6c9] text-[#646a61] transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
+                        href={`/products/${product.id}`}
                       >
                         <Icon name="info" />
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </article>
@@ -462,14 +563,14 @@ export default function ProductCatalog() {
           </section>
         )}
 
-        <section className="mt-10 grid gap-4 rounded-md border border-[#ded6c9] bg-white p-5 shadow-sm md:grid-cols-3">
+        <section className="mt-12 grid border-y border-[#ded6c9] md:grid-cols-3">
           {[
             ["truck", "Vận chuyển và lắp đặt", "Hỗ trợ giao hàng, lắp đặt tại nhà cho Hà Nội và TP. HCM."],
             ["check", "Cam kết vật liệu", "Ưu tiên gỗ sấy, vải bền màu và phụ kiện có nguồn gốc rõ ràng."],
             ["star", "Tư vấn phối đồ", "Kết nối catalog với AI để đề xuất sản phẩm đúng phong cách."],
           ].map(([iconName, title, text]) => (
-            <article className="rounded-md bg-[#fbf7ef] p-4" key={title}>
-              <span className="grid h-10 w-10 place-items-center rounded-md bg-white text-[#2f6f5e]">
+            <article className="py-6 md:border-l md:border-[#ded6c9] md:px-6 md:first:border-l-0 md:first:pl-0" key={title}>
+              <span className="grid h-10 w-10 place-items-center rounded-md bg-[#e7f1ec] text-[#2f6f5e]">
                 <Icon name={iconName as "truck" | "check" | "star"} />
               </span>
               <h2 className="mt-3 text-base font-bold">{title}</h2>
@@ -479,108 +580,6 @@ export default function ProductCatalog() {
         </section>
       </section>
 
-      {selectedProduct && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-          <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-md bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex justify-end bg-white/90 p-4 backdrop-blur">
-              <button
-                aria-label="Đóng chi tiết sản phẩm"
-                className="rounded-md bg-[#f7f3ec] p-2 text-[#646a61]"
-                onClick={() => setSelectedProduct(null)}
-                type="button"
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-
-            <div className="grid gap-6 p-5 pt-0 md:grid-cols-[0.9fr_1.1fr] md:p-8 md:pt-0">
-              <Image
-                alt={selectedProduct.name}
-                className="aspect-square w-full rounded-md object-cover"
-                height={640}
-                sizes="(min-width: 768px) 45vw, 100vw"
-                src={selectedProduct.image}
-                width={640}
-              />
-
-              <div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded bg-[#f7f3ec] px-2 py-1 text-xs font-bold uppercase text-[#6f746d]">
-                    {selectedProduct.category}
-                  </span>
-                  <span className="rounded bg-[#eef6f2] px-2 py-1 text-xs font-bold uppercase text-[#2f6f5e]">
-                    {selectedProduct.styleName}
-                  </span>
-                  <ProductStatusBadge product={selectedProduct} />
-                </div>
-
-                <h2 className="mt-4 text-3xl font-bold leading-tight">{selectedProduct.name}</h2>
-                <p className="mt-2 flex items-center gap-2 text-sm font-bold text-[#b46f2c]">
-                  <Icon name="star" />
-                  {selectedProduct.rating} từ {selectedProduct.reviewsCount} đánh giá
-                </p>
-
-                <p className="mt-5 text-3xl font-bold">{formatPrice(selectedProduct.priceVND)}</p>
-                <p className="mt-5 text-sm leading-7 text-[#646a61]">
-                  {selectedProduct.description}
-                </p>
-
-                <div className="mt-6 grid gap-3 rounded-md bg-[#fbf7ef] p-4 text-sm sm:grid-cols-2">
-                  <div>
-                    <p className="font-bold text-[#51564f]">Kích thước</p>
-                    <p className="mt-1 text-[#646a61]">{selectedProduct.dimensions}</p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-[#51564f]">Vật liệu</p>
-                    <p className="mt-1 text-[#646a61]">{selectedProduct.material}</p>
-                  </div>
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  <h3 className="text-sm font-bold uppercase text-[#51564f]">
-                    Thông số kỹ thuật
-                  </h3>
-                  {Object.entries(selectedProduct.specifications).map(([key, value]) => (
-                    <div className="flex justify-between gap-4 border-b border-[#eee7dc] py-3 text-sm" key={key}>
-                      <span className="text-[#646a61]">{key}</span>
-                      <span className="text-right font-semibold">{value}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                  <button
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#d89b47] px-4 py-3 text-sm font-bold text-[#1f2421]"
-                    onClick={() => addToCart(selectedProduct)}
-                    type="button"
-                  >
-                    <Icon name="cart" />
-                    Thêm vào giỏ
-                  </button>
-                  <a
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#2f6f5e] px-4 py-3 text-sm font-bold text-white"
-                    href={`https://shopee.vn/search?keyword=${encodeURIComponent(selectedProduct.name)}`}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <Icon name="bag" />
-                    Shopee
-                  </a>
-                  <a
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1f2421] px-4 py-3 text-sm font-bold text-white"
-                    href={`https://www.tiktok.com/search?q=${encodeURIComponent(selectedProduct.name)}`}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    TikTok
-                    <Icon name="arrow" />
-                  </a>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
     </main>
   );
 }

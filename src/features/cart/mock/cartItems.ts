@@ -23,8 +23,9 @@ export const initialCartItems: CartItem[] = [
     dimensions: "220 x 92 x 78 cm",
     priceVND: 18900000,
     quantity: 1,
-    image:
-      "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&q=80&w=700",
+    image: "/images/product-space/organic-calm.png",
+    productHref: "/products/1",
+    source: "catalog",
   },
   {
     id: "table-indochine-02",
@@ -35,8 +36,9 @@ export const initialCartItems: CartItem[] = [
     dimensions: "110 x 60 x 42 cm",
     priceVND: 7200000,
     quantity: 1,
-    image:
-      "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&q=80&w=700",
+    image: "/images/product-space/urban-warmth.png",
+    productHref: "/products/2",
+    source: "catalog",
   },
   {
     id: "lamp-modern-03",
@@ -47,7 +49,8 @@ export const initialCartItems: CartItem[] = [
     dimensions: "42 x 42 x 168 cm",
     priceVND: 3450000,
     quantity: 2,
-    image:
-      "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&q=80&w=700",
+    image: "/images/product-space/soft-evening.png",
+    productHref: "/products/3",
+    source: "catalog",
   },
 ];

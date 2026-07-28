@@ -62,9 +62,9 @@ export default function ProcessView() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 className="inline-flex items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#1f2421]"
-                href="/ai"
+                href="/product-space"
               >
-                Bắt đầu quét phòng
+                Mở Product Space
                 <Icon name="arrow" />
               </Link>
               <Link

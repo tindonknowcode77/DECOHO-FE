@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
+import {
+  demoAdminCredentials,
+  demoAdminSessionUser,
+} from "@/src/features/admin/mock/adminDemo";
 import { demoStoreCredentials, demoStoreSessionUser } from "@/src/features/store/mock/storeDemo";
 import { saveSessionUser } from "../services/session";
 import type { LoginFormState } from "../types";
@@ -98,6 +102,14 @@ export default function LoginView() {
     router.push("/");
   }
 
+  function completeAdminLogin() {
+    saveSessionUser({
+      ...demoAdminSessionUser,
+      remember: form.remember,
+    });
+    router.push("/admin");
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -117,7 +129,24 @@ export default function LoginView() {
       return;
     }
 
-    if (form.email.trim().toLowerCase() === demoStoreCredentials.email) {
+    const normalizedEmail = form.email.trim().toLowerCase();
+
+    if (normalizedEmail === demoAdminCredentials.email) {
+      if (form.password !== demoAdminCredentials.password) {
+        setError("Mật khẩu Admin demo là admin123.");
+        return;
+      }
+
+      setIsLoading(true);
+
+      window.setTimeout(() => {
+        setIsLoading(false);
+        completeAdminLogin();
+      }, 650);
+      return;
+    }
+
+    if (normalizedEmail === demoStoreCredentials.email) {
       if (form.password !== demoStoreCredentials.password) {
         setError("Mật khẩu Store demo là store123.");
         return;
@@ -155,6 +184,15 @@ export default function LoginView() {
     window.setTimeout(() => {
       setIsLoading(false);
       completeStoreLogin();
+    }, 650);
+  }
+
+  function handleAdminDemoLogin() {
+    setIsLoading(true);
+
+    window.setTimeout(() => {
+      setIsLoading(false);
+      completeAdminLogin();
     }, 650);
   }
 
@@ -329,6 +367,16 @@ export default function LoginView() {
             >
               <Icon name="shield" />
               Dùng thử Store demo
+            </button>
+
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#c8c3dd] bg-[#f3f1fa] px-4 text-xs font-bold uppercase text-[#51477e] transition hover:bg-[#e8e4f5]"
+              id="admin-demo-login-btn"
+              onClick={handleAdminDemoLogin}
+              type="button"
+            >
+              <Icon name="shield" />
+              Dùng thử Admin demo
             </button>
 
             {/* <p className="rounded-md border border-[#ded6c9] bg-white px-3 py-2 text-xs leading-5 text-[#646a61]">

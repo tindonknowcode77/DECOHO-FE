@@ -8,18 +8,27 @@ export type StoreFlowStep = {
   status: StoreFlowStatus;
 };
 
-export type StoreProductStatus = "active" | "draft" | "review";
+export type StoreProductStatus = "active" | "draft" | "pending_review" | "rejected" | "review";
 
 export type StoreProduct = {
   id: string;
   name: string;
   category: string;
+  dimensions?: string;
+  image?: string;
+  material?: string;
   priceVND: number;
   stock: number;
   views: number;
   conversionRate: number;
   modelStatus: "missing" | "ready" | "reviewing";
   status: StoreProductStatus;
+  rejectionReason?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  storeId?: string;
+  storeName?: string;
+  submittedAt?: string;
 };
 
 export type StoreLead = {

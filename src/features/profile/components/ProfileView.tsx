@@ -304,7 +304,7 @@ export default function ProfileView() {
 
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-md bg-[#fbf7ef] p-4 text-center">
-                  <p className="text-xs font-bold uppercase text-[#646a61]">Phân tích AI</p>
+                  <p className="text-xs font-bold uppercase text-[#646a61]">Product Space</p>
                   <p className="mt-2 text-3xl font-bold">3</p>
                   <p className="mt-1 text-xs text-[#2f6f5e]">Lượt hoàn thành</p>
                 </div>

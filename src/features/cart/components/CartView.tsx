@@ -2,9 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import { initialCartItems, promoCodes } from "../mock/cartItems";
+import {
+  clearStoredPromoCode,
+  getStoredCartItems,
+  getStoredPromoCode,
+  saveStoredCartItems,
+  saveStoredPromoCode,
+  subscribeCartItems,
+} from "../services/cartStorage";
 import type { CartItem } from "../types";
 
 const FREE_SHIPPING_THRESHOLD = 15000000;
@@ -44,11 +52,40 @@ function Icon({ name }: { name: "cart" | "trash" | "plus" | "minus" | "arrow" | 
 
 export default function CartView() {
   const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
+  const [hasLoadedCart, setHasLoadedCart] = useState(false);
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState("");
-  const [checkoutMessage, setCheckoutMessage] = useState("");
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setCartItems(getStoredCartItems(initialCartItems));
+
+      const storedCode = getStoredPromoCode();
+      const storedPromo = promoCodes.find((promo) => promo.code === storedCode);
+
+      if (storedPromo) {
+        setAppliedPromo(storedPromo.code);
+        setPromoDiscount(storedPromo.discount);
+        setPromoInput(storedPromo.code);
+      }
+
+      setHasLoadedCart(true);
+    }, 0);
+    const unsubscribe = subscribeCartItems(
+      (items) => {
+        setCartItems(items);
+        setHasLoadedCart(true);
+      },
+      initialCartItems,
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      unsubscribe();
+    };
+  }, []);
 
   const subtotal = useMemo(
     () => cartItems.reduce((total, item) => total + item.priceVND * item.quantity, 0),
@@ -64,20 +101,25 @@ export default function CartView() {
   const amountToFreeShipping = Math.max(FREE_SHIPPING_THRESHOLD - subtotal, 0);
 
   function updateQuantity(id: string, delta: number) {
-    setCartItems((items) =>
-      items.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantity: Math.max(item.quantity + delta, 1),
-            }
-          : item,
-      ),
+    const nextItems = cartItems.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            quantity: Math.min(
+              Math.max(item.quantity + delta, 1),
+              item.stock ?? Number.POSITIVE_INFINITY,
+            ),
+          }
+        : item,
     );
+    setCartItems(nextItems);
+    saveStoredCartItems(nextItems);
   }
 
   function removeItem(id: string) {
-    setCartItems((items) => items.filter((item) => item.id !== id));
+    const nextItems = cartItems.filter((item) => item.id !== id);
+    setCartItems(nextItems);
+    saveStoredCartItems(nextItems);
   }
 
   function applyPromo(event: FormEvent<HTMLFormElement>) {
@@ -94,12 +136,14 @@ export default function CartView() {
       setAppliedPromo(null);
       setPromoDiscount(0);
       setPromoMessage("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+      clearStoredPromoCode();
       return;
     }
 
     setAppliedPromo(promo.code);
     setPromoDiscount(promo.discount);
     setPromoMessage(`Áp dụng thành công ${promo.code}: ${promo.description}.`);
+    saveStoredPromoCode(promo.code);
   }
 
   function removePromo() {
@@ -107,6 +151,21 @@ export default function CartView() {
     setPromoDiscount(0);
     setPromoInput("");
     setPromoMessage("");
+    clearStoredPromoCode();
+  }
+
+  if (!hasLoadedCart) {
+    return (
+      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#1f2421]">
+        <section className="mx-auto max-w-7xl">
+          <div className="h-10 w-64 animate-pulse rounded-md bg-[#e9e1d5]" />
+          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_390px]">
+            <div className="h-96 animate-pulse rounded-lg bg-white shadow-sm" />
+            <div className="h-80 animate-pulse rounded-lg bg-white shadow-sm" />
+          </div>
+        </section>
+      </main>
+    );
   }
 
   if (cartItems.length === 0) {
@@ -118,8 +177,8 @@ export default function CartView() {
           </span>
           <h1 className="mt-6 text-2xl font-bold">Giỏ hàng đang trống</h1>
           <p className="mt-3 text-sm leading-6 text-[#646a61]">
-            Bạn chưa chọn món nội thất nào. Hãy khám phá catalog hoặc để AI gợi
-            ý sản phẩm phù hợp với căn phòng.
+            Bạn chưa chọn món nội thất nào. Hãy khám phá catalog hoặc chạm vào
+            sản phẩm trong một không gian hoàn chỉnh.
           </p>
           <div className="mt-6 grid w-full gap-3">
             <Link
@@ -130,9 +189,9 @@ export default function CartView() {
             </Link>
             <Link
               className="rounded-md border border-[#ded6c9] px-5 py-3 text-sm font-bold text-[#1f2421]"
-              href="/ai"
+              href="/product-space"
             >
-              Phân tích bằng AI
+              Mở Product Space
             </Link>
           </div>
         </section>
@@ -175,27 +234,41 @@ export default function CartView() {
                 className="grid gap-4 border-b border-[#eee7dc] p-5 last:border-b-0 sm:grid-cols-[112px_1fr] lg:grid-cols-[112px_1fr_auto]"
                 key={item.id}
               >
-                <Image
-                  alt={item.name}
-                  className="h-28 w-full rounded-md object-cover sm:w-28"
-                  height={160}
-                  sizes="112px"
-                  src={item.image}
-                  width={160}
-                />
+                <Link
+                  aria-label={`Xem ${item.name}`}
+                  className="block overflow-hidden rounded-md"
+                  href={item.productHref ?? "/products"}
+                >
+                  <Image
+                    alt={item.name}
+                    className="h-28 w-full rounded-md object-cover transition hover:scale-[1.03] sm:w-28"
+                    height={160}
+                    sizes="112px"
+                    src={item.image}
+                    unoptimized={item.image.startsWith("data:")}
+                    width={160}
+                  />
+                </Link>
 
                 <div className="min-w-0">
                   <p className="w-fit rounded bg-[#f7f3ec] px-2 py-1 text-xs font-bold uppercase text-[#6f746d]">
                     {item.category} | {item.style}
                   </p>
-                  <h2 className="mt-3 text-lg font-bold">{item.name}</h2>
+                  <h2 className="mt-3 text-lg font-bold">
+                    <Link
+                      className="transition hover:text-[#2f6f5e]"
+                      href={item.productHref ?? "/products"}
+                    >
+                      {item.name}
+                    </Link>
+                  </h2>
                   <p className="mt-2 text-sm text-[#646a61]">KT: {item.dimensions}</p>
                   <p className="mt-1 text-sm text-[#646a61]">{item.material}</p>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 sm:col-span-2 lg:col-span-1 lg:min-w-52 lg:flex-col lg:items-end">
+                <div className="flex min-w-0 flex-col items-start gap-4 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between lg:col-span-1 lg:min-w-52 lg:flex-col lg:items-end">
                   <p className="text-lg font-bold">{formatPrice(item.priceVND * item.quantity)}</p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto">
                     <div className="flex items-center rounded-md border border-[#ded6c9] bg-[#fbf7ef] p-1">
                       <button
                         aria-label={`Giảm số lượng ${item.name}`}
@@ -209,7 +282,8 @@ export default function CartView() {
                       <span className="w-9 text-center text-sm font-bold">{item.quantity}</span>
                       <button
                         aria-label={`Tăng số lượng ${item.name}`}
-                        className="rounded p-2 text-[#62675f] hover:bg-white"
+                        className="rounded p-2 text-[#62675f] hover:bg-white disabled:opacity-40"
+                        disabled={item.stock !== undefined && item.quantity >= item.stock}
                         onClick={() => updateQuantity(item.id, 1)}
                         type="button"
                       >
@@ -316,24 +390,13 @@ export default function CartView() {
                 </div>
               </div>
 
-              <button
+              <Link
                 className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#1f2421] transition hover:bg-[#e4aa5b]"
-                onClick={() =>
-                  setCheckoutMessage(
-                    `Đã ghi nhận đơn hàng tạm tính ${formatPrice(total)}. Module checkout sẽ được nối API ở bước sau.`,
-                  )
-                }
-                type="button"
+                href="/checkout"
               >
                 Tiến hành thanh toán
                 <Icon name="arrow" />
-              </button>
-
-              {checkoutMessage && (
-                <p className="mt-3 rounded-md bg-[#eefbf2] p-3 text-xs leading-5 text-[#23643b]">
-                  {checkoutMessage}
-                </p>
-              )}
+              </Link>
 
               <p className="mt-5 flex items-center justify-center gap-2 border-t border-[#eee7dc] pt-4 text-xs text-[#646a61]">
                 <Icon name="shield" />

@@ -74,7 +74,7 @@ const showroomItems: Record<ShowroomItemId, ShowroomItemInfo> = {
       { hex: "#1f2421", name: "Den mo" },
     ],
     description: "Mat ban rong cho sofa trung tam, hop voi phong khach can diem nhan gon.",
-    href: "/products/prod-2",
+    href: "/products/2",
   },
   floorLamp: {
     sku: "DCH-LMP-MORI-170",
@@ -108,7 +108,7 @@ const showroomItems: Record<ShowroomItemId, ShowroomItemInfo> = {
       { hex: "#9d8f7f", name: "Taupe" },
     ],
     description: "Ghe don nho gon cho goc tiep khach, co the doi vai theo concept phong.",
-    href: "/products/prod-5",
+    href: "/products/5",
   },
   pendant: {
     sku: "DCH-PEN-KASA-048",
@@ -159,7 +159,7 @@ const showroomItems: Record<ShowroomItemId, ShowroomItemInfo> = {
       { hex: "#cfb57a", name: "Vien det" },
     ],
     description: "Gom cum sofa va ban tra thanh mot vung sinh hoat ro rang, am chan hon.",
-    href: "/products/prod-3",
+    href: "/products/3",
   },
   shelf: {
     sku: "DCH-SHF-ANN-170",
@@ -176,7 +176,7 @@ const showroomItems: Record<ShowroomItemId, ShowroomItemInfo> = {
       { hex: "#b89068", name: "Veneer soi" },
     ],
     description: "Dung de trung bay sach, gom va mau vat lieu trong khu tiep khach.",
-    href: "/products/prod-6",
+    href: "/products/4",
   },
   sofa: {
     sku: "DCH-SOF-SORA-190",
@@ -194,7 +194,7 @@ const showroomItems: Record<ShowroomItemId, ShowroomItemInfo> = {
       { hex: "#9d8f7f", name: "Tua taupe" },
     ],
     description: "Kieu dang thap, ti le rong vua can cho can ho hien dai va phong khach am.",
-    href: "/products/prod-1",
+    href: "/products/1",
   },
   wallArt: {
     sku: "DCH-ART-LAY-090",

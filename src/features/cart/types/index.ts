@@ -8,6 +8,9 @@ export type CartItem = {
   priceVND: number;
   quantity: number;
   image: string;
+  productHref?: string;
+  source?: "catalog" | "store";
+  stock?: number;
 };
 
 export type PromoCode = {
