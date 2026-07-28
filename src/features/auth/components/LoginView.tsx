@@ -164,15 +164,6 @@ export default function LoginView() {
     }, 650);
   }
 
-  function handleAdminDemoLogin() {
-    setIsLoading(true);
-
-    window.setTimeout(() => {
-      setIsLoading(false);
-      completeAdminLogin();
-    }, 650);
-  }
-
   return (
     <main className="grid min-h-screen bg-[#f7f3ec] text-[#1f2421] lg:grid-cols-12">
       <section className="relative hidden overflow-hidden bg-[#1f2421] lg:col-span-7 lg:flex lg:items-end">
@@ -356,16 +347,6 @@ export default function LoginView() {
             >
               <Icon name="shield" />
               Dùng thử Store demo
-            </button>
-
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#c8c3dd] bg-[#f3f1fa] px-4 text-xs font-bold uppercase text-[#51477e] transition hover:bg-[#e8e4f5]"
-              id="admin-demo-login-btn"
-              onClick={handleAdminDemoLogin}
-              type="button"
-            >
-              <Icon name="shield" />
-              Dùng thử Admin demo
             </button>
 
             {/* <p className="rounded-md border border-[#ded6c9] bg-white px-3 py-2 text-xs leading-5 text-[#646a61]">
