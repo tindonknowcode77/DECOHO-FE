@@ -9,7 +9,7 @@ const roomMoments = [
     description:
       "Khám phá sofa, bàn trà và vật liệu ngay trong những không gian nội thất hoàn chỉnh.",
     href: "/product-space",
-    action: "Mở Product Space",
+    action: "Mở Moodboard",
     icon: "scan",
   },
   {
@@ -150,7 +150,7 @@ export default function HomePage() {
                 className="inline-flex items-center justify-center gap-2 rounded-md bg-[#e4a33c] px-5 py-3.5 text-sm font-bold text-[#17251f] shadow-sm transition hover:bg-[#f2bc61]"
                 href="/product-space"
               >
-                Khám phá Product Space
+                Khám phá Moodboard
                 <ArrowIcon />
               </Link>
               <Link
@@ -391,7 +391,7 @@ export default function HomePage() {
                 title: "Chạm để khám phá",
                 text: "Xem thông tin và giá của từng món đồ ngay trong không gian.",
                 href: "/product-space",
-                label: "Mở Product Space",
+                label: "Mở Moodboard",
               },
               {
                 number: "3D",
@@ -402,10 +402,10 @@ export default function HomePage() {
               },
               {
                 number: "ST",
-                title: "Chọn từ Store đã duyệt",
+                title: "Chọn từ cửa hàng đã duyệt",
                 text: "Khám phá sản phẩm có thông tin, giá và cửa hàng minh bạch.",
                 href: "/store",
-                label: "Ghé Store",
+                label: "Ghé cửa hàng",
               },
             ].map((tool, index) => (
               <article
@@ -473,7 +473,7 @@ export default function HomePage() {
               Phòng mẫu 3D
             </Link>
             <Link className="transition hover:text-[#a76227]" href="/store">
-              Store
+              Cửa hàng
             </Link>
           </div>
         </div>

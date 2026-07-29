@@ -125,7 +125,7 @@ export default function LoginView() {
 
     if (normalizedEmail === demoStoreCredentials.email) {
       if (form.password !== demoStoreCredentials.password) {
-        setError("Mật khẩu Store demo là store123.");
+        setError("Mật khẩu cửa hàng demo là store123.");
         return;
       }
 
@@ -346,11 +346,11 @@ export default function LoginView() {
               type="button"
             >
               <Icon name="shield" />
-              Dùng thử Store demo
+              Dùng thử cửa hàng demo
             </button>
 
             {/* <p className="rounded-md border border-[#ded6c9] bg-white px-3 py-2 text-xs leading-5 text-[#646a61]">
-              Store demo: <strong>{demoStoreCredentials.email}</strong> /{" "}
+              Cửa hàng demo: <strong>{demoStoreCredentials.email}</strong> /{" "}
               <strong>{demoStoreCredentials.password}</strong>
             </p> */}
 

@@ -191,7 +191,7 @@ export default function CartView() {
               className="rounded-md border border-[#ded6c9] px-5 py-3 text-sm font-bold text-[#1f2421]"
               href="/product-space"
             >
-              Mở Product Space
+              Mở Moodboard
             </Link>
           </div>
         </section>

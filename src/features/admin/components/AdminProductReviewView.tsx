@@ -260,9 +260,9 @@ export default function AdminProductReviewView() {
       status === "active"
         ? `Đã duyệt và public ${product?.name ?? "sản phẩm"}.`
         : status === "rejected"
-          ? `Đã gửi yêu cầu chỉnh sửa cho ${product?.storeName ?? "Store"}.`
+          ? `Đã gửi yêu cầu chỉnh sửa cho ${product?.storeName ?? "cửa hàng"}.`
           : status === "draft"
-            ? `Đã gỡ ${product?.name ?? "sản phẩm"} khỏi Store public.`
+            ? `Đã gỡ ${product?.name ?? "sản phẩm"} khỏi cửa hàng công khai.`
             : `Đã đưa ${product?.name ?? "sản phẩm"} về hàng chờ.`,
     );
   }
@@ -306,7 +306,7 @@ export default function AdminProductReviewView() {
           </p>
           <h1 className="mt-2 text-3xl font-bold">Cần tài khoản Admin</h1>
           <p className="mt-4 text-sm leading-7 text-[#646a61]">
-            Tài khoản khách và Store không có quyền duyệt sản phẩm. Hãy đăng nhập
+            Tài khoản khách và cửa hàng không có quyền duyệt sản phẩm. Hãy đăng nhập
             bằng tài khoản Admin demo để mở trung tâm kiểm duyệt.
           </p>
           <div className="mt-5 rounded-lg bg-[#f7f3ec] p-4 text-sm">
@@ -362,7 +362,7 @@ export default function AdminProductReviewView() {
                 Admin Center
               </div>
               <h1 className="mt-4 text-4xl font-bold sm:text-5xl">
-                Kiểm duyệt hệ thống Store
+                Kiểm duyệt hệ thống cửa hàng
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/70">
                 Kiểm tra nội dung, giá, tồn kho và model 3D trước khi sản phẩm
@@ -374,7 +374,7 @@ export default function AdminProductReviewView() {
               href="/store"
             >
               <Icon name="eye" />
-              Xem Store public
+              Xem cửa hàng công khai
             </Link>
           </div>
 
@@ -448,7 +448,7 @@ export default function AdminProductReviewView() {
                 <input
                   className="h-11 w-full rounded-md border border-[#d8cebf] bg-white pl-10 pr-4 text-sm outline-none transition focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/10"
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Tìm sản phẩm, danh mục hoặc Store..."
+                  placeholder="Tìm sản phẩm, danh mục hoặc cửa hàng..."
                   type="search"
                   value={searchTerm}
                 />
@@ -566,7 +566,7 @@ export default function AdminProductReviewView() {
 
                   <dl className="mt-5 divide-y divide-[#eee7dc] border-y border-[#eee7dc] text-sm">
                     {[
-                      ["Store", selectedProduct.storeName ?? "Mộc An Furniture"],
+                      ["Cửa hàng", selectedProduct.storeName ?? "Mộc An Furniture"],
                       ["Danh mục", selectedProduct.category],
                       ["Giá bán", formatPrice(selectedProduct.priceVND)],
                       ["Tồn kho", `${selectedProduct.stock} sản phẩm`],
@@ -629,7 +629,7 @@ export default function AdminProductReviewView() {
                           }
                           type="button"
                         >
-                          Gỡ khỏi Store public
+                          Gỡ khỏi cửa hàng công khai
                         </button>
                       ) : (
                         <button
@@ -733,7 +733,7 @@ export default function AdminProductReviewView() {
               </button>
             </div>
             <p className="mt-3 text-sm leading-6 text-[#646a61]">
-              Lý do sẽ hiển thị trong Seller Center để Store biết chính xác nội
+              Lý do sẽ hiển thị trong trung tâm người bán để cửa hàng biết chính xác nội
               dung cần sửa.
             </p>
             <label className="mt-5 block text-sm font-bold">
@@ -757,7 +757,7 @@ export default function AdminProductReviewView() {
                 className="h-11 rounded-md bg-[#bc3d2b] text-sm font-bold text-white"
                 type="submit"
               >
-                Gửi về Store
+                Gửi về cửa hàng
               </button>
             </div>
           </form>

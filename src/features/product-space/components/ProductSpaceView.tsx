@@ -422,7 +422,7 @@ export default function ProductSpaceView({
               Nội thất có thể chạm
             </p>
             <h1 className="mt-2 text-4xl font-bold sm:text-5xl">
-              Product Space
+              Moodboard
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#646a61] sm:text-base">
               Di chuột hoặc chạm vào điểm đánh dấu trong phòng để xem đúng sản

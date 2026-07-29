@@ -251,7 +251,7 @@ export default function ProductCatalog() {
               className="inline-flex h-11 items-center gap-2 rounded-md bg-[#2f6f5e] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#285f51]"
               href="/product-space"
             >
-              Xem Product Space
+              Xem Moodboard
               <Icon name="arrow" />
             </Link>
           </div>

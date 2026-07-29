@@ -30,10 +30,10 @@ type IconName =
 const menuItems = [
   { href: "/", label: "Trang chủ" },
   { href: "/process", label: "Quy trình thiết kế" },
-  { href: "/product-space", label: "Product Space" },
+  { href: "/product-space", label: "Moodboard" },
   { href: "/showroom", label: "Phòng mẫu 3D" },
   { href: "/products", label: "Sản phẩm" },
-  { href: "/store", label: "Store" },
+  { href: "/store", label: "Cửa hàng" },
 ];
 
 const authPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
@@ -194,7 +194,7 @@ export default function Navigation() {
                       {currentUser.role === "admin"
                         ? "Quản trị viên"
                         : currentUser.role === "store"
-                          ? "Đối tác Store"
+                          ? "Đối tác cửa hàng"
                           : "Thành viên"}
                     </span>
                   </span>
@@ -245,7 +245,7 @@ export default function Navigation() {
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <Icon name="store" />
-                          Kênh Store
+                          Kênh cửa hàng
                         </Link>
                       )}
 
@@ -359,7 +359,7 @@ export default function Navigation() {
                     href="/store"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Kênh Store
+                    Kênh cửa hàng
                   </Link>
                 )}
                 <Link

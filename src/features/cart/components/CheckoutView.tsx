@@ -354,7 +354,7 @@ export default function CheckoutView() {
             </p>
             <h1 className="mt-2 text-3xl font-bold">Cảm ơn bạn đã chọn DECOHO</h1>
             <p className="mt-3 text-sm leading-6 text-white/75">
-              Đơn hàng đã được ghi nhận và Store sẽ sớm xác nhận lịch giao.
+              Đơn hàng đã được ghi nhận và cửa hàng sẽ sớm xác nhận lịch giao.
             </p>
           </div>
 
@@ -507,7 +507,7 @@ export default function CheckoutView() {
                   <div>
                     <h2 className="text-xl font-bold">Thông tin nhận hàng</h2>
                     <p className="mt-1 text-sm text-[#646a61]">
-                      Store dùng thông tin này để xác nhận và giao sản phẩm.
+                      Cửa hàng dùng thông tin này để xác nhận và giao sản phẩm.
                     </p>
                   </div>
                 </div>
@@ -837,7 +837,7 @@ export default function CheckoutView() {
                   <div>
                     <h2 className="text-xl font-bold">Xác nhận đơn hàng</h2>
                     <p className="mt-1 text-sm text-[#646a61]">
-                      Kiểm tra lần cuối trước khi gửi đơn đến Store.
+                      Kiểm tra lần cuối trước khi gửi đơn đến cửa hàng.
                     </p>
                   </div>
                 </div>
@@ -888,7 +888,7 @@ export default function CheckoutView() {
                       type="checkbox"
                     />
                     Tôi xác nhận thông tin đơn hàng là chính xác và đồng ý để DECOHO
-                    cùng Store liên hệ xử lý đơn.
+                    cùng cửa hàng liên hệ xử lý đơn.
                   </label>
                 </div>
 

@@ -81,13 +81,13 @@ const roleDetails = {
   },
   customer: {
     actionHref: "/product-space",
-    actionLabel: "Mở Product Space",
+    actionLabel: "Mở Moodboard",
     label: "Thành viên DECOHO",
   },
   store: {
     actionHref: "/store",
-    actionLabel: "Mở kênh Store",
-    label: "Đối tác Store",
+    actionLabel: "Mở kênh cửa hàng",
+    label: "Đối tác cửa hàng",
   },
 } as const;
 
@@ -642,7 +642,7 @@ export default function ProfileView() {
                   {
                     href: "/product-space",
                     icon: Sparkles,
-                    label: "Khám phá Product Space",
+                    label: "Khám phá Moodboard",
                   },
                   {
                     href: "/showroom",

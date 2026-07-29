@@ -8,7 +8,7 @@ export const demoStoreCredentials = {
 
 export const demoStoreSessionUser: AuthSessionUser = {
   email: demoStoreCredentials.email,
-  name: "Mộc An Store",
+  name: "Cửa hàng Mộc An",
   phone: "0908 888 168",
   registeredAt: "2026-07-20T08:30:00.000Z",
   role: "store",
@@ -20,7 +20,7 @@ export const demoStoreSessionUser: AuthSessionUser = {
 export const storeFlowSteps: StoreFlowStep[] = [
   {
     id: "register",
-    title: "Đăng ký Store",
+    title: "Đăng ký cửa hàng",
     description: "Tạo tài khoản người bán, khai báo email, số điện thoại và ngành hàng.",
     metric: "Hoàn tất",
     status: "completed",

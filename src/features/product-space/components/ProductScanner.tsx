@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+import { aiScannerService } from "@/src/services/ai-scanner.service";
 
 type DetectedProduct = {
   id: number;
@@ -26,40 +27,10 @@ type DetectedProduct = {
   confirmed: boolean;
 };
 
-const suggestedProducts: DetectedProduct[] = [
-  {
-    category: "Sofa",
-    color: "Kem",
-    confidence: 94,
-    confirmed: false,
-    id: 1,
-    material: "Vải boucle",
-    name: "Sofa cong 3 chỗ",
-  },
-  {
-    category: "Bàn trà",
-    color: "Nâu tự nhiên",
-    confidence: 87,
-    confirmed: false,
-    id: 2,
-    material: "Gỗ sồi",
-    name: "Bàn trà tròn thấp",
-  },
-  {
-    category: "Đèn trang trí",
-    color: "Trắng ngà",
-    confidence: 78,
-    confirmed: false,
-    id: 3,
-    material: "Vải và kim loại",
-    name: "Đèn sàn chụp vải",
-  },
-];
-
 export default function ProductScanner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [preview, setPreview] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -70,7 +41,6 @@ export default function ProductScanner() {
   useEffect(
     () => () => {
       if (preview) URL.revokeObjectURL(preview);
-      if (timerRef.current) clearTimeout(timerRef.current);
     },
     [preview],
   );
@@ -90,6 +60,7 @@ export default function ProductScanner() {
 
     if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
+    setSelectedFile(file);
     setFileName(file.name);
     setProducts([]);
     setMessage("");
@@ -106,16 +77,39 @@ export default function ProductScanner() {
     selectFile(event.dataTransfer.files[0]);
   }
 
-  function scanImage() {
-    if (!preview || isScanning) return;
+  async function scanImage() {
+    if (!selectedFile || isScanning) return;
     setIsScanning(true);
     setProducts([]);
     setMessage("");
 
-    timerRef.current = setTimeout(() => {
-      setProducts(suggestedProducts);
+    try {
+      const result = await aiScannerService.scanImage(selectedFile);
+      setProducts(
+        result.products.map((product, index) => ({
+          category: product.category,
+          color: product.color,
+          confidence: product.confidence,
+          confirmed: false,
+          id: Date.now() + index,
+          material: product.material,
+          name: product.name,
+        })),
+      );
+      setMessage(
+        result.products.length
+          ? `AI đã tìm thấy ${result.products.length} sản phẩm trong ${result.roomType}.`
+          : "AI chưa tìm thấy sản phẩm rõ ràng trong ảnh này.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? `Không thể quét ảnh: ${error.message}`
+          : "Không thể kết nối AI Scanner. Vui lòng thử lại.",
+      );
+    } finally {
       setIsScanning(false);
-    }, 1600);
+    }
   }
 
   function updateProduct(
@@ -280,8 +274,7 @@ export default function ProductScanner() {
             )}
           </button>
           <p className="mt-2 text-center text-xs text-[#828780]">
-            Bản hiện tại minh họa luồng nhận diện; cần nối Vision API để quét
-            dữ liệu thật.
+            AI có thể ước tính sai; hãy kiểm tra thông tin trước khi xác nhận.
           </p>
         </div>
 

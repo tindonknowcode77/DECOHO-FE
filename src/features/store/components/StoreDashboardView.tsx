@@ -266,7 +266,7 @@ export default function StoreDashboardView() {
   }
 
   function requestConsultation() {
-    showNotice("Đã ghi nhận yêu cầu tư vấn. Store sẽ liên hệ qua thông tin demo.");
+    showNotice("Đã ghi nhận yêu cầu tư vấn. Cửa hàng sẽ liên hệ qua thông tin demo.");
   }
 
   function addStoreProductToCart(product: StoreProduct, index: number) {
@@ -278,14 +278,14 @@ export default function StoreDashboardView() {
         image:
           product.image ??
           storeProductImages[index % storeProductImages.length],
-        material: product.material || "Vật liệu theo hồ sơ Store",
+        material: product.material || "Vật liệu theo hồ sơ cửa hàng",
         name: product.name,
         priceVND: product.priceVND,
         productHref: "/store#store-products",
         quantity: 1,
         source: "store",
         stock: product.stock,
-        style: product.storeName || "Mộc An Store",
+        style: product.storeName || "Mộc An",
       },
       initialCartItems,
     );
@@ -487,7 +487,7 @@ export default function StoreDashboardView() {
   }
 
   function showPublicPreview(productName: string) {
-    showNotice(`${productName} đang mở ở hồ sơ Store public.`);
+    showNotice(`${productName} đang mở ở hồ sơ cửa hàng công khai.`);
   }
 
   if (!hasCheckedSession) {
@@ -525,7 +525,7 @@ export default function StoreDashboardView() {
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.1em] text-[#f3ca7d] backdrop-blur-md">
                 <Icon name="shield" />
-                Store đã xác minh
+                Cửa hàng đã xác minh
               </div>
               <h1 className="mt-5 text-4xl font-bold leading-tight sm:text-6xl">
                 Mộc An Furniture
@@ -659,7 +659,7 @@ export default function StoreDashboardView() {
                   href="/login"
                 >
                   <Icon name="login" />
-                  Đăng nhập Store
+                  Đăng nhập cửa hàng
                 </Link>
               )}
             </div>
@@ -926,7 +926,7 @@ export default function StoreDashboardView() {
                 </div>
                 <span className="inline-flex items-center gap-2 rounded-full bg-[#eefbf2] px-3 py-2 text-xs font-black text-[#23643b]">
                   <Icon name="check" />
-                  Đã duyệt Store
+                  Đã duyệt cửa hàng
                 </span>
               </div>
 
@@ -1081,7 +1081,7 @@ export default function StoreDashboardView() {
                 <div>
                   <p className="text-sm font-black">Ảnh sản phẩm</p>
                   <p className="mt-1 text-sm font-semibold leading-6 text-[#656b63]">
-                    Ảnh được tối ưu trước khi lưu vào bản demo Store.
+                    Ảnh được tối ưu trước khi lưu vào bản demo cửa hàng.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-[#1f2421] px-4 text-sm font-black text-white transition hover:bg-[#2f6f5e]">
