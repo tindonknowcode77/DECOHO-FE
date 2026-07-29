@@ -8,6 +8,7 @@ import { initialCartItems } from "@/src/features/cart/mock/cartItems";
 import { addCartItem } from "@/src/features/cart/services/cartStorage";
 import { getProducts } from "@/src/features/products/services/productService";
 import type { Product } from "@/src/features/products/types";
+import ProductScanner from "./ProductScanner";
 
 type Hotspot = {
   id: string;
@@ -437,6 +438,20 @@ export default function ProductSpaceView({
           </Link>
         </header>
 
+        <div className="mt-12 flex items-end justify-between gap-4 border-b border-[#ded6c9] pb-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[#b46f2c]">
+              Không gian có thể chạm
+            </p>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+              Khám phá showroom theo phong cách
+            </h2>
+          </div>
+          <span className="hidden text-xs text-[#737970] sm:block">
+            Chọn không gian · Chạm vào điểm đánh dấu
+          </span>
+        </div>
+
         <div
           aria-label="Chọn không gian"
           className="mt-6 grid gap-3 sm:grid-cols-3"
@@ -604,6 +619,8 @@ export default function ProductSpaceView({
             <ArrowIcon />
           </Link>
         </div>
+
+        <ProductScanner />
       </section>
     </main>
   );

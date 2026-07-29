@@ -280,6 +280,93 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="border-y border-[#ded5c5] bg-[#eee9e0] py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.38fr_0.62fr] lg:items-start">
+            <div className="lg:sticky lg:top-24">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#8b6548]">
+                Moodboard · Living room
+              </p>
+              <h2 className="mt-4 text-4xl font-bold leading-tight text-[#1d2721] sm:text-5xl">
+                Contemporary Calm
+              </h2>
+              <p className="mt-5 max-w-md text-base leading-8 text-[#606960]">
+                Một không gian đương đại cân bằng giữa đường nét mềm, bảng màu
+                trung tính và những bề mặt gỗ ấm. Mỗi chi tiết được chọn để căn
+                phòng thanh lịch nhưng vẫn gần gũi.
+              </p>
+
+              <div className="mt-8 border-y border-[#d3c9ba] py-6">
+                <p className="text-xs font-bold uppercase tracking-[0.1em] text-[#737970]">
+                  Bảng màu chủ đạo
+                </p>
+                <div className="mt-4 flex gap-2">
+                  {[
+                    { color: "#eeeae2", name: "Warm white" },
+                    { color: "#c4c0b8", name: "Stone" },
+                    { color: "#8a8b76", name: "Sage" },
+                    { color: "#76533b", name: "Walnut" },
+                    { color: "#cdb99b", name: "Oatmeal" },
+                    { color: "#383a38", name: "Charcoal" },
+                  ].map((swatch) => (
+                    <span
+                      className="group relative h-10 flex-1 rounded-sm border border-black/10 shadow-sm"
+                      key={swatch.name}
+                      style={{ backgroundColor: swatch.color }}
+                      title={swatch.name}
+                    >
+                      <span className="pointer-events-none absolute left-1/2 top-12 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded bg-[#1d2721] px-2 py-1 text-[10px] font-bold text-white group-hover:block">
+                        {swatch.name}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
+                {[
+                  ["Phong cách", "Contemporary"],
+                  ["Không khí", "Tĩnh · Ấm"],
+                  ["Vật liệu", "Gỗ · Boucle"],
+                  ["Điểm nhấn", "Sage green"],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-xs text-[#83877f]">{label}</p>
+                    <p className="mt-1 font-bold text-[#303a34]">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <Link
+                className="mt-8 inline-flex items-center gap-2 rounded-md bg-[#1d2721] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#8b6548]"
+                href="/products"
+              >
+                Khám phá sản phẩm cùng phong cách
+                <ArrowIcon />
+              </Link>
+            </div>
+
+            <div>
+              <div className="relative aspect-[4/5] overflow-hidden rounded-lg border border-[#d2c8ba] bg-white shadow-[0_20px_55px_rgba(54,43,30,.14)]">
+                <Image
+                  alt="Moodboard phòng khách Contemporary Calm với sofa xanh sage, ghế boucle, gỗ walnut và bảng màu trung tính"
+                  className="object-cover"
+                  fill
+                  sizes="(min-width: 1024px) 58vw, 100vw"
+                  src="/images/moodboards/contemporary-living-moodboard-v2.png"
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[#777d76]">
+                <p>Concept 01 · Phòng khách đương đại</p>
+                <p className="font-bold uppercase tracking-[0.08em]">
+                  Sage · Walnut · Boucle
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mx-2 overflow-hidden rounded-lg bg-[#173e34] py-16 text-white shadow-[0_18px_50px_rgba(28,57,48,.15)] sm:mx-3 sm:py-20">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
