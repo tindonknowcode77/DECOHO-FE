@@ -9,12 +9,6 @@ type Product = { _id?: string; id?: string; name?: string; price?: number; image
 type ProductPoint = { _id?: string; id?: string; x?: number; y?: number; product?: Product; productId?: Product | string };
 type ProductSpace = { _id?: string; id?: string; title?: string; imageUrl?: string; description?: string; roomType?: string; isFeatured?: boolean; productPoints?: ProductPoint[]; createdAt?: string };
 
-const roomFilters = [
-  ["all", "Tất cả"], ["living_room", "🛋 Phòng khách"], ["bedroom", "🛏 Phòng ngủ"],
-  ["dining_room", "🍽 Phòng ăn"], ["kitchen", "☕ Nhà bếp"], ["office", "▤ Góc làm việc"],
-  ["bathroom", "♨ Phòng tắm"], ["other", "✦ Trang trí"],
-] as const;
-
 const roomLabels: Record<string, string> = { living_room: "Phòng khách", bedroom: "Phòng ngủ", dining_room: "Phòng ăn", kitchen: "Nhà bếp", office: "Góc làm việc", bathroom: "Phòng tắm", other: "Không gian" };
 
 function getProduct(point: ProductPoint) { return typeof point.productId === "object" ? point.productId : point.product; }
@@ -23,14 +17,13 @@ function currency(value?: number) { return typeof value === "number" ? new Intl.
 export default function ProductSpaceView() {
   const [spaces, setSpaces] = useState<ProductSpace[]>([]);
   const [activeId, setActiveId] = useState("");
-  const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
       const response = await fetch(`${base}/product-spaces`, { cache: "no-store" });
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.message ?? "Không thể tải Moodboard.");
@@ -41,29 +34,26 @@ export default function ProductSpaceView() {
   }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
-  const filtered = useMemo(() => spaces.filter((space) => (filter === "all" || space.roomType === filter) && `${space.title ?? ""} ${space.description ?? ""}`.toLowerCase().includes(query.toLowerCase())), [filter, query, spaces]);
+  const filtered = useMemo(() => spaces.filter((space) => `${space.title ?? ""} ${space.description ?? ""}`.toLowerCase().includes(query.toLowerCase())), [query, spaces]);
   const active = spaces.find((space) => String(space._id ?? space.id) === activeId) ?? filtered[0];
   const points = active?.productPoints ?? [];
   const user = getSessionUser();
   const createHref = user && ["admin", "super_admin", "staff"].includes(user.role ?? "") ? "/admin" : "/login";
 
   return <main className="min-h-screen bg-[#fff9f1] text-[#22271f]">
-    <section className="border-b border-[#e8dece] bg-white px-4 py-3"><div className="flex gap-2 overflow-x-auto">{roomFilters.map(([id,label]) => <button className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition ${filter===id?"bg-[#79943b] text-white":"border border-transparent text-[#636960] hover:border-[#dce8ba] hover:bg-[#f4f8e8]"}`} key={id} onClick={()=>setFilter(id)} type="button">{label}</button>)}</div></section>
+    <div className="px-3 py-5 sm:px-4 lg:px-5">
+      <header className="rounded-3xl border border-[#eadfce] bg-[linear-gradient(120deg,#fffdf8,#f5f8e9)] px-5 py-5 shadow-sm sm:px-7"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><p className="font-accent text-lg font-bold text-[#7a943e]">Lưu lại mọi cảm hứng ✦</p><h1 className="mt-1 text-4xl font-black">Moodboard của tôi ♡</h1><p className="mt-1 text-sm text-[#697067]">Thu thập, sắp xếp và chia sẻ ý tưởng cho không gian sống.</p></div><div className="flex flex-wrap gap-2"><label className="flex min-w-56 flex-1 items-center gap-2 rounded-xl border border-[#ddd2c2] bg-white px-4 py-2.5 text-sm shadow-sm"><span>⌕</span><input className="w-full bg-transparent outline-none" onChange={(event)=>setQuery(event.target.value)} placeholder="Tìm Moodboard..." value={query}/></label><button className="rounded-xl border border-[#ddd2c2] bg-white px-4 py-2 text-sm font-bold shadow-sm transition hover:border-[#8ca84b] hover:text-[#718b36]" onClick={()=>void load()} type="button">↻ Làm mới</button></div></div><div className="mt-5 flex flex-wrap gap-2">{[["all","Tất cả"],["saved","Đã lưu"],["shared","Đã chia sẻ"],["products","Sản phẩm"],["combos","Combo"]].map(([id,label], index)=><span className={`rounded-full px-4 py-2 text-xs font-bold ${index===0?"bg-[#79943b] text-white":"border border-[#e0d6c7] bg-white text-[#656b63]"}`} key={id}>{label}</span>)}</div></header>
 
-    <div className="px-3 py-6 sm:px-4 lg:px-5">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="font-accent text-lg font-bold text-[#7a943e]">Lưu lại mọi cảm hứng ✦</p><h1 className="mt-1 text-4xl font-black">Moodboard của tôi ♡</h1><p className="mt-1 text-sm text-[#697067]">Thu thập, sắp xếp và chia sẻ ý tưởng cho không gian sống.</p></div><div className="flex flex-wrap gap-2"><label className="flex min-w-56 items-center gap-2 rounded-xl border border-[#ddd2c2] bg-white px-4 py-2.5 text-sm"><span>⌕</span><input className="w-full bg-transparent outline-none" onChange={(event)=>setQuery(event.target.value)} placeholder="Tìm Moodboard..." value={query}/></label><button className="rounded-xl border border-[#ddd2c2] bg-white px-4 py-2 text-sm font-bold" onClick={()=>void load()} type="button">Làm mới</button></div></header>
-
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className={`mt-5 grid gap-5 ${error ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1fr)_420px]"}`}>
         <section>
-          <div className="mb-4 flex flex-wrap gap-2">{[["all","Tất cả"],["saved","Đã lưu"],["shared","Đã chia sẻ"],["products","Sản phẩm"],["combos","Combo"]].map(([id,label], index)=><span className={`rounded-full px-4 py-2 text-xs font-bold ${index===0?"bg-[#79943b] text-white":"border border-[#e0d6c7] bg-white text-[#656b63]"}`} key={id}>{label}</span>)}</div>
-          {loading ? <div className="grid min-h-72 place-items-center rounded-2xl border bg-white text-[#71776f]">Đang tải Moodboard...</div> : error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{error}</div> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {loading ? <div className="grid min-h-72 place-items-center rounded-2xl border bg-white text-[#71776f]">Đang tải Moodboard...</div> : error ? <div className="grid min-h-[430px] place-items-center rounded-3xl border border-[#eadfce] bg-white p-8 text-center shadow-sm"><div className="max-w-md"><span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#fff0eb] text-3xl">⌁</span><h2 className="mt-5 text-3xl font-black">Chưa kết nối được Moodboard</h2><p className="mt-3 text-sm leading-6 text-[#6d736b]">Backend DECOHO chưa phản hồi. Hãy kiểm tra server đang chạy ở cổng 3000 rồi thử tải lại.</p><p className="mt-2 rounded-lg bg-[#faf7f1] px-3 py-2 text-xs text-[#8b6258]">{error}</p><button className="mt-5 rounded-xl bg-[#79943b] px-6 py-3 text-sm font-black text-white shadow-lg shadow-[#79943b]/20" onClick={()=>void load()} type="button">Thử kết nối lại</button></div></div> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             <Link className="grid min-h-64 place-items-center rounded-2xl border-2 border-dashed border-[#d9cebd] bg-white text-center transition hover:border-[#92b34c] hover:bg-[#fbfef4]" href={createHref}><div><span className="text-5xl font-light">＋</span><p className="mt-3 font-black">Tạo Moodboard mới</p><p className="mt-1 text-xs text-[#797f76]">Lưu ý tưởng và sản phẩm</p></div></Link>
             {filtered.map((space,index) => { const id=String(space._id ?? space.id ?? index); const count=space.productPoints?.length ?? 0; return <button className={`group overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${id===String(active?._id ?? active?.id)?"border-[#8cab49] ring-2 ring-[#bcd77d]/30":"border-[#e4dacb]"}`} key={id} onClick={()=>setActiveId(id)} type="button"><div className="relative aspect-[4/3] overflow-hidden bg-[#eee9df]">{space.imageUrl ? <Image alt={space.title ?? "Moodboard"} className="object-cover transition duration-500 group-hover:scale-105" fill sizes="(min-width:1280px) 25vw,50vw" src={space.imageUrl} unoptimized/> : <div className="grid h-full place-items-center text-sm text-[#898d86]">Chưa có ảnh cover</div>}<span className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-[#e6a727] shadow">{space.isFeatured?"★":"☆"}</span></div><div className="p-4"><h2 className="text-lg font-black">{space.title ?? "Moodboard chưa đặt tên"}</h2><p className="mt-1 text-xs text-[#737970]">{roomLabels[space.roomType ?? ""] ?? "Không gian"} · {count} sản phẩm</p></div></button> })}
           </div>}
           {!loading && !error && filtered.length === 0 && spaces.length > 0 ? <p className="mt-4 rounded-xl bg-white p-5 text-center text-sm text-[#777d75]">Không tìm thấy Moodboard phù hợp.</p> : null}
         </section>
 
-        <aside className="self-start overflow-hidden rounded-2xl border border-[#ddd2c2] bg-white shadow-[0_18px_50px_rgba(70,52,31,.10)] xl:sticky xl:top-20">
+        <aside className={`${error ? "hidden" : "block"} self-start overflow-hidden rounded-2xl border border-[#ddd2c2] bg-white shadow-[0_18px_50px_rgba(70,52,31,.10)] xl:sticky xl:top-32`}>
           {active ? <><div className="flex items-start justify-between gap-3 p-5"><div><p className="text-xs text-[#798078]">Moodboard đang chọn</p><h2 className="mt-1 text-2xl font-black">{active.title ?? "Moodboard"} ✎</h2><p className="mt-1 text-xs text-[#72786f]">{roomLabels[active.roomType ?? ""] ?? "Không gian"} · {points.length} sản phẩm</p></div><button className="rounded-lg bg-[#79943b] px-4 py-2 text-xs font-black text-white" type="button">Chia sẻ ↗</button></div>
             <div className="relative mx-4 aspect-[16/9] overflow-hidden rounded-xl bg-[#ece7dd]">{active.imageUrl ? <Image alt={active.title ?? "Moodboard"} className="object-cover" fill sizes="420px" src={active.imageUrl} unoptimized/> : <div className="grid h-full place-items-center text-sm text-[#888d85]">Chưa có ảnh</div>}{points.map((point,index)=><span className="absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[#ef6e61] text-xs font-black text-white shadow" key={point._id ?? point.id ?? index} style={{left:`${point.x ?? 0}%`,top:`${point.y ?? 0}%`}}>{index+1}</span>)}</div>
             <section className="border-b border-[#eee6da] p-5"><div className="flex items-center justify-between"><h3 className="text-lg font-black">Sản phẩm đã lưu ({points.length})</h3><Link className="text-xs font-black text-[#718d35]" href="/products">Xem tất cả <span>→</span></Link></div>{points.length ? <div className="mt-4 grid grid-cols-2 gap-3">{points.slice(0,4).map((point,index)=>{const product=getProduct(point);return <Link className="rounded-xl border border-[#ece4d8] p-2" href={product?`/products/${product._id ?? product.id}`:"/products"} key={point._id ?? point.id ?? index}>{product?.images?.[0] ? <div className="relative aspect-square overflow-hidden rounded-lg"><Image alt={product.name ?? "Sản phẩm"} className="object-cover" fill sizes="160px" src={product.images[0]} unoptimized/></div> : <div className="grid aspect-square place-items-center rounded-lg bg-[#f2eee7] text-2xl">🪑</div>}<p className="mt-2 truncate text-xs font-black">{product?.name ?? "Sản phẩm"}</p><p className="mt-1 text-[11px] text-[#78913f]">{currency(product?.price)}</p></Link>})}</div> : <p className="mt-3 rounded-xl bg-[#faf7f1] p-4 text-center text-xs text-[#7b8079]">Moodboard này chưa gắn sản phẩm.</p>}</section>

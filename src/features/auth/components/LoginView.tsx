@@ -78,7 +78,7 @@ export default function LoginView() {
 
     setIsLoading(true);
     try {
-      const baseUrl=(process.env.NEXT_PUBLIC_API_URL??"http://localhost:3000/api").replace(/\/$/,"");
+      const baseUrl=(process.env.NEXT_PUBLIC_API_URL??"http://localhost:3001/api").replace(/\/$/,"");
       const response=await fetch(`${baseUrl}/auth/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:form.email.trim().toLowerCase(),password:form.password})});
       const data=await response.json().catch(()=>null);
       if(!response.ok){const message=Array.isArray(data?.message)?data.message.join(". "):data?.message;throw new Error(message??`Đăng nhập thất bại (${response.status}).`);}

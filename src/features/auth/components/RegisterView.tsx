@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import type { RegisterFormState } from "../types";
@@ -37,6 +38,7 @@ function Icon({ name }: { name: IconName }) {
 }
 
 export default function RegisterView() {
+  const router = useRouter();
   const [form, setForm] = useState<RegisterFormState>({
     agreeTerms: false,
     confirmPassword: "",
@@ -95,7 +97,7 @@ export default function RegisterView() {
 
     setIsLoading(true);
     try {
-      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
       const response = await fetch(`${baseUrl}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,6 +114,11 @@ export default function RegisterView() {
       }
       setSuccess(data?.message ?? "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.");
       setForm({ agreeTerms: false, confirmPassword: "", email: "", name: "", password: "" });
+      window.sessionStorage.setItem(
+        "decoho_registration_notice",
+        "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.",
+      );
+      router.replace("/");
     } catch (value) {
       setError(value instanceof Error ? value.message : "Không thể kết nối máy chủ.");
     } finally {

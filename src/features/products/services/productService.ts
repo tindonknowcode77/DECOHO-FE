@@ -39,7 +39,7 @@ type ApiProduct = {
 function getApiUrl() {
   const url =
     process.env.NEXT_PUBLIC_PRODUCTS_API_URL?.trim() ||
-    `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "")}/products`;
+    `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "")}/products`;
 
   return url.replace(/\/+$/, "");
 }

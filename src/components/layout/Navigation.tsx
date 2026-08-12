@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
+import GlobalSearch from "./GlobalSearch";
 import {
   clearSessionUser,
   getSessionUser,
@@ -136,19 +137,21 @@ export default function Navigation() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#ded6c9] bg-white/85 shadow-sm backdrop-blur">
-      <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
+      <div className="mx-auto max-w-[1680px] px-4 sm:px-6 xl:px-8">
+        <div className="flex h-[72px] items-center gap-3 xl:gap-5">
           <Link aria-label="DECOHO home" href="/" onClick={closeMenus}>
-            <BrandLogo className="h-12 w-[158px]" variant="horizontal" />
+            <BrandLogo className="h-12 w-[170px] shrink-0" variant="horizontal" />
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <GlobalSearch />
+
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex">
             {menuItems.map((item) => {
               const isActive = isActivePath(pathname, item.href);
 
               return (
                 <Link
-                  className={`relative rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  className={`relative whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition 2xl:px-3.5 2xl:text-sm ${
                     isActive
                       ? "text-[#1f2421]"
                       : "text-[#646a61] hover:bg-[#f7f3ec] hover:text-[#1f2421]"
@@ -165,7 +168,7 @@ export default function Navigation() {
             })}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2">
             <button
               aria-label="Thông báo"
               className="relative hidden rounded-md p-2 text-[#646a61] transition hover:bg-[#f7f3ec] hover:text-[#1f2421] sm:block"
@@ -292,14 +295,14 @@ export default function Navigation() {
             ) : (
               <div className="hidden items-center gap-2 sm:flex">
                 <Link
-                  className="inline-flex items-center gap-2 rounded-md border border-[#ded6c9] bg-white px-3 py-2 text-sm font-bold text-[#1f2421] transition hover:bg-[#f7f3ec]"
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-[#ded6c9] bg-white px-3 py-2.5 text-sm font-bold text-[#1f2421] transition hover:bg-[#f7f3ec]"
                   href="/login"
                 >
                   <Icon name="login" />
                   Đăng nhập
                 </Link>
                 <Link
-                  className="rounded-md bg-[#2f6f5e] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#285f51]"
+                  className="whitespace-nowrap rounded-lg bg-[#2f6f5e] px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-[#285f51]"
                   href="/register"
                 >
                   Đăng ký
@@ -309,7 +312,7 @@ export default function Navigation() {
 
             <button
               aria-label="Mở menu"
-              className="rounded-md p-2 text-[#51564f] transition hover:bg-[#f7f3ec] md:hidden"
+              className="rounded-md p-2 text-[#51564f] transition hover:bg-[#f7f3ec] xl:hidden"
               onClick={() => setIsMobileMenuOpen((value) => !value)}
               type="button"
             >
@@ -320,7 +323,7 @@ export default function Navigation() {
       </div>
 
       <nav aria-label="Danh mục nội thất" className="border-t border-[#eee7dc] bg-white/95">
-        <div className="mx-auto flex max-w-7xl justify-start gap-1 overflow-x-auto px-3 py-2 text-xs font-bold text-[#5f665d] scrollbar-hide md:justify-center">
+        <div className="mx-auto flex max-w-[1680px] justify-start gap-2 overflow-x-auto px-4 py-2.5 text-xs font-bold text-[#5f665d] scrollbar-hide md:justify-center">
           {categoryItems.map(([icon, label, category]) => (
             <Link
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3.5 py-2 transition hover:border-[#d9e7b4] hover:bg-[#f2f8df] hover:text-[#66862e]"
@@ -336,7 +339,7 @@ export default function Navigation() {
       </nav>
 
       {isMobileMenuOpen && (
-        <div className="border-t border-[#ded6c9] bg-white md:hidden">
+        <div className="border-t border-[#ded6c9] bg-white xl:hidden">
           <div className="space-y-1 px-5 py-3">
             {menuItems.map((item) => {
               const isActive = isActivePath(pathname, item.href);

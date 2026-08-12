@@ -23,7 +23,7 @@ export default function AiRoomStudio() {
     try {
       const form = new FormData(); form.append("image", file);
       const token = getAccessToken();
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
       const response = await fetch(`${base}/ai-scanner/scan`, { method: "POST", body: form, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.message ?? "AI không thể phân tích ảnh.");
