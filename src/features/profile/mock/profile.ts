@@ -1,14 +1,14 @@
 import type { ProfileOption, UserProfile } from "../types";
 
 export const profileUser: UserProfile = {
-  address: "Số 10, phố Duy Tân, Cầu Giấy, Hà Nội",
-  avatar: "sofa",
-  email: "demo@decoho.vn",
-  favoriteMaterials: ["wood", "linen"],
-  joinedDate: "24/06/2026",
-  name: "Gia chủ DECOHO",
-  phone: "0987 654 321",
-  preferredStyle: "japandi",
+  address: "",
+  avatar: "",
+  email: "",
+  favoriteMaterials: [],
+  joinedDate: "",
+  name: "",
+  phone: "",
+  preferredStyle: "",
 };
 
 export const preferredStyles: ProfileOption[] = [

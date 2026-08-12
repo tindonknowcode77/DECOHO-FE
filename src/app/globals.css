@@ -3,19 +3,75 @@
 :root {
   --background: #f7f3ec;
   --foreground: #1f2421;
+  --font-body: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --font-accent: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-body);
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  font-feature-settings: "kern" 1, "liga" 1;
+  letter-spacing: -0.008em;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.font-display { font-family: var(--font-display); }
+.font-accent { font-family: var(--font-accent); letter-spacing: -0.04em; }
+
+::selection { background: #cbe782; color: #20251f; }
+
+/* Home có mật độ nội dung cao như một moodboard, hạn chế khoảng trắng dư. */
+.home-compact > section:nth-child(1) { padding-block: 2.25rem !important; }
+.home-compact > section:nth-child(2) { padding-bottom: 2rem !important; }
+.home-compact > section:nth-child(3) { padding-block: 2rem !important; }
+.home-compact > section:nth-child(4) { padding-block: 2rem !important; }
+.home-compact > section:nth-child(5) { padding-bottom: 2rem !important; }
+
+.home-compact .max-w-7xl {
+  max-width: 100% !important;
+}
+
+.home-compact > section {
+  padding-left: 0.875rem !important;
+  padding-right: 0.875rem !important;
+}
+
+.home-compact > section > .max-w-7xl {
+  max-width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+@media (min-width: 1024px) {
+  .home-compact > section:nth-child(1) { padding-block: 2.5rem !important; }
+  .home-compact > section {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
 }
 
 img {

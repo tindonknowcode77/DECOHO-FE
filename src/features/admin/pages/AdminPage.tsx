@@ -1,1 +1,1 @@
-export { default } from "../components/AdminProductReviewView";
+export { default } from "../components/AdminCenterView";

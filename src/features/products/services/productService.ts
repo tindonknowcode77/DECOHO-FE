@@ -11,7 +11,8 @@ type ApiDimensions = {
 };
 
 type ApiProduct = {
-  id: string | number;
+  id?: string | number;
+  _id?: string;
   sku?: string;
   name?: string;
   category?: string;
@@ -30,21 +31,15 @@ type ApiProduct = {
   rating?: string | number;
   reviews?: string | number;
   images?: string[];
+  image?: string;
   tags?: string[];
+  styleTags?: string[];
 };
-
-const FALLBACK_IMAGES = [
-  "/images/decoho-home-interior-v2.png",
-  "/images/decoho-home-hero-v2.png",
-];
-
-const DEFAULT_PRODUCTS_API_URL =
-  "https://670f544b3e715186165759aa.mockapi.io/DECOHO";
 
 function getApiUrl() {
   const url =
     process.env.NEXT_PUBLIC_PRODUCTS_API_URL?.trim() ||
-    DEFAULT_PRODUCTS_API_URL;
+    `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "")}/products`;
 
   return url.replace(/\/+$/, "");
 }
@@ -78,7 +73,7 @@ function getDimensions(value: ApiProduct["dimensions"]) {
 }
 
 function getStyleName(product: ApiProduct) {
-  const tags = product.tags ?? [];
+  const tags = product.tags ?? product.styleTags ?? [];
   const category = product.category?.toLowerCase();
   const styleTag = tags.find((tag) => {
     const normalizedTag = tag.toLowerCase();
@@ -114,7 +109,8 @@ function isPlaceholderImage(url: string) {
   }
 }
 
-function normalizeProduct(product: ApiProduct, index = 0): Product {
+function normalizeProduct(product: ApiProduct): Product {
+  const productId=String(product.id??product._id??"");
   const originalPrice = toNumber(product.price);
   const discountPercentage = Math.max(
     0,
@@ -124,14 +120,13 @@ function normalizeProduct(product: ApiProduct, index = 0): Product {
     originalPrice * (1 - discountPercentage / 100),
   );
   const styleName = getStyleName(product);
-  const apiImages = (product.images ?? []).filter(Boolean);
+  const apiImages = [product.image,...(product.images ?? [])].filter((value):value is string=>Boolean(value));
   const usableImage = apiImages.find((image) => !isPlaceholderImage(image));
-  const image =
-    usableImage ?? FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
+  const image = usableImage ?? "";
 
   return {
-    id: String(product.id),
-    sku: product.sku ?? `DECOHO-${product.id}`,
+    id: productId,
+    sku: product.sku ?? productId,
     name: product.name ?? "Sản phẩm DECOHO",
     category: product.category ?? "Nội thất",
     brand: product.brand ?? "DECOHO",
@@ -145,7 +140,7 @@ function normalizeProduct(product: ApiProduct, index = 0): Product {
     color: product.color ?? "Đang cập nhật",
     image,
     images: apiImages,
-    tags: product.tags ?? [],
+    tags: product.tags ?? product.styleTags ?? [],
     style: slugify(styleName),
     styleName,
     description:
@@ -181,7 +176,7 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
   const data = (await response.json()) as ApiProduct[];
 
   if (!Array.isArray(data)) {
-    throw new Error("MockAPI trả về dữ liệu sản phẩm không hợp lệ.");
+    throw new Error("Backend trả về dữ liệu sản phẩm không hợp lệ.");
   }
 
   return data.map(normalizeProduct);
@@ -189,7 +184,7 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
 
 export async function getProductById(id: string): Promise<Product | null> {
   const response = await fetch(
-    `${getApiUrl()}?id=${encodeURIComponent(id)}`,
+    `${getApiUrl()}/${encodeURIComponent(id)}`,
     {
       cache: "no-store",
       headers: {
@@ -202,12 +197,8 @@ export async function getProductById(id: string): Promise<Product | null> {
     throw new Error(`Không thể tải sản phẩm (${response.status}).`);
   }
 
-  const data = (await response.json()) as ApiProduct[];
-  const product = Array.isArray(data) ? data[0] : null;
-
-  return product
-    ? normalizeProduct(product, toNumber(product.id))
-    : null;
+  const product = (await response.json()) as ApiProduct;
+  return product ? normalizeProduct(product) : null;
 }
 
 export function getRecommendedProducts(

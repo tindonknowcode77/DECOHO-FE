@@ -5,13 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
-import {
-  demoAdminCredentials,
-  demoAdminSessionUser,
-} from "@/src/features/admin/mock/adminDemo";
-import { demoStoreCredentials, demoStoreSessionUser } from "@/src/features/store/mock/storeDemo";
 import GoogleSignInButton from "./GoogleSignInButton";
-import { saveSessionUser } from "../services/session";
+import { saveAuthTokens, saveSessionUser } from "../services/session";
 import type { LoginFormState } from "../types";
 
 type IconName = "arrow" | "home" | "lock" | "mail" | "shield" | "spark";
@@ -62,32 +57,7 @@ export default function LoginView() {
     }));
   }
 
-  function completeLogin(name: string, email: string, targetPath = "/") {
-    saveSessionUser({
-      email,
-      name,
-      remember: form.remember,
-    });
-    router.push(targetPath);
-  }
-
-  function completeStoreLogin() {
-    saveSessionUser({
-      ...demoStoreSessionUser,
-      remember: form.remember,
-    });
-    router.push("/");
-  }
-
-  function completeAdminLogin() {
-    saveSessionUser({
-      ...demoAdminSessionUser,
-      remember: form.remember,
-    });
-    router.push("/admin");
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
@@ -106,106 +76,52 @@ export default function LoginView() {
       return;
     }
 
-    const normalizedEmail = form.email.trim().toLowerCase();
-
-    if (normalizedEmail === demoAdminCredentials.email) {
-      if (form.password !== demoAdminCredentials.password) {
-        setError("Mật khẩu Admin demo là admin123.");
-        return;
-      }
-
-      setIsLoading(true);
-
-      window.setTimeout(() => {
-        setIsLoading(false);
-        completeAdminLogin();
-      }, 650);
-      return;
+    setIsLoading(true);
+    try {
+      const baseUrl=(process.env.NEXT_PUBLIC_API_URL??"http://localhost:3000/api").replace(/\/$/,"");
+      const response=await fetch(`${baseUrl}/auth/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:form.email.trim().toLowerCase(),password:form.password})});
+      const data=await response.json().catch(()=>null);
+      if(!response.ok){const message=Array.isArray(data?.message)?data.message.join(". "):data?.message;throw new Error(message??`Đăng nhập thất bại (${response.status}).`);}
+      const apiRole=String(data.user?.role??"USER").toLowerCase();
+      const role = apiRole === "customer" ? "user" : apiRole === "store" ? "supplier" : (["user", "supplier", "staff", "admin", "super_admin"].includes(apiRole) ? apiRole : "user") as "user" | "supplier" | "staff" | "admin" | "super_admin";
+      saveAuthTokens(data.accessToken,data.refreshToken);
+      saveSessionUser({email:data.user?.email??form.email.trim(),name:data.user?.fullName??data.user?.name??form.email.split("@")[0],remember:form.remember,role});
+      router.push(["admin","super_admin","staff"].includes(role)?"/admin":role==="supplier"?"/store":"/");
+    } catch(error) {
+      setError(error instanceof Error?error.message:"Không thể kết nối máy chủ.");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (normalizedEmail === demoStoreCredentials.email) {
-      if (form.password !== demoStoreCredentials.password) {
-        setError("Mật khẩu cửa hàng demo là store123.");
-        return;
-      }
-
-      setIsLoading(true);
-
-      window.setTimeout(() => {
-        setIsLoading(false);
-        completeStoreLogin();
-      }, 650);
-      return;
-    }
-
-    setIsLoading(true);
-
-    window.setTimeout(() => {
-      setIsLoading(false);
-      completeLogin(form.email.split("@")[0].toUpperCase(), form.email.trim());
-    }, 900);
-  }
-
-  function handleDemoLogin() {
-    setIsLoading(true);
-
-    window.setTimeout(() => {
-      setIsLoading(false);
-      completeLogin("Nguyễn Minh Anh", "demo.designer@gmail.com");
-    }, 650);
-  }
-
-  function handleStoreDemoLogin() {
-    setIsLoading(true);
-
-    window.setTimeout(() => {
-      setIsLoading(false);
-      completeStoreLogin();
-    }, 650);
   }
 
   return (
-    <main className="grid min-h-screen bg-[#f7f3ec] text-[#1f2421] lg:grid-cols-12">
-      <section className="relative hidden overflow-hidden bg-[#1f2421] lg:col-span-7 lg:flex lg:items-end">
-        <Image
-          alt="Không gian nội thất cao cấp"
-          className="h-full w-full object-cover opacity-80"
-          fill
-          priority
-          sizes="60vw"
-          src={heroImage}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#1f2421] via-[#1f2421]/45 to-transparent" />
-
-        <div className="relative z-10 max-w-2xl p-12 text-white">
-          <p className="inline-flex items-center gap-2 rounded-md border border-[#d89b47]/35 bg-[#d89b47]/20 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#f7d79a]">
-            <Icon name="spark" />
-            Trí tuệ nhân tạo kiến tạo không gian
-          </p>
-          <h1 className="mt-5 text-5xl font-bold leading-tight">
-            Nâng tầm không gian sống của bạn.
+    <main className="min-h-screen bg-[#fbf1e7] p-0 text-[#1f2421] lg:grid lg:place-items-center lg:p-8">
+      <div className="grid min-h-screen w-full overflow-hidden bg-white shadow-[0_24px_70px_rgba(72,55,35,0.16)] lg:min-h-0 lg:max-w-6xl lg:grid-cols-[1.08fr_.92fr] lg:rounded-[28px] lg:border lg:border-[#e5d9c9]">
+      <section className="relative hidden min-h-[780px] overflow-hidden bg-[#fff8ef] px-10 pb-8 pt-10 lg:flex lg:flex-col">
+        <BrandLogo className="h-14 w-52" variant="horizontal" />
+        <div className="relative z-10 mt-12 max-w-lg">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#77963b]">Không gian của bạn · Câu chuyện của bạn</p>
+          <h1 className="mt-4 text-5xl font-black leading-[1.02] tracking-[-0.04em]">
+            Nhà của bạn.<br />Phong cách của bạn.<br /><span className="text-[#ee6c5f]">Cảm hứng của bạn.</span>
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-white/75">
-            DECOHO giúp phân tích mặt bằng, gợi ý phong cách, chọn sản phẩm và
-            chuẩn bị giỏ hàng nội thất trong một quy trình liền mạch.
-          </p>
-
-          <div className="mt-8 grid max-w-lg grid-cols-3 gap-6 border-t border-white/20 pt-7">
-            {[
-              ["100k+", "Mẫu thiết kế AI"],
-              ["04s", "Phân tích tức thời"],
-              ["98.5%", "Khách hàng hài lòng"],
-            ].map(([value, label]) => (
-              <div key={label}>
-                <p className="text-2xl font-bold">{value}</p>
-                <p className="mt-1 text-xs text-white/65">{label}</p>
-              </div>
-            ))}
+          <div className="mt-6 inline-flex max-w-sm rotate-[-2deg] items-center gap-3 rounded-sm bg-[#b8dc64] px-5 py-4 text-sm font-bold leading-6 shadow-sm">
+            <Icon name="spark" />
+            Khám phá nội thất phù hợp với căn phòng, gu thẩm mỹ và ngân sách của bạn.
           </div>
+        </div>
+        <div className="relative mt-7 min-h-0 flex-1 overflow-hidden rounded-[36px] border-[6px] border-white shadow-xl">
+          <Image alt="Phòng khách ấm cúng của DECOHO" className="object-cover" fill priority sizes="55vw" src={heroImage} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#4a3c2b]/20 to-transparent" />
+          <div className="absolute right-5 top-5 rotate-3 rounded-lg border border-[#eadfce] bg-white p-3 shadow-lg">
+            <p className="text-xs font-black">Good vibes, every day ✦</p>
+          </div>
+        </div>
+        <div className="relative z-10 -mt-5 grid grid-cols-3 gap-3 rounded-2xl border border-[#eadfce] bg-white/95 p-4 shadow-lg backdrop-blur">
+          {[["☺", "Dành riêng cho bạn"], ["♢", "An toàn & tin cậy"], ["⌂", "Đúng gu, đúng nhà"]].map(([icon,label]) => <div className="text-center" key={label}><p className="text-xl font-black text-[#74933a]">{icon}</p><p className="mt-1 text-[10px] font-black">{label}</p></div>)}
         </div>
       </section>
 
-      <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:col-span-5">
+      <section className="flex items-center justify-center bg-white px-5 py-10 sm:px-10 lg:min-h-[780px] lg:px-14">
         <div className="w-full max-w-[400px]">
           <Link
             className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-[#646a61] hover:text-[#1f2421]"
@@ -215,15 +131,15 @@ export default function LoginView() {
             Về trang chủ
           </Link>
 
-          <div className="mb-8">
+          <div className="mb-7 lg:hidden">
             <BrandLogo className="h-16 w-56" variant="horizontal" />
           </div>
 
           <div className="mb-6">
-            <h2 className="text-3xl font-bold">Chào mừng quay trở lại</h2>
+            <p className="mb-2 text-sm font-black text-[#78963d]">DECOHO xin chào!</p>
+            <h2 className="text-4xl font-black tracking-[-0.03em]">Chào mừng trở lại ♡</h2>
             <p className="mt-2 text-sm leading-6 text-[#646a61]">
-              Đăng nhập để tiếp tục quản lý hồ sơ, bản phân tích AI và giỏ hàng
-              nội thất của bạn.
+              Đăng nhập để tiếp tục hành trình trang trí không gian của bạn.
             </p>
           </div>
 
@@ -245,7 +161,7 @@ export default function LoginView() {
                 </span>
                 <input
                   autoComplete="email"
-                  className="h-12 w-full rounded-md border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/15"
+                  className="h-13 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="login-email"
                   onChange={(event) => updateField("email", event.target.value)}
                   placeholder="name@example.com"
@@ -271,7 +187,7 @@ export default function LoginView() {
                 </span>
                 <input
                   autoComplete="current-password"
-                  className="h-12 w-full rounded-md border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/15"
+                  className="h-13 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="login-password"
                   onChange={(event) => updateField("password", event.target.value)}
                   placeholder="••••••••"
@@ -293,7 +209,7 @@ export default function LoginView() {
             </label>
 
             <button
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1f2421] px-5 text-sm font-bold text-white transition hover:bg-[#2f352f] disabled:opacity-60"
+              className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#789b35] px-5 text-sm font-black text-white shadow-[0_8px_20px_rgba(120,155,53,.2)] transition hover:bg-[#66872c] disabled:opacity-60"
               disabled={isLoading}
               id="login-submit-btn"
               type="submit"
@@ -311,7 +227,7 @@ export default function LoginView() {
 
           <div className="relative my-6 text-center">
             <hr className="border-[#ded6c9]" />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#f7f3ec] px-3 text-xs font-semibold text-[#646a61]">
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 text-xs font-semibold text-[#646a61]">
               Hoặc tiếp tục với
             </span>
           </div>
@@ -321,39 +237,6 @@ export default function LoginView() {
               onError={setError}
               remember={form.remember}
             />
-
-            <div className="relative py-1 text-center">
-              <hr className="border-[#ded6c9]" />
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#f7f3ec] px-3 text-[10px] font-bold uppercase text-[#7b7f78]">
-                Tài khoản demo
-              </span>
-            </div>
-
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#ecd5ab] bg-[#fff7e8] px-4 text-xs font-bold uppercase text-[#8a5d25] transition hover:bg-[#fbe9c3]"
-              id="demo-login-btn"
-              onClick={handleDemoLogin}
-              type="button"
-            >
-              <Icon name="spark" />
-              Dùng thử bản demo
-            </button>
-
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#b7dfc4] bg-[#eefbf2] px-4 text-xs font-bold uppercase text-[#23643b] transition hover:bg-[#dff1e6]"
-              id="store-demo-login-btn"
-              onClick={handleStoreDemoLogin}
-              type="button"
-            >
-              <Icon name="shield" />
-              Dùng thử cửa hàng demo
-            </button>
-
-            {/* <p className="rounded-md border border-[#ded6c9] bg-white px-3 py-2 text-xs leading-5 text-[#646a61]">
-              Cửa hàng demo: <strong>{demoStoreCredentials.email}</strong> /{" "}
-              <strong>{demoStoreCredentials.password}</strong>
-            </p> */}
-
           </div>
 
           <p className="mt-8 text-center text-sm text-[#646a61]">
@@ -362,8 +245,10 @@ export default function LoginView() {
               Đăng ký ngay
             </Link>
           </p>
+          <div className="mt-8 rounded-2xl border border-[#eadfce] bg-[#fff8ef] p-4 text-center text-sm font-semibold leading-6 text-[#5f594f]">🪴 Từ góc nhỏ ấm cúng đến căn phòng trong mơ — tìm nội thất đúng chất của bạn.</div>
         </div>
       </section>
+      </div>
     </main>
   );
 }

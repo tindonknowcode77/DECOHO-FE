@@ -2,10 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
-import { saveSessionUser } from "../services/session";
 import type { RegisterFormState } from "../types";
 
 type IconName = "arrow" | "check" | "home" | "lock" | "mail" | "shield" | "spark" | "user";
@@ -39,7 +37,6 @@ function Icon({ name }: { name: IconName }) {
 }
 
 export default function RegisterView() {
-  const router = useRouter();
   const [form, setForm] = useState<RegisterFormState>({
     agreeTerms: false,
     confirmPassword: "",
@@ -48,6 +45,7 @@ export default function RegisterView() {
     password: "",
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   function updateField<TField extends keyof RegisterFormState>(
@@ -60,9 +58,10 @@ export default function RegisterView() {
     }));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setSuccess("");
 
     if (
       !form.name.trim() ||
@@ -95,63 +94,52 @@ export default function RegisterView() {
     }
 
     setIsLoading(true);
-
-    window.setTimeout(() => {
-      saveSessionUser({
-        email: form.email.trim(),
-        name: form.name.trim(),
-        registeredAt: new Date().toISOString(),
+    try {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
+      const response = await fetch(`${baseUrl}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          fullName: form.name.trim(),
+          password: form.password,
+        }),
       });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = Array.isArray(data?.message) ? data.message.join(". ") : data?.message;
+        throw new Error(message ?? `Đăng ký thất bại (${response.status}).`);
+      }
+      setSuccess(data?.message ?? "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.");
+      setForm({ agreeTerms: false, confirmPassword: "", email: "", name: "", password: "" });
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Không thể kết nối máy chủ.");
+    } finally {
       setIsLoading(false);
-      router.push("/profile");
-    }, 900);
+    }
   }
 
   return (
-    <main className="grid min-h-screen bg-[#f7f3ec] text-[#1f2421] lg:grid-cols-12">
-      <section className="relative hidden overflow-hidden bg-[#1f2421] lg:col-span-7 lg:flex lg:items-end">
-        <Image
-          alt="Không gian nội thất Japandi sáng và ấm"
-          className="h-full w-full object-cover opacity-80"
-          fill
-          priority
-          sizes="60vw"
-          src={heroImage}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#1f2421] via-[#1f2421]/45 to-transparent" />
-
-        <div className="relative z-10 max-w-2xl p-12 text-white">
-          <p className="inline-flex items-center gap-2 rounded-md border border-[#d89b47]/35 bg-[#d89b47]/20 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#f7d79a]">
-            <Icon name="spark" />
-            Trải nghiệm xu hướng thiết kế mới
-          </p>
-          <h1 className="mt-5 text-5xl font-bold leading-tight">
-            Hiện thực hóa ngôi nhà trong mơ của bạn.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-white/75">
-            Tạo tài khoản miễn phí để mở khóa phân tích không gian AI, lưu hồ
-            sơ gu thẩm mỹ, quản lý sản phẩm yêu thích và chuẩn bị giỏ hàng nội
-            thất cá nhân.
-          </p>
-
-          <div className="mt-8 grid max-w-xl gap-3 border-t border-white/20 pt-7">
-            {[
-              "Phân tích ảnh phòng bằng AI",
-              "Lưu phong cách và vật liệu yêu thích",
-              "Đồng bộ catalog sản phẩm và giỏ hàng",
-            ].map((item) => (
-              <p className="flex items-center gap-3 text-sm text-white/80" key={item}>
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-[#d89b47] text-[#1f2421]">
-                  <Icon name="check" />
-                </span>
-                {item}
-              </p>
-            ))}
-          </div>
+    <main className="min-h-screen bg-[#fbf1e7] p-0 text-[#1f2421] lg:grid lg:place-items-center lg:p-8">
+      <div className="grid min-h-screen w-full overflow-hidden bg-white shadow-[0_24px_70px_rgba(72,55,35,0.16)] lg:min-h-0 lg:max-w-6xl lg:grid-cols-[1.08fr_.92fr] lg:rounded-[28px] lg:border lg:border-[#e5d9c9]">
+      <section className="relative hidden min-h-[820px] overflow-hidden bg-[#fff8ef] px-10 pb-8 pt-10 lg:flex lg:flex-col">
+        <BrandLogo className="h-14 w-52" variant="horizontal" />
+        <div className="relative z-10 mt-10 max-w-lg">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#77963b]">Bắt đầu hành trình DECOHO</p>
+          <h1 className="mt-4 text-5xl font-black leading-[1.02] tracking-[-0.04em]">Tạo tổ ấm.<br />Lưu cảm hứng.<br /><span className="text-[#ee6c5f]">Sống đúng gu ♡</span></h1>
+          <div className="mt-6 inline-flex rotate-[-2deg] items-center gap-3 rounded-sm bg-[#b8dc64] px-5 py-4 text-sm font-bold shadow-sm"><Icon name="spark" />Một tài khoản nhỏ, thật nhiều ý tưởng xinh cho ngôi nhà của bạn.</div>
+        </div>
+        <div className="relative mt-7 min-h-0 flex-1 overflow-hidden rounded-[36px] border-[6px] border-white shadow-xl">
+          <Image alt="Không gian nội thất ấm cúng của DECOHO" className="object-cover" fill priority sizes="55vw" src={heroImage} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#4a3c2b]/20 to-transparent" />
+          <div className="absolute right-5 top-5 rotate-3 rounded-lg border border-[#eadfce] bg-white p-3 shadow-lg"><p className="text-xs font-black">Your home, your happy place ✦</p></div>
+        </div>
+        <div className="relative z-10 -mt-5 grid grid-cols-3 gap-3 rounded-2xl border border-[#eadfce] bg-white/95 p-4 shadow-lg backdrop-blur">
+          {[["✦", "Quét phòng bằng AI"], ["♡", "Lưu gu yêu thích"], ["⌂", "Mua sắm dễ dàng"]].map(([icon,label]) => <div className="text-center" key={label}><p className="text-xl font-black text-[#74933a]">{icon}</p><p className="mt-1 text-[10px] font-black">{label}</p></div>)}
         </div>
       </section>
 
-      <section className="flex items-center justify-center px-5 py-10 sm:px-8 lg:col-span-5">
+      <section className="flex items-center justify-center bg-white px-5 py-10 sm:px-10 lg:min-h-[820px] lg:px-14">
         <div className="w-full max-w-md">
           <Link
             className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[#646a61] hover:text-[#1f2421]"
@@ -161,14 +149,15 @@ export default function RegisterView() {
             Về trang chủ
           </Link>
 
-          <div className="mb-6">
+          <div className="mb-6 lg:hidden">
             <BrandLogo className="h-16 w-56" variant="horizontal" />
           </div>
 
           <div className="mb-6">
-            <h2 className="text-3xl font-bold">Đăng ký tài khoản</h2>
+            <p className="mb-2 text-sm font-black text-[#78963d]">Cùng trang trí nào!</p>
+            <h2 className="text-4xl font-black tracking-[-0.03em]">Tạo tài khoản mới ♡</h2>
             <p className="mt-2 text-sm leading-6 text-[#646a61]">
-              Cùng AI khởi tạo không gian sống tương lai chỉ trong vài bước.
+              Tham gia DECOHO để lưu mọi cảm hứng cho căn nhà trong mơ.
             </p>
           </div>
 
@@ -181,6 +170,14 @@ export default function RegisterView() {
             </div>
           )}
 
+          {success && (
+            <div className="mb-4 rounded-md border border-[#b9d8c9] bg-[#edf8f2] p-4 text-sm leading-6 text-[#245b47]">
+              <p className="font-bold">Đăng ký thành công</p>
+              <p>{success}</p>
+              <Link className="mt-2 inline-block font-bold underline" href="/login">Đi đến đăng nhập</Link>
+            </div>
+          )}
+
           <form className="space-y-4" onSubmit={handleSubmit}>
             <label className="block">
               <span className="text-xs font-bold uppercase text-[#51564f]">Họ và tên</span>
@@ -190,7 +187,7 @@ export default function RegisterView() {
                 </span>
                 <input
                   autoComplete="name"
-                  className="h-11 w-full rounded-md border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/15"
+                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="register-name"
                   onChange={(event) => updateField("name", event.target.value)}
                   placeholder="Nguyễn Văn A"
@@ -208,7 +205,7 @@ export default function RegisterView() {
                 </span>
                 <input
                   autoComplete="email"
-                  className="h-11 w-full rounded-md border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/15"
+                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="register-email"
                   onChange={(event) => updateField("email", event.target.value)}
                   placeholder="name@example.com"
@@ -228,7 +225,7 @@ export default function RegisterView() {
                 </span>
                 <input
                   autoComplete="new-password"
-                  className="h-11 w-full rounded-md border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/15"
+                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="register-password"
                   onChange={(event) => updateField("password", event.target.value)}
                   placeholder="••••••••"
@@ -248,7 +245,7 @@ export default function RegisterView() {
                 </span>
                 <input
                   autoComplete="new-password"
-                  className="h-11 w-full rounded-md border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none focus:border-[#2f6f5e] focus:ring-2 focus:ring-[#2f6f5e]/15"
+                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="register-confirm-password"
                   onChange={(event) => updateField("confirmPassword", event.target.value)}
                   placeholder="••••••••"
@@ -280,7 +277,7 @@ export default function RegisterView() {
             </label>
 
             <button
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#1f2421] px-5 text-sm font-bold text-white transition hover:bg-[#2f352f] disabled:opacity-60"
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#789b35] px-5 text-sm font-black text-white shadow-[0_8px_20px_rgba(120,155,53,.2)] transition hover:bg-[#66872c] disabled:opacity-60"
               disabled={isLoading}
               id="register-submit-btn"
               type="submit"
@@ -302,8 +299,10 @@ export default function RegisterView() {
               Đăng nhập tại đây
             </Link>
           </p>
+          <div className="mt-6 rounded-2xl border border-[#eadfce] bg-[#fff8ef] p-4 text-center text-sm font-semibold leading-6 text-[#5f594f]">🌼 Mỗi ngôi nhà đẹp đều bắt đầu từ một ý tưởng nhỏ xinh.</div>
         </div>
       </section>
+      </div>
     </main>
   );
 }

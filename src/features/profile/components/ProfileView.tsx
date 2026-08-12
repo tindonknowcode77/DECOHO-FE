@@ -74,20 +74,30 @@ const avatarIcons: Record<string, LucideIcon> = {
 };
 
 const roleDetails = {
+  super_admin: {
+    actionHref: "/admin",
+    actionLabel: "Mở Admin Center",
+    label: "Quản trị viên cao cấp",
+  },
   admin: {
     actionHref: "/admin",
     actionLabel: "Mở Admin Center",
     label: "Quản trị viên",
   },
-  customer: {
+  staff: {
+    actionHref: "/admin",
+    actionLabel: "Mở khu vực nhân viên",
+    label: "Nhân viên DECOHO",
+  },
+  user: {
     actionHref: "/product-space",
     actionLabel: "Mở Moodboard",
     label: "Thành viên DECOHO",
   },
-  store: {
+  supplier: {
     actionHref: "/store",
     actionLabel: "Mở kênh cửa hàng",
-    label: "Đối tác cửa hàng",
+    label: "Nhà cung cấp",
   },
 } as const;
 
@@ -315,7 +325,7 @@ export default function ProfileView() {
   const phoneInvalid =
     phone.trim().length > 0 &&
     (phoneDigits.length < 9 || phoneDigits.length > 11);
-  const role = sessionUser?.role ?? "customer";
+  const role = sessionUser?.role ?? "user";
   const currentRole = roleDetails[role];
 
   function toggleMaterial(materialId: string) {

@@ -1,6 +1,8 @@
 import type { AuthSessionUser } from "../types";
 
-export const AUTH_STORAGE_KEY = "decoho_demo_user";
+export const AUTH_STORAGE_KEY = "decoho_user";
+export const ACCESS_TOKEN_KEY = "decoho_access_token";
+export const REFRESH_TOKEN_KEY = "decoho_refresh_token";
 export const AUTH_CHANGE_EVENT = "decoho-auth-change";
 
 function isBrowser() {
@@ -29,8 +31,16 @@ function parseSessionUser(value: string | null): AuthSessionUser | null {
         registeredAt: parsed.registeredAt,
         remember: parsed.remember,
         role:
-          parsed.role === "admin" || parsed.role === "customer" || parsed.role === "store"
+          parsed.role === "user" ||
+          parsed.role === "supplier" ||
+          parsed.role === "staff" ||
+          parsed.role === "admin" ||
+          parsed.role === "super_admin"
             ? parsed.role
+            : (parsed as { role?: string }).role === "customer"
+              ? "user"
+            : (parsed as { role?: string }).role === "store"
+              ? "supplier"
             : undefined,
         storeId: typeof parsed.storeId === "string" ? parsed.storeId : undefined,
         storeName: typeof parsed.storeName === "string" ? parsed.storeName : undefined,
@@ -39,6 +49,13 @@ function parseSessionUser(value: string | null): AuthSessionUser | null {
           parsed.storeStatus === "pending" ||
           parsed.storeStatus === "rejected"
             ? parsed.storeStatus
+            : undefined,
+        supplierApplicationStatus:
+          parsed.supplierApplicationStatus === "none" ||
+          parsed.supplierApplicationStatus === "pending" ||
+          parsed.supplierApplicationStatus === "approved" ||
+          parsed.supplierApplicationStatus === "rejected"
+            ? parsed.supplierApplicationStatus
             : undefined,
       };
     }
@@ -66,12 +83,17 @@ export function saveSessionUser(user: AuthSessionUser) {
   window.dispatchEvent(new CustomEvent<AuthSessionUser>(AUTH_CHANGE_EVENT, { detail: user }));
 }
 
+export function saveAuthTokens(accessToken:string,refreshToken?:string){if(!isBrowser())return;window.localStorage.setItem(ACCESS_TOKEN_KEY,accessToken);if(refreshToken)window.localStorage.setItem(REFRESH_TOKEN_KEY,refreshToken);}
+export function getAccessToken(){return isBrowser()?window.localStorage.getItem(ACCESS_TOKEN_KEY):null;}
+
 export function clearSessionUser() {
   if (!isBrowser()) {
     return;
   }
 
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
   window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT, { detail: null }));
 }
 

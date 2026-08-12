@@ -22,8 +22,9 @@ export type AuthSessionUser = {
   preferredStyle?: string;
   remember?: boolean;
   registeredAt?: string;
-  role?: "admin" | "customer" | "store";
+  role?: "user" | "supplier" | "staff" | "admin" | "super_admin";
   storeId?: string;
   storeName?: string;
   storeStatus?: "approved" | "pending" | "rejected";
+  supplierApplicationStatus?: "none" | "pending" | "approved" | "rejected";
 };

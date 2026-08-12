@@ -2,626 +2,75 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Check, ShoppingCart } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { initialCartItems } from "@/src/features/cart/mock/cartItems";
-import { addCartItem } from "@/src/features/cart/services/cartStorage";
-import { getProducts } from "@/src/features/products/services/productService";
-import type { Product } from "@/src/features/products/types";
-import ProductScanner from "./ProductScanner";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getSessionUser } from "@/src/features/auth/services/session";
 
-type Hotspot = {
-  id: string;
-  productId: string;
-  fallbackLabel: string;
-  x: number;
-  y: number;
-  cardSide: "left" | "right";
-  cardAlign?: "top" | "center" | "bottom";
-};
+type Product = { _id?: string; id?: string; name?: string; price?: number; images?: string[] };
+type ProductPoint = { _id?: string; id?: string; x?: number; y?: number; product?: Product; productId?: Product | string };
+type ProductSpace = { _id?: string; id?: string; title?: string; imageUrl?: string; description?: string; roomType?: string; isFeatured?: boolean; productPoints?: ProductPoint[]; createdAt?: string };
 
-type ProductScene = {
-  id: string;
-  name: string;
-  style: string;
-  description: string;
-  image: string;
-  hotspots: Hotspot[];
-};
+const roomFilters = [
+  ["all", "Tất cả"], ["living_room", "🛋 Phòng khách"], ["bedroom", "🛏 Phòng ngủ"],
+  ["dining_room", "🍽 Phòng ăn"], ["kitchen", "☕ Nhà bếp"], ["office", "▤ Góc làm việc"],
+  ["bathroom", "♨ Phòng tắm"], ["other", "✦ Trang trí"],
+] as const;
 
-const productScenes: ProductScene[] = [
-  {
-    id: "organic-calm",
-    name: "Organic Calm",
-    style: "Tự nhiên · Tĩnh tại",
-    description:
-      "Bảng màu kem, gỗ ấm và những đường cong mềm tạo nên một phòng khách nhẹ nhàng.",
-    image: "/images/product-space/organic-calm.png",
-    hotspots: [
-      {
-        cardAlign: "center",
-        cardSide: "right",
-        fallbackLabel: "Kệ tivi phòng khách",
-        id: "organic-tv-console",
-        productId: "11",
-        x: 15,
-        y: 70,
-      },
-      {
-        cardAlign: "top",
-        cardSide: "right",
-        fallbackLabel: "Đèn thả cánh hoa",
-        id: "organic-pendant",
-        productId: "17",
-        x: 50,
-        y: 22,
-      },
-      {
-        cardAlign: "center",
-        cardSide: "left",
-        fallbackLabel: "Sofa góc chữ L",
-        id: "organic-sofa",
-        productId: "1",
-        x: 76,
-        y: 64,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "right",
-        fallbackLabel: "Bộ bàn trà đá tự nhiên",
-        id: "organic-table",
-        productId: "18",
-        x: 43,
-        y: 76,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "left",
-        fallbackLabel: "Thảm dệt Japandi",
-        id: "organic-rug",
-        productId: "4",
-        x: 58,
-        y: 86,
-      },
-    ],
-  },
-  {
-    id: "urban-warmth",
-    name: "Urban Warmth",
-    style: "Hiện đại · Ấm áp",
-    description:
-      "Đường nét gọn, tương phản đen và kem cùng ánh sáng gián tiếp cho căn hộ thành thị.",
-    image: "/images/product-space/urban-warmth.png",
-    hotspots: [
-      {
-        cardAlign: "top",
-        cardSide: "right",
-        fallbackLabel: "Đèn chùm ánh sáng vàng",
-        id: "urban-chandelier",
-        productId: "16",
-        x: 52,
-        y: 17,
-      },
-      {
-        cardAlign: "center",
-        cardSide: "right",
-        fallbackLabel: "Kệ tivi treo tường",
-        id: "urban-tv-console",
-        productId: "11",
-        x: 36,
-        y: 59,
-      },
-      {
-        cardAlign: "center",
-        cardSide: "left",
-        fallbackLabel: "Sofa góc chữ L",
-        id: "urban-sofa",
-        productId: "1",
-        x: 76,
-        y: 60,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "right",
-        fallbackLabel: "Bàn trà tròn màu đen",
-        id: "urban-table",
-        productId: "12",
-        x: 50,
-        y: 70,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "right",
-        fallbackLabel: "Ghế thư giãn boucle",
-        id: "urban-chair",
-        productId: "13",
-        x: 23,
-        y: 73,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "right",
-        fallbackLabel: "Đôn tròn bọc da lộn",
-        id: "urban-ottoman",
-        productId: "14",
-        x: 30,
-        y: 86,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "left",
-        fallbackLabel: "Thảm lông ngắn màu kem",
-        id: "urban-rug",
-        productId: "15",
-        x: 66,
-        y: 84,
-      },
-    ],
-  },
-  {
-    id: "soft-evening",
-    name: "Soft Evening",
-    style: "Cozy · Ánh sáng ấm",
-    description:
-      "Không gian quây quần với sofa lớn, gỗ sáng và nhiều lớp ánh sáng dịu vào cuối ngày.",
-    image: "/images/product-space/soft-evening.png",
-    hotspots: [
-      {
-        cardAlign: "top",
-        cardSide: "right",
-        fallbackLabel: "Đèn thả trần nghệ thuật",
-        id: "evening-pendant",
-        productId: "5",
-        x: 49,
-        y: 14,
-      },
-      {
-        cardAlign: "center",
-        cardSide: "right",
-        fallbackLabel: "Kệ tivi phòng khách",
-        id: "evening-tv-console",
-        productId: "11",
-        x: 20,
-        y: 66,
-      },
-      {
-        cardAlign: "center",
-        cardSide: "left",
-        fallbackLabel: "Sofa góc chữ L",
-        id: "evening-sofa",
-        productId: "1",
-        x: 80,
-        y: 61,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "right",
-        fallbackLabel: "Bàn trà tròn",
-        id: "evening-table",
-        productId: "2",
-        x: 50,
-        y: 69,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "right",
-        fallbackLabel: "Ghế thư giãn boucle",
-        id: "evening-poufs",
-        productId: "13",
-        x: 25,
-        y: 83,
-      },
-      {
-        cardAlign: "bottom",
-        cardSide: "left",
-        fallbackLabel: "Thảm lông ngắn màu kem",
-        id: "evening-rug",
-        productId: "15",
-        x: 54,
-        y: 84,
-      },
-    ],
-  },
-];
+const roomLabels: Record<string, string> = { living_room: "Phòng khách", bedroom: "Phòng ngủ", dining_room: "Phòng ăn", kitchen: "Nhà bếp", office: "Góc làm việc", bathroom: "Phòng tắm", other: "Không gian" };
 
-function formatPrice(value: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    currency: "VND",
-    maximumFractionDigits: 0,
-    style: "currency",
-  }).format(value);
-}
+function getProduct(point: ProductPoint) { return typeof point.productId === "object" ? point.productId : point.product; }
+function currency(value?: number) { return typeof value === "number" ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value) : "Liên hệ"; }
 
-function ArrowIcon() {
-  return (
-    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M5 12h14m-6-6 6 6-6 6"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
+export default function ProductSpaceView() {
+  const [spaces, setSpaces] = useState<ProductSpace[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
+      const response = await fetch(`${base}/product-spaces`, { cache: "no-store" });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.message ?? "Không thể tải Moodboard.");
+      const items = (Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : []) as ProductSpace[];
+      setSpaces(items); setActiveId((current) => current || String(items[0]?._id ?? items[0]?.id ?? ""));
+    } catch (value) { setError(value instanceof Error ? value.message : "Không thể kết nối backend."); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
-function ProductPopover({
-  isAdded,
-  onAddToCart,
-  product,
-}: {
-  isAdded: boolean;
-  onAddToCart: (product: Product) => void;
-  product: Product;
-}) {
-  return (
-    <div className="w-full rounded-lg border border-white/70 bg-white/95 p-4 text-[#1f2421] shadow-[0_18px_45px_rgba(24,30,26,.26)] backdrop-blur-md sm:w-64">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#2f6f5e]">
-          {product.category}
-        </p>
-        <span className="shrink-0 text-[10px] font-bold uppercase text-[#b46f2c]">
-          {product.stock > 0 ? `Còn ${product.stock}` : "Hết hàng"}
-        </span>
-      </div>
-      <h3 className="mt-2 line-clamp-2 text-base font-bold leading-5">
-        {product.name}
-      </h3>
-      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#646a61]">
-        {product.material} · {product.dimensions}
-      </p>
-      <div className="mt-3 border-t border-[#eee7dc] pt-3">
-        <p className="text-sm font-bold">{formatPrice(product.priceVND)}</p>
-        <div className="mt-3 grid grid-cols-[1fr_84px] gap-2">
-          <button
-            className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-bold transition ${
-              isAdded
-                ? "bg-[#2f6f5e] text-white"
-                : "bg-[#d89b47] text-[#17211d] hover:bg-[#e4aa55]"
-            } disabled:cursor-not-allowed disabled:bg-[#d7d3cb] disabled:text-[#777c75]`}
-            disabled={product.stock === 0}
-            onClick={() => onAddToCart(product)}
-            type="button"
-          >
-            {isAdded ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <ShoppingCart className="h-4 w-4" />
-            )}
-            {isAdded ? "Đã thêm" : "Thêm giỏ"}
-          </button>
-          <Link
-            className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-[#d7cdbc] text-xs font-bold text-[#2f6f5e] transition hover:border-[#2f6f5e]"
-            href={`/products/${product.id}`}
-          >
-            Chi tiết
-            <ArrowIcon />
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+  const filtered = useMemo(() => spaces.filter((space) => (filter === "all" || space.roomType === filter) && `${space.title ?? ""} ${space.description ?? ""}`.toLowerCase().includes(query.toLowerCase())), [filter, query, spaces]);
+  const active = spaces.find((space) => String(space._id ?? space.id) === activeId) ?? filtered[0];
+  const points = active?.productPoints ?? [];
+  const user = getSessionUser();
+  const createHref = user && ["admin", "super_admin", "staff"].includes(user.role ?? "") ? "/admin" : "/login";
 
-export default function ProductSpaceView({
-  initialProducts = [],
-}: {
-  initialProducts?: Product[];
-}) {
-  const [selectedSceneId, setSelectedSceneId] = useState(productScenes[0].id);
-  const [activeHotspotId, setActiveHotspotId] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [isLoading, setIsLoading] = useState(initialProducts.length === 0);
-  const [loadError, setLoadError] = useState("");
-  const [reloadToken, setReloadToken] = useState(0);
-  const [addedProductId, setAddedProductId] = useState<string | null>(null);
-  const addedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return <main className="min-h-screen bg-[#fff9f1] text-[#22271f]">
+    <section className="border-b border-[#e8dece] bg-white px-4 py-3"><div className="flex gap-2 overflow-x-auto">{roomFilters.map(([id,label]) => <button className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition ${filter===id?"bg-[#79943b] text-white":"border border-transparent text-[#636960] hover:border-[#dce8ba] hover:bg-[#f4f8e8]"}`} key={id} onClick={()=>setFilter(id)} type="button">{label}</button>)}</div></section>
 
-  useEffect(() => {
-    if (initialProducts.length > 0 && reloadToken === 0) {
-      return;
-    }
+    <div className="px-3 py-6 sm:px-4 lg:px-5">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="font-accent text-lg font-bold text-[#7a943e]">Lưu lại mọi cảm hứng ✦</p><h1 className="mt-1 text-4xl font-black">Moodboard của tôi ♡</h1><p className="mt-1 text-sm text-[#697067]">Thu thập, sắp xếp và chia sẻ ý tưởng cho không gian sống.</p></div><div className="flex flex-wrap gap-2"><label className="flex min-w-56 items-center gap-2 rounded-xl border border-[#ddd2c2] bg-white px-4 py-2.5 text-sm"><span>⌕</span><input className="w-full bg-transparent outline-none" onChange={(event)=>setQuery(event.target.value)} placeholder="Tìm Moodboard..." value={query}/></label><button className="rounded-xl border border-[#ddd2c2] bg-white px-4 py-2 text-sm font-bold" onClick={()=>void load()} type="button">Làm mới</button></div></header>
 
-    const controller = new AbortController();
-
-    async function loadProducts() {
-      setIsLoading(true);
-      setLoadError("");
-
-      try {
-        setProducts(await getProducts(controller.signal));
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          const message =
-            error instanceof Error ? error.message : "";
-          setLoadError(
-            message && message !== "Failed to fetch"
-              ? message
-              : "Không thể kết nối catalog sản phẩm. Vui lòng thử lại.",
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadProducts();
-
-    return () => controller.abort();
-  }, [initialProducts.length, reloadToken]);
-
-  useEffect(
-    () => () => {
-      if (addedResetTimer.current) {
-        clearTimeout(addedResetTimer.current);
-      }
-    },
-    [],
-  );
-
-  const selectedScene =
-    productScenes.find((scene) => scene.id === selectedSceneId) ??
-    productScenes[0];
-
-  const productsById = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
-  );
-
-  const activeHotspot = selectedScene.hotspots.find(
-    (hotspot) => hotspot.id === activeHotspotId,
-  );
-  const activeProduct = activeHotspot
-    ? productsById.get(activeHotspot.productId)
-    : undefined;
-  const availableProductCount = selectedScene.hotspots.filter((hotspot) =>
-    productsById.has(hotspot.productId),
-  ).length;
-
-  function selectScene(sceneId: string) {
-    setSelectedSceneId(sceneId);
-    setActiveHotspotId(null);
-  }
-
-  function addProductToCart(product: Product) {
-    addCartItem(
-      {
-        category: product.category,
-        dimensions: product.dimensions,
-        id: `catalog-${product.id}`,
-        image: product.image,
-        material: product.material,
-        name: product.name,
-        priceVND: product.priceVND,
-        productHref: `/products/${product.id}`,
-        quantity: 1,
-        source: "catalog",
-        stock: product.stock,
-        style: product.styleName,
-      },
-      initialCartItems,
-    );
-    setAddedProductId(product.id);
-
-    if (addedResetTimer.current) {
-      clearTimeout(addedResetTimer.current);
-    }
-
-    addedResetTimer.current = setTimeout(() => setAddedProductId(null), 2200);
-  }
-
-  return (
-    <main className="min-h-screen bg-[#f6f1e9] px-5 py-8 text-[#1f2421] sm:px-8 sm:py-10">
-      <section className="mx-auto max-w-7xl">
-        <header className="flex flex-col justify-between gap-5 border-b border-[#ded6c9] pb-6 lg:flex-row lg:items-end">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[#b46f2c]">
-              Nội thất có thể chạm
-            </p>
-            <h1 className="mt-2 text-4xl font-bold sm:text-5xl">
-              Moodboard
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#646a61] sm:text-base">
-              Di chuột hoặc chạm vào điểm đánh dấu trong phòng để xem đúng sản
-              phẩm, giá và thông số từ catalog DECOHO.
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-11 w-fit items-center gap-2 rounded-md bg-[#1f2421] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#2f6f5e]"
-            href="/products"
-          >
-            Mở toàn bộ sản phẩm
-            <ArrowIcon />
-          </Link>
-        </header>
-
-        <div className="mt-12 flex items-end justify-between gap-4 border-b border-[#ded6c9] pb-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[#b46f2c]">
-              Không gian có thể chạm
-            </p>
-            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
-              Khám phá showroom theo phong cách
-            </h2>
-          </div>
-          <span className="hidden text-xs text-[#737970] sm:block">
-            Chọn không gian · Chạm vào điểm đánh dấu
-          </span>
-        </div>
-
-        <div
-          aria-label="Chọn không gian"
-          className="mt-6 grid gap-3 sm:grid-cols-3"
-          role="tablist"
-        >
-          {productScenes.map((scene) => {
-            const isSelected = scene.id === selectedScene.id;
-
-            return (
-              <button
-                aria-selected={isSelected}
-                className={`grid grid-cols-[76px_1fr] items-center gap-3 rounded-lg border p-2 text-left transition ${
-                  isSelected
-                    ? "border-[#2f6f5e] bg-[#e8f1ec] shadow-sm"
-                    : "border-[#ded6c9] bg-white hover:border-[#b8ad9c]"
-                }`}
-                key={scene.id}
-                onClick={() => selectScene(scene.id)}
-                role="tab"
-                type="button"
-              >
-                <span className="relative h-14 overflow-hidden rounded-md bg-[#ddd4c6]">
-                  <Image
-                    alt=""
-                    className="object-cover"
-                    fill
-                    sizes="76px"
-                    src={scene.image}
-                  />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold">{scene.name}</span>
-                  <span className="mt-1 block truncate text-xs text-[#646a61]">
-                    {scene.style}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {loadError && (
-          <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-lg border border-[#e3b7ad] bg-[#fff7f4] p-4 text-sm text-[#8f2f24] sm:flex-row sm:items-center">
-            <p>{loadError}</p>
-            <button
-              className="rounded-md border border-[#d79c8f] px-3 py-2 font-bold"
-              onClick={() => setReloadToken((value) => value + 1)}
-              type="button"
-            >
-              Tải lại
-            </button>
-          </div>
-        )}
-
-        <section className="mt-5 overflow-hidden rounded-lg border border-[#d7cdbc] bg-[#17211d] shadow-[0_18px_50px_rgba(48,39,28,.16)]">
-          <div className="relative aspect-[3/2] overflow-hidden">
-            <Image
-              alt={`Không gian ${selectedScene.name}`}
-              className="object-cover"
-              fill
-              priority
-              sizes="(min-width: 1280px) 1216px, 100vw"
-              src={selectedScene.image}
-            />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/35 to-transparent" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/45 to-transparent" />
-
-            <div className="absolute left-4 top-4 rounded-full border border-white/35 bg-black/35 px-3 py-2 text-xs font-bold text-white backdrop-blur-md sm:left-5 sm:top-5">
-              {selectedScene.name} · {selectedScene.style}
-            </div>
-
-            {selectedScene.hotspots.map((hotspot, index) => {
-              const product = productsById.get(hotspot.productId);
-              const isActive = activeHotspotId === hotspot.id;
-
-              return (
-                <div
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 ${
-                    isActive ? "z-40" : "z-20"
-                  }`}
-                  key={hotspot.id}
-                  onMouseEnter={() => setActiveHotspotId(hotspot.id)}
-                  onMouseLeave={() => setActiveHotspotId(null)}
-                  style={{ left: `${hotspot.x}%`, top: `${hotspot.y}%` }}
-                >
-                  <button
-                    aria-label={`Xem ${product?.name ?? hotspot.fallbackLabel}`}
-                    className={`relative grid h-9 w-9 place-items-center rounded-full border-2 border-white text-sm font-bold shadow-[0_5px_18px_rgba(0,0,0,.35)] transition ${
-                      isActive
-                        ? "scale-110 bg-[#d89b47] text-[#17211d]"
-                        : "bg-[#2f6f5e] text-white hover:scale-110 hover:bg-[#d89b47] hover:text-[#17211d]"
-                    }`}
-                    onClick={() =>
-                      setActiveHotspotId((current) =>
-                        current === hotspot.id ? null : hotspot.id,
-                      )
-                    }
-                    onFocus={() => setActiveHotspotId(hotspot.id)}
-                    type="button"
-                  >
-                    <span
-                      className={`absolute inset-0 -z-10 rounded-full bg-white/60 ${
-                        isActive ? "animate-ping" : ""
-                      }`}
-                    />
-                    {index + 1}
-                  </button>
-
-                  {isActive && product && (
-                    <div
-                      className={`absolute hidden sm:block ${
-                        hotspot.cardSide === "left" ? "right-12" : "left-12"
-                      } ${
-                        hotspot.cardAlign === "top"
-                          ? "top-0"
-                          : hotspot.cardAlign === "bottom"
-                            ? "bottom-0"
-                            : "top-1/2 -translate-y-1/2"
-                      }`}
-                    >
-                      <ProductPopover
-                        isAdded={addedProductId === product.id}
-                        onAddToCart={addProductToCart}
-                        product={product}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex items-end justify-between gap-4 text-white sm:bottom-5 sm:left-5 sm:right-5">
-              <p className="hidden max-w-md text-sm leading-6 text-white/85 sm:block">
-                {selectedScene.description}
-              </p>
-              <span className="ml-auto rounded-full border border-white/30 bg-black/35 px-3 py-2 text-xs font-bold backdrop-blur-md">
-                {isLoading
-                  ? "Đang nối catalog..."
-                  : `${availableProductCount} sản phẩm trong phòng`}
-              </span>
-            </div>
-          </div>
-
-          {activeProduct && (
-            <div className="border-t border-white/15 bg-[#17211d] p-4 sm:hidden">
-              <ProductPopover
-                isAdded={addedProductId === activeProduct.id}
-                onAddToCart={addProductToCart}
-                product={activeProduct}
-              />
-            </div>
-          )}
+      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <section>
+          <div className="mb-4 flex flex-wrap gap-2">{[["all","Tất cả"],["saved","Đã lưu"],["shared","Đã chia sẻ"],["products","Sản phẩm"],["combos","Combo"]].map(([id,label], index)=><span className={`rounded-full px-4 py-2 text-xs font-bold ${index===0?"bg-[#79943b] text-white":"border border-[#e0d6c7] bg-white text-[#656b63]"}`} key={id}>{label}</span>)}</div>
+          {loading ? <div className="grid min-h-72 place-items-center rounded-2xl border bg-white text-[#71776f]">Đang tải Moodboard...</div> : error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{error}</div> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <Link className="grid min-h-64 place-items-center rounded-2xl border-2 border-dashed border-[#d9cebd] bg-white text-center transition hover:border-[#92b34c] hover:bg-[#fbfef4]" href={createHref}><div><span className="text-5xl font-light">＋</span><p className="mt-3 font-black">Tạo Moodboard mới</p><p className="mt-1 text-xs text-[#797f76]">Lưu ý tưởng và sản phẩm</p></div></Link>
+            {filtered.map((space,index) => { const id=String(space._id ?? space.id ?? index); const count=space.productPoints?.length ?? 0; return <button className={`group overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${id===String(active?._id ?? active?.id)?"border-[#8cab49] ring-2 ring-[#bcd77d]/30":"border-[#e4dacb]"}`} key={id} onClick={()=>setActiveId(id)} type="button"><div className="relative aspect-[4/3] overflow-hidden bg-[#eee9df]">{space.imageUrl ? <Image alt={space.title ?? "Moodboard"} className="object-cover transition duration-500 group-hover:scale-105" fill sizes="(min-width:1280px) 25vw,50vw" src={space.imageUrl} unoptimized/> : <div className="grid h-full place-items-center text-sm text-[#898d86]">Chưa có ảnh cover</div>}<span className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-[#e6a727] shadow">{space.isFeatured?"★":"☆"}</span></div><div className="p-4"><h2 className="text-lg font-black">{space.title ?? "Moodboard chưa đặt tên"}</h2><p className="mt-1 text-xs text-[#737970]">{roomLabels[space.roomType ?? ""] ?? "Không gian"} · {count} sản phẩm</p></div></button> })}
+          </div>}
+          {!loading && !error && filtered.length === 0 && spaces.length > 0 ? <p className="mt-4 rounded-xl bg-white p-5 text-center text-sm text-[#777d75]">Không tìm thấy Moodboard phù hợp.</p> : null}
         </section>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-[#646a61]">
-          <p>
-            Chọn một không gian khác để khám phá cách cùng sản phẩm thay đổi
-            theo bối cảnh.
-          </p>
-          <Link
-            className="inline-flex items-center gap-2 font-bold text-[#2f6f5e] hover:text-[#b46f2c]"
-            href="/products"
-          >
-            So sánh trong catalog
-            <ArrowIcon />
-          </Link>
-        </div>
-
-        <ProductScanner />
-      </section>
-    </main>
-  );
+        <aside className="self-start overflow-hidden rounded-2xl border border-[#ddd2c2] bg-white shadow-[0_18px_50px_rgba(70,52,31,.10)] xl:sticky xl:top-20">
+          {active ? <><div className="flex items-start justify-between gap-3 p-5"><div><p className="text-xs text-[#798078]">Moodboard đang chọn</p><h2 className="mt-1 text-2xl font-black">{active.title ?? "Moodboard"} ✎</h2><p className="mt-1 text-xs text-[#72786f]">{roomLabels[active.roomType ?? ""] ?? "Không gian"} · {points.length} sản phẩm</p></div><button className="rounded-lg bg-[#79943b] px-4 py-2 text-xs font-black text-white" type="button">Chia sẻ ↗</button></div>
+            <div className="relative mx-4 aspect-[16/9] overflow-hidden rounded-xl bg-[#ece7dd]">{active.imageUrl ? <Image alt={active.title ?? "Moodboard"} className="object-cover" fill sizes="420px" src={active.imageUrl} unoptimized/> : <div className="grid h-full place-items-center text-sm text-[#888d85]">Chưa có ảnh</div>}{points.map((point,index)=><span className="absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[#ef6e61] text-xs font-black text-white shadow" key={point._id ?? point.id ?? index} style={{left:`${point.x ?? 0}%`,top:`${point.y ?? 0}%`}}>{index+1}</span>)}</div>
+            <section className="border-b border-[#eee6da] p-5"><div className="flex items-center justify-between"><h3 className="text-lg font-black">Sản phẩm đã lưu ({points.length})</h3><Link className="text-xs font-black text-[#718d35]" href="/products">Xem tất cả <span>→</span></Link></div>{points.length ? <div className="mt-4 grid grid-cols-2 gap-3">{points.slice(0,4).map((point,index)=>{const product=getProduct(point);return <Link className="rounded-xl border border-[#ece4d8] p-2" href={product?`/products/${product._id ?? product.id}`:"/products"} key={point._id ?? point.id ?? index}>{product?.images?.[0] ? <div className="relative aspect-square overflow-hidden rounded-lg"><Image alt={product.name ?? "Sản phẩm"} className="object-cover" fill sizes="160px" src={product.images[0]} unoptimized/></div> : <div className="grid aspect-square place-items-center rounded-lg bg-[#f2eee7] text-2xl">🪑</div>}<p className="mt-2 truncate text-xs font-black">{product?.name ?? "Sản phẩm"}</p><p className="mt-1 text-[11px] text-[#78913f]">{currency(product?.price)}</p></Link>})}</div> : <p className="mt-3 rounded-xl bg-[#faf7f1] p-4 text-center text-xs text-[#7b8079]">Moodboard này chưa gắn sản phẩm.</p>}</section>
+            <section className="p-5"><div className="flex items-center justify-between"><h3 className="text-lg font-black">Ghi chú</h3><span className="text-xs font-bold text-[#78913f]">Chỉnh sửa</span></div><p className="mt-2 text-sm leading-6 text-[#666d65]">{active.description || "Chưa có ghi chú cho Moodboard này."}</p><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-[#eef4df] px-3 py-1 text-[11px] font-bold text-[#667c38]">{roomLabels[active.roomType ?? ""] ?? "Không gian"}</span>{active.isFeatured ? <span className="rounded-full bg-[#fff0c9] px-3 py-1 text-[11px] font-bold text-[#9a7020]">Nổi bật</span> : null}</div></section>
+          </> : <div className="grid min-h-[520px] place-items-center p-8 text-center"><div><span className="text-5xl">♡</span><h2 className="mt-4 text-2xl font-black">Chưa có Moodboard</h2><p className="mt-2 text-sm text-[#747a72]">Tạo hoặc công khai Moodboard từ trang quản trị để bắt đầu.</p><Link className="mt-5 inline-block rounded-xl bg-[#79943b] px-5 py-3 text-sm font-black text-white" href={createHref}>Tạo Moodboard</Link></div></div>}
+        </aside>
+      </div>
+    </div>
+  </main>;
 }

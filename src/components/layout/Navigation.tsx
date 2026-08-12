@@ -36,6 +36,17 @@ const menuItems = [
   { href: "/store", label: "Cửa hàng" },
 ];
 
+const categoryItems = [
+  ["🛋", "Phòng khách", "Sofa"],
+  ["🛏", "Phòng ngủ", "Giường"],
+  ["🍽", "Phòng ăn", "Bàn"],
+  ["💡", "Đèn", "Đèn"],
+  ["▦", "Thảm", "Thảm"],
+  ["◌", "Trang trí", "Đồ trang trí"],
+  ["🪴", "Cây xanh", "Cây xanh"],
+  ["🧸", "Phòng bé", "Phòng bé"],
+] as const;
+
 const authPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 function Icon({ name }: { name: IconName }) {
@@ -191,10 +202,14 @@ export default function Navigation() {
                       {currentUser.name}
                     </span>
                     <span className="mt-1 block text-[10px] text-[#646a61]">
-                      {currentUser.role === "admin"
-                        ? "Quản trị viên"
-                        : currentUser.role === "store"
-                          ? "Đối tác cửa hàng"
+                      {currentUser.role === "super_admin"
+                        ? "Quản trị viên cao cấp"
+                        : currentUser.role === "admin"
+                          ? "Quản trị viên"
+                          : currentUser.role === "staff"
+                            ? "Nhân viên"
+                        : currentUser.role === "supplier"
+                          ? "Nhà cung cấp"
                           : "Thành viên"}
                     </span>
                   </span>
@@ -219,7 +234,7 @@ export default function Navigation() {
                         </p>
                       </div>
 
-                      {currentUser.role === "admin" && (
+                      {(currentUser.role === "admin" || currentUser.role === "super_admin") && (
                         <Link
                           className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
                             pathname === "/admin"
@@ -234,7 +249,7 @@ export default function Navigation() {
                         </Link>
                       )}
 
-                      {currentUser.role === "store" && (
+                      {currentUser.role === "supplier" && (
                         <Link
                           className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
                             pathname === "/store"
@@ -245,7 +260,7 @@ export default function Navigation() {
                           onClick={() => setIsProfileOpen(false)}
                         >
                           <Icon name="store" />
-                          Kênh cửa hàng
+                          Kênh nhà cung cấp
                         </Link>
                       )}
 
@@ -304,6 +319,22 @@ export default function Navigation() {
         </div>
       </div>
 
+      <nav aria-label="Danh mục nội thất" className="border-t border-[#eee7dc] bg-white/95">
+        <div className="mx-auto flex max-w-7xl justify-start gap-1 overflow-x-auto px-3 py-2 text-xs font-bold text-[#5f665d] scrollbar-hide md:justify-center">
+          {categoryItems.map(([icon, label, category]) => (
+            <Link
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3.5 py-2 transition hover:border-[#d9e7b4] hover:bg-[#f2f8df] hover:text-[#66862e]"
+              href={`/products?category=${encodeURIComponent(category)}`}
+              key={label}
+              onClick={closeMenus}
+            >
+              <span aria-hidden="true">{icon}</span>
+              {label}
+            </Link>
+          ))}
+        </div>
+      </nav>
+
       {isMobileMenuOpen && (
         <div className="border-t border-[#ded6c9] bg-white md:hidden">
           <div className="space-y-1 px-5 py-3">
@@ -340,7 +371,7 @@ export default function Navigation() {
 
             {currentUser ? (
               <>
-                {currentUser.role === "admin" && (
+                {(currentUser.role === "admin" || currentUser.role === "super_admin") && (
                   <Link
                     className={`block rounded-md px-4 py-3 text-sm font-semibold ${
                       pathname === "/admin" ? "bg-[#1f2421] text-white" : "text-[#51564f]"
@@ -351,7 +382,7 @@ export default function Navigation() {
                     Admin Center
                   </Link>
                 )}
-                {currentUser.role === "store" && (
+                {currentUser.role === "supplier" && (
                   <Link
                     className={`block rounded-md px-4 py-3 text-sm font-semibold ${
                       pathname === "/store" ? "bg-[#1f2421] text-white" : "text-[#51564f]"
@@ -359,7 +390,7 @@ export default function Navigation() {
                     href="/store"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Kênh cửa hàng
+                    Kênh nhà cung cấp
                   </Link>
                 )}
                 <Link

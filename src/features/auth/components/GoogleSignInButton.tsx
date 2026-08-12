@@ -60,6 +60,9 @@ type GoogleSignInButtonProps = {
   remember: boolean;
 };
 
+let initializedGoogleClientId: string | null = null;
+let activeCredentialHandler: ((response: GoogleCredentialResponse) => void) | null = null;
+
 export default function GoogleSignInButton({
   onError,
   remember,
@@ -108,7 +111,7 @@ export default function GoogleSignInButton({
           name: profile.name,
           registeredAt: new Date().toISOString(),
           remember,
-          role: "customer",
+          role: "user",
         });
         router.replace("/");
         router.refresh();
@@ -123,6 +126,15 @@ export default function GoogleSignInButton({
     },
     [onError, remember, router],
   );
+
+  useEffect(() => {
+    activeCredentialHandler = handleCredential;
+    return () => {
+      if (activeCredentialHandler === handleCredential) {
+        activeCredentialHandler = null;
+      }
+    };
+  }, [handleCredential]);
 
   useEffect(() => {
     const container = buttonContainerRef.current;
@@ -148,13 +160,16 @@ export default function GoogleSignInButton({
 
     const identityService = googleIdentity;
 
-    identityService.initialize({
-      callback: handleCredential,
-      cancel_on_tap_outside: true,
-      client_id: clientId,
-      context: "signin",
-      ux_mode: "popup",
-    });
+    if (initializedGoogleClientId !== clientId) {
+      identityService.initialize({
+        callback: (response) => activeCredentialHandler?.(response),
+        cancel_on_tap_outside: true,
+        client_id: clientId,
+        context: "signin",
+        ux_mode: "popup",
+      });
+      initializedGoogleClientId = clientId;
+    }
 
     let renderedWidth = 0;
 
@@ -192,7 +207,6 @@ export default function GoogleSignInButton({
 
     return () => {
       resizeObserver.disconnect();
-      identityService.cancel();
     };
   }, [clientId, handleCredential, isScriptReady, onError]);
 
