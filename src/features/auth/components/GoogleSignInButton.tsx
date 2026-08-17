@@ -57,6 +57,7 @@ type GoogleProfileResponse = {
     email?: string;
     fullName?: string;
     role?: string;
+    onboardingCompleted?: boolean;
   };
 };
 
@@ -123,8 +124,9 @@ export default function GoogleSignInButton({
           registeredAt: new Date().toISOString(),
           remember,
           role,
+          onboardingCompleted: Boolean(profile.user.onboardingCompleted),
         });
-        router.replace(["admin", "super_admin", "staff"].includes(role) ? "/admin" : role === "supplier" ? "/store" : "/");
+        router.replace(["admin", "super_admin", "staff"].includes(role) ? "/admin" : role === "supplier" ? "/store" : profile.user.onboardingCompleted ? "/" : "/onboarding");
         router.refresh();
       } catch (error) {
         setIsVerifying(false);

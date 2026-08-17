@@ -27,4 +27,5 @@ export type AuthSessionUser = {
   storeName?: string;
   storeStatus?: "approved" | "pending" | "rejected";
   supplierApplicationStatus?: "none" | "pending" | "approved" | "rejected";
+  onboardingCompleted?: boolean;
 };

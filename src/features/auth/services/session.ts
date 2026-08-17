@@ -30,6 +30,7 @@ function parseSessionUser(value: string | null): AuthSessionUser | null {
         preferredStyle: parsed.preferredStyle,
         registeredAt: parsed.registeredAt,
         remember: parsed.remember,
+        onboardingCompleted: Boolean(parsed.onboardingCompleted),
         role:
           parsed.role === "user" ||
           parsed.role === "supplier" ||

@@ -87,8 +87,9 @@ export default function LoginView() {
       const apiRole=String(data.user?.role??"USER").toLowerCase();
       const role = apiRole === "customer" ? "user" : apiRole === "store" ? "supplier" : (["user", "supplier", "staff", "admin", "super_admin"].includes(apiRole) ? apiRole : "user") as "user" | "supplier" | "staff" | "admin" | "super_admin";
       saveAuthTokens(data.accessToken,data.refreshToken);
-      saveSessionUser({email:data.user?.email??form.email.trim(),name:data.user?.fullName??data.user?.name??form.email.split("@")[0],remember:form.remember,role});
-      router.push(["admin","super_admin","staff"].includes(role)?"/admin":role==="supplier"?"/store":"/");
+      const onboardingCompleted = Boolean(data.user?.onboardingCompleted);
+      saveSessionUser({email:data.user?.email??form.email.trim(),name:data.user?.fullName??data.user?.name??form.email.split("@")[0],remember:form.remember,role,onboardingCompleted});
+      router.push(["admin","super_admin","staff"].includes(role)?"/admin":role==="supplier"?"/store":onboardingCompleted?"/":"/onboarding");
     } catch(error) {
       setError(error instanceof Error?error.message:"Không thể kết nối máy chủ.");
     } finally {

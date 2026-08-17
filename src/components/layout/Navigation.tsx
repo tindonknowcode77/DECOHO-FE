@@ -30,7 +30,6 @@ type IconName =
 
 const menuItems = [
   { href: "/", label: "Trang chủ" },
-  { href: "/process", label: "Quy trình thiết kế" },
   { href: "/product-space", label: "Moodboard" },
   { href: "/community", label: "Cộng đồng" },
   { href: "/showroom", label: "Phòng mẫu 3D" },
@@ -49,7 +48,7 @@ const categoryItems = [
   ["🧸", "Phòng bé", "Phòng bé"],
 ] as const;
 
-const authPaths = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
+const authPaths = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/onboarding"];
 
 function Icon({ name }: { name: IconName }) {
   const paths = {
