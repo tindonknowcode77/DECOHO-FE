@@ -19,7 +19,6 @@ export default function HomePage() {
   return <main className="home-compact overflow-hidden bg-[#fffaf3] text-[#20251f]">
     <section className="relative mx-auto grid max-w-7xl gap-6 px-5 py-12 sm:px-8 md:grid-cols-[.9fr_1.1fr] md:items-center lg:gap-10 lg:py-16">
       <div className="relative z-10">
-        <span className="absolute -left-4 -top-5 grid h-8 w-8 place-items-center rounded-full bg-[#20251f] text-sm font-black text-white">1</span>
         <p className="font-accent text-lg font-bold text-[#759139]">Ngôi nhà thật · Cảm hứng thật ✦</p>
         <h1 className="mt-5 text-5xl font-black leading-[.92] tracking-[-.055em] sm:text-6xl lg:text-7xl">TRANG TRÍ<br/><span className="text-[#ef6e61]">ĐÚNG CHẤT.</span></h1>
         <p className="mt-6 max-w-lg text-lg font-bold leading-8">Căn phòng của bạn, phong cách của bạn, cộng đồng của bạn ♡</p>

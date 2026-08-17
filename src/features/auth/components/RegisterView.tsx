@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { CheckCircle2, Mail, Sparkles, X } from "lucide-react";
 import BrandLogo from "@/src/components/common/BrandLogo";
+import PasswordVisibilityButton from "./PasswordVisibilityButton";
 import type { RegisterFormState } from "../types";
 
 type IconName = "arrow" | "check" | "home" | "lock" | "mail" | "shield" | "spark" | "user";
@@ -38,7 +39,6 @@ function Icon({ name }: { name: IconName }) {
 }
 
 export default function RegisterView() {
-  const router = useRouter();
   const [form, setForm] = useState<RegisterFormState>({
     agreeTerms: false,
     confirmPassword: "",
@@ -48,7 +48,10 @@ export default function RegisterView() {
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   function updateField<TField extends keyof RegisterFormState>(
     field: TField,
@@ -112,13 +115,13 @@ export default function RegisterView() {
         const message = Array.isArray(data?.message) ? data.message.join(". ") : data?.message;
         throw new Error(message ?? `Đăng ký thất bại (${response.status}).`);
       }
+      setRegisteredEmail(form.email.trim().toLowerCase());
       setSuccess(data?.message ?? "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.");
       setForm({ agreeTerms: false, confirmPassword: "", email: "", name: "", password: "" });
       window.sessionStorage.setItem(
         "decoho_registration_notice",
         "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.",
       );
-      router.replace("/");
     } catch (value) {
       setError(value instanceof Error ? value.message : "Không thể kết nối máy chủ.");
     } finally {
@@ -177,14 +180,6 @@ export default function RegisterView() {
             </div>
           )}
 
-          {success && (
-            <div className="mb-4 rounded-md border border-[#b9d8c9] bg-[#edf8f2] p-4 text-sm leading-6 text-[#245b47]">
-              <p className="font-bold">Đăng ký thành công</p>
-              <p>{success}</p>
-              <Link className="mt-2 inline-block font-bold underline" href="/login">Đi đến đăng nhập</Link>
-            </div>
-          )}
-
           <form className="space-y-4" onSubmit={handleSubmit}>
             <label className="block">
               <span className="text-xs font-bold uppercase text-[#51564f]">Họ và tên</span>
@@ -194,7 +189,7 @@ export default function RegisterView() {
                 </span>
                 <input
                   autoComplete="name"
-                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
+                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-12 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="register-name"
                   onChange={(event) => updateField("name", event.target.value)}
                   placeholder="Nguyễn Văn A"
@@ -236,8 +231,13 @@ export default function RegisterView() {
                   id="register-password"
                   onChange={(event) => updateField("password", event.target.value)}
                   placeholder="••••••••"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={form.password}
+                />
+                <PasswordVisibilityButton
+                  inputId="register-password"
+                  onToggle={() => setShowPassword((current) => !current)}
+                  visible={showPassword}
                 />
               </span>
             </label>
@@ -252,12 +252,17 @@ export default function RegisterView() {
                 </span>
                 <input
                   autoComplete="new-password"
-                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
+                  className="h-12 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-12 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="register-confirm-password"
                   onChange={(event) => updateField("confirmPassword", event.target.value)}
                   placeholder="••••••••"
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   value={form.confirmPassword}
+                />
+                <PasswordVisibilityButton
+                  inputId="register-confirm-password"
+                  onToggle={() => setShowConfirmPassword((current) => !current)}
+                  visible={showConfirmPassword}
                 />
               </span>
             </label>
@@ -310,6 +315,28 @@ export default function RegisterView() {
         </div>
       </section>
       </div>
+      {success && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-[#20352a]/45 p-4 backdrop-blur-sm">
+          <section aria-labelledby="register-success-title" aria-modal="true" className="relative w-full max-w-lg overflow-hidden rounded-[30px] border border-white/70 bg-[#fffdf8] p-7 text-center shadow-[0_30px_90px_rgba(32,53,42,.28)] sm:p-10" role="dialog">
+            <button aria-label="Đóng thông báo" className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full text-[#777b74] transition hover:bg-[#f3eee6]" onClick={() => setSuccess("")} type="button"><X size={19} /></button>
+            <span className="pointer-events-none absolute -left-3 top-8 rotate-[-14deg] text-4xl text-[#f06f64]">♡</span>
+            <span className="pointer-events-none absolute right-9 top-14 text-3xl text-[#e8b846]">✦</span>
+            <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#eaf3ca] text-[#729232] shadow-inner"><CheckCircle2 size={44} /></div>
+            <p className="font-accent mt-5 text-lg text-[#78963d]">Chào mừng bạn đến DECOHO ✦</p>
+            <h2 className="mt-1 text-4xl" id="register-success-title">Đăng ký thành công!</h2>
+            <p className="mx-auto mt-4 max-w-sm leading-7 text-[#666d64]">Chúng mình vừa gửi một liên kết xác minh tới</p>
+            <p className="mx-auto mt-2 w-fit rounded-full bg-[#fff0e4] px-4 py-2 text-sm font-extrabold text-[#8f554d]">{registeredEmail}</p>
+            <div className="mt-6 rounded-2xl border border-[#dfe8c2] bg-[#f7faec] p-4 text-left text-sm leading-6 text-[#566149]">
+              <p className="flex gap-3"><Mail className="mt-0.5 shrink-0 text-[#78963d]" size={20} /><span><strong>Mở hộp thư</strong> và bấm nút xác minh email. Sau đó quay lại DECOHO để đăng nhập nhé!</span></p>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <a className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#8baf3f] px-5 py-3 font-bold text-white transition hover:bg-[#78963d]" href="https://mail.google.com" rel="noreferrer" target="_blank"><Mail size={18} /> Mở Gmail</a>
+              <Link className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#d8cebf] bg-white px-5 py-3 font-bold text-[#20352a] transition hover:bg-[#f8f3eb]" href="/login"><Sparkles size={18} /> Đến đăng nhập</Link>
+            </div>
+            <p className="mt-5 text-xs leading-5 text-[#858980]">Chưa thấy email? Hãy kiểm tra mục Spam hoặc đợi thêm một chút.</p>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

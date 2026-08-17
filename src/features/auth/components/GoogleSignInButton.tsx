@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { googleClientId } from "@/src/configs/auth";
-import { saveSessionUser } from "../services/session";
+import { saveAuthTokens, saveSessionUser } from "../services/session";
 
 type GoogleCredentialResponse = {
   clientId?: string;
@@ -49,10 +49,15 @@ declare global {
 }
 
 type GoogleProfileResponse = {
-  avatar?: string;
-  email?: string;
-  error?: string;
-  name?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  message?: string | string[];
+  user?: {
+    avatar?: string | { secureUrl?: string };
+    email?: string;
+    fullName?: string;
+    role?: string;
+  };
 };
 
 type GoogleSignInButtonProps = {
@@ -84,7 +89,8 @@ export default function GoogleSignInButton({
       onError("");
 
       try {
-        const verificationResponse = await fetch("/api/auth/google", {
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
+        const verificationResponse = await fetch(`${baseUrl}/auth/google`, {
           body: JSON.stringify({ credential: response.credential }),
           headers: {
             "Content-Type": "application/json",
@@ -96,24 +102,29 @@ export default function GoogleSignInButton({
 
         if (
           !verificationResponse.ok ||
-          !profile.email ||
-          !profile.name
+          !profile.accessToken ||
+          !profile.user?.email ||
+          !profile.user?.fullName
         ) {
           throw new Error(
-            profile.error ||
+            (Array.isArray(profile.message) ? profile.message.join(". ") : profile.message) ||
               "Không thể xác minh tài khoản Google. Vui lòng thử lại.",
           );
         }
 
+        const apiRole = String(profile.user.role ?? "USER").toLowerCase();
+        const role = apiRole === "customer" ? "user" : apiRole === "store" ? "supplier" : (["user", "supplier", "staff", "admin", "super_admin"].includes(apiRole) ? apiRole : "user") as "user" | "supplier" | "staff" | "admin" | "super_admin";
+        const avatar = typeof profile.user.avatar === "string" ? profile.user.avatar : profile.user.avatar?.secureUrl;
+        saveAuthTokens(profile.accessToken, profile.refreshToken);
         saveSessionUser({
-          avatar: profile.avatar,
-          email: profile.email,
-          name: profile.name,
+          avatar,
+          email: profile.user.email,
+          name: profile.user.fullName,
           registeredAt: new Date().toISOString(),
           remember,
-          role: "user",
+          role,
         });
-        router.replace("/");
+        router.replace(["admin", "super_admin", "staff"].includes(role) ? "/admin" : role === "supplier" ? "/store" : "/");
         router.refresh();
       } catch (error) {
         setIsVerifying(false);

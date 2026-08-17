@@ -32,6 +32,7 @@ const menuItems = [
   { href: "/", label: "Trang chủ" },
   { href: "/process", label: "Quy trình thiết kế" },
   { href: "/product-space", label: "Moodboard" },
+  { href: "/community", label: "Cộng đồng" },
   { href: "/showroom", label: "Phòng mẫu 3D" },
   { href: "/products", label: "Sản phẩm" },
   { href: "/store", label: "Cửa hàng" },
@@ -48,7 +49,7 @@ const categoryItems = [
   ["🧸", "Phòng bé", "Phòng bé"],
 ] as const;
 
-const authPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
+const authPaths = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
 
 function Icon({ name }: { name: IconName }) {
   const paths = {

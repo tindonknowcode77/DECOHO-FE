@@ -51,6 +51,10 @@ textarea {
 .home-compact > section:nth-child(4) { padding-block: 2rem !important; }
 .home-compact > section:nth-child(5) { padding-bottom: 2rem !important; }
 
+.home-compact article > span:first-child {
+  display: none;
+}
+
 .home-compact .max-w-7xl {
   max-width: 100% !important;
 }

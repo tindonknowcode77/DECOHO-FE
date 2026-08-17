@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import GoogleSignInButton from "./GoogleSignInButton";
+import PasswordVisibilityButton from "./PasswordVisibilityButton";
 import { saveAuthTokens, saveSessionUser } from "../services/session";
 import type { LoginFormState } from "../types";
 
@@ -46,6 +47,7 @@ export default function LoginView() {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   function updateField<TField extends keyof LoginFormState>(
     field: TField,
@@ -161,7 +163,7 @@ export default function LoginView() {
                 </span>
                 <input
                   autoComplete="email"
-                  className="h-13 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-3 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
+                  className="h-13 w-full rounded-xl border border-[#ded6c9] bg-white pl-10 pr-12 text-sm outline-none transition focus:border-[#78963d] focus:ring-4 focus:ring-[#a8c85f]/15"
                   id="login-email"
                   onChange={(event) => updateField("email", event.target.value)}
                   placeholder="name@example.com"
@@ -191,8 +193,13 @@ export default function LoginView() {
                   id="login-password"
                   onChange={(event) => updateField("password", event.target.value)}
                   placeholder="••••••••"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={form.password}
+                />
+                <PasswordVisibilityButton
+                  inputId="login-password"
+                  onToggle={() => setShowPassword((current) => !current)}
+                  visible={showPassword}
                 />
               </span>
             </label>
