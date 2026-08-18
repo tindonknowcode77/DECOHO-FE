@@ -4,8 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Bookmark, Heart, ImagePlus, MessageCircle, Send, Share2, Sparkles, Users, X } from "lucide-react";
-import { apiClient } from "@/src/services/axios";
-import { getAccessToken, getSessionUser } from "@/src/features/auth/services/session";
+import { ApiError, apiClient } from "@/src/services/axios";
+import { clearSessionUser, getAccessToken, getSessionUser } from "@/src/features/auth/services/session";
 import type { CommunityCreator, CommunityFeed, CommunityPost, CommunityUser } from "../types";
 import BeforeAfterImage from "./BeforeAfterImage";
 
@@ -65,7 +65,15 @@ export default function CommunityView() {
       const path = token ? `/community/feed?tab=${tab}` : `/community/posts?tab=${tab}`;
       setFeed(await apiClient.get<CommunityFeed>(path, token ? { token } : undefined));
       setError("");
-    } catch { setError(tab === "following" && !token ? "Hãy đăng nhập để xem những người bạn đang theo dõi." : "Chưa thể tải bảng tin cộng đồng."); }
+    } catch (value) {
+      if (token && value instanceof ApiError && value.status === 401) {
+        clearSessionUser();
+        setFeed(await apiClient.get<CommunityFeed>(`/community/posts?tab=${tab}`));
+        setError("Phiên đăng nhập đã hết hạn. Bảng tin công khai vẫn được hiển thị; hãy đăng nhập lại để tương tác.");
+      } else {
+        setError(tab === "following" && !token ? "Hãy đăng nhập để xem những người bạn đang theo dõi." : "Chưa thể tải bảng tin cộng đồng.");
+      }
+    }
     finally { setLoading(false); }
   }, [tab, token]);
 

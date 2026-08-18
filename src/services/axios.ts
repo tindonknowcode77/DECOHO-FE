@@ -1,5 +1,15 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 type ApiRequestOptions = Omit<RequestInit, "body" | "method"> & {
   token?: string;
 };
@@ -48,7 +58,16 @@ async function request<TResponse>(
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    const payload = (await response.json().catch(() => null)) as
+      | { message?: string | string[] }
+      | null;
+    const detail = Array.isArray(payload?.message)
+      ? payload.message.join(". ")
+      : payload?.message;
+    throw new ApiError(
+      detail ?? `API request failed with status ${response.status}`,
+      response.status,
+    );
   }
 
   if (response.status === 204) {
