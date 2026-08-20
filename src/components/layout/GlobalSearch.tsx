@@ -25,7 +25,7 @@ export default function GlobalSearch() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+        const base = process.env.NEXT_PUBLIC_API_URL ?? "/backend-api";
         const response = await fetch(`${base}/search?q=${encodeURIComponent(query.trim())}&sessionId=${encodeURIComponent(sessionId())}&limit=5`);
         if (!response.ok) throw new Error(); setData(await response.json()); setOpen(true);
       } catch { setData(null); setOpen(true); } finally { setLoading(false); }

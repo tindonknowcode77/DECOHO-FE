@@ -14,7 +14,7 @@ export default function StoreDashboardView() {
   const loadProducts = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "/backend-api";
       const token = getAccessToken();
       const response = await fetch(`${base}/products/supplier/mine`, { cache: "no-store", headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
       const body = await response.json().catch(() => null);

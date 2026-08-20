@@ -28,7 +28,7 @@ export default function ProductSpaceView() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "/backend-api";
       const token = getAccessToken();
       const response = await fetch(`${base}/product-spaces`, { cache: "no-store" });
       const mineResponse = token ? await fetch(`${base}/product-spaces/mine`, { cache: "no-store", headers: { Authorization: `Bearer ${token}` } }) : null;
@@ -65,7 +65,7 @@ export default function ProductSpaceView() {
     setCreating(true);
     setCreateError("");
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "/backend-api";
       const formData = new FormData(event.currentTarget);
       formData.set("width", "4");
       formData.set("length", "4");

@@ -23,7 +23,7 @@ export default function VerifyEmailView() {
         return;
       }
       try {
-        const base = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
+        const base = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
         const response = await fetch(`${base}/auth/verify-email?token=${encodeURIComponent(token)}`, {
           cache: "no-store",
           signal: controller.signal,

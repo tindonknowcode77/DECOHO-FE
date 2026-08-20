@@ -28,7 +28,7 @@ const modules:ModuleConfig[]=[
   {id:"settings",label:"Cài đặt hệ thống",group:"Hệ thống"},
 ];
 
-function apiBase(){return(process.env.NEXT_PUBLIC_API_URL??"http://localhost:3001/api").replace(/\/$/,"");}
+function apiBase(){return(process.env.NEXT_PUBLIC_API_URL??"/backend-api").replace(/\/$/,"");}
 function idOf(value:Record<string,unknown>){return String(value._id??value.id??value.roomId??value.ticketCode??value.orderCode??"");}
 function titleOf(value:Record<string,unknown>){return String(value.title??value.name??value.code??value.ticketCode??value.orderCode??value.originalFileName??value.email??idOf(value)??"Bản ghi");}
 function summaryOf(value:Record<string,unknown>){const keys=["status","role","type","email","roomType","model","price","rating","priority"];return keys.filter((key)=>value[key]!==undefined).map((key)=>`${key}: ${String(value[key])}`).join(" · ");}

@@ -90,7 +90,7 @@ export default function GoogleSignInButton({
       onError("");
 
       try {
-        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
+        const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
         const verificationResponse = await fetch(`${baseUrl}/auth/google`, {
           body: JSON.stringify({ credential: response.credential }),
           headers: {
