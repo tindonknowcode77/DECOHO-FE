@@ -3,6 +3,7 @@ export type CommunityUser = {
   fullName: string;
   avatar?: string | { secureUrl?: string };
   businessAddress?: string;
+  following?: boolean;
 };
 
 export type CommunityComment = {
@@ -34,6 +35,7 @@ export type CommunityCreator = {
   avatar?: string | { secureUrl?: string };
   posts: number;
   likes: number;
+  following?: boolean;
 };
 
 export type CommunityFeed = {

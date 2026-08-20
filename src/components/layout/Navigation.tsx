@@ -3,6 +3,21 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  Archive,
+  Armchair,
+  Bath,
+  BedDouble,
+  ChevronDown,
+  CookingPot,
+  Lamp,
+  LampDesk,
+  Paintbrush,
+  PanelsTopLeft,
+  Sofa,
+  Sprout,
+  type LucideIcon,
+} from "lucide-react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import GlobalSearch from "./GlobalSearch";
 import {
@@ -30,23 +45,41 @@ type IconName =
 
 const menuItems = [
   { href: "/", label: "Trang chủ" },
-  { href: "/product-space", label: "Moodboard" },
+  { href: "/product-space", label: "Bảng cảm hứng" },
   { href: "/community", label: "Cộng đồng" },
-  { href: "/showroom", label: "Phòng mẫu 3D" },
   { href: "/products", label: "Sản phẩm" },
   { href: "/store", label: "Cửa hàng" },
+  { href: "/showroom", label: "Phòng mẫu 3D" },
 ];
 
-const categoryItems = [
-  ["🛋", "Phòng khách", "Sofa"],
-  ["🛏", "Phòng ngủ", "Giường"],
-  ["🍽", "Phòng ăn", "Bàn"],
-  ["💡", "Đèn", "Đèn"],
-  ["▦", "Thảm", "Thảm"],
-  ["◌", "Trang trí", "Đồ trang trí"],
-  ["🪴", "Cây xanh", "Cây xanh"],
-  ["🧸", "Phòng bé", "Phòng bé"],
-] as const;
+const categoryItems: Array<{
+  icon: LucideIcon;
+  label: string;
+  category: string;
+}> = [
+  { icon: Sofa, label: "Living Room", category: "Sofa" },
+  { icon: BedDouble, label: "Bedroom", category: "Giường" },
+  { icon: LampDesk, label: "Study Desk", category: "Bàn làm việc" },
+  { icon: CookingPot, label: "Kitchen", category: "Nhà bếp" },
+  { icon: Bath, label: "Bathroom", category: "Phòng tắm" },
+  { icon: Paintbrush, label: "Decor", category: "Đồ trang trí" },
+  { icon: Archive, label: "Storage", category: "Tủ" },
+  { icon: Lamp, label: "Lighting", category: "Đèn" },
+  { icon: Sprout, label: "Plants", category: "Cây xanh" },
+];
+
+const moreCategoryItems: Array<{
+  icon: LucideIcon;
+  label: string;
+  category: string;
+}> = [
+  { icon: PanelsTopLeft, label: "Dining Room", category: "Bàn" },
+  { icon: Armchair, label: "Kids Room", category: "Phòng bé" },
+  { icon: Paintbrush, label: "Mirrors", category: "Gương" },
+  { icon: PanelsTopLeft, label: "Wall Art", category: "Tranh treo tường" },
+  { icon: Armchair, label: "Chairs", category: "Ghế" },
+  { icon: Archive, label: "Rugs", category: "Thảm" },
+];
 
 const authPaths = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/onboarding"];
 
@@ -89,6 +122,7 @@ export default function Navigation() {
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMoreCategoriesOpen, setIsMoreCategoriesOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(null);
   const [cartCount, setCartCount] = useState(
     initialCartItems.reduce((total, item) => total + item.quantity, 0),
@@ -123,6 +157,7 @@ export default function Navigation() {
   function closeMenus() {
     setIsMobileMenuOpen(false);
     setIsProfileOpen(false);
+    setIsMoreCategoriesOpen(false);
   }
 
   function handleLogout() {
@@ -136,39 +171,46 @@ export default function Navigation() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#ded6c9] bg-white/85 shadow-sm backdrop-blur">
-      <div className="mx-auto max-w-[1680px] px-4 sm:px-6 xl:px-8">
-        <div className="flex h-[72px] items-center gap-3 xl:gap-5">
-          <Link aria-label="DECOHO home" href="/" onClick={closeMenus}>
+    <header className="sticky top-0 z-50 border-b border-[#ded6c9] bg-white/95 shadow-sm backdrop-blur">
+      <div className="mx-auto max-w-[1680px] px-3 sm:px-5 xl:px-8">
+        <div className="grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 xl:gap-4">
+          <Link
+            aria-label="DECOHO home"
+            className="justify-self-start"
+            href="/"
+            onClick={closeMenus}
+          >
             <BrandLogo className="h-12 w-[170px] shrink-0" variant="horizontal" />
           </Link>
 
-          <GlobalSearch />
+          <div className="hidden min-w-0 items-center justify-center gap-3 lg:flex">
+            <GlobalSearch />
 
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex">
-            {menuItems.map((item) => {
-              const isActive = isActivePath(pathname, item.href);
+            <nav className="hidden min-w-0 items-center justify-center gap-0.5 xl:flex">
+              {menuItems.map((item) => {
+                const isActive = isActivePath(pathname, item.href);
 
-              return (
-                <Link
-                  className={`relative whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition 2xl:px-3.5 2xl:text-sm ${
-                    isActive
-                      ? "text-[#1f2421]"
-                      : "text-[#646a61] hover:bg-[#f7f3ec] hover:text-[#1f2421]"
-                  }`}
-                  href={item.href}
-                  key={item.href}
-                >
-                  {item.label}
-                  {isActive && (
-                    <span className="absolute inset-x-4 -bottom-1 h-0.5 rounded-full bg-[#d89b47]" />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+                return (
+                  <Link
+                    className={`relative whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition 2xl:px-3.5 2xl:text-sm ${
+                      isActive
+                        ? "text-[#1f2421]"
+                        : "text-[#646a61] hover:bg-[#f7f3ec] hover:text-[#1f2421]"
+                    }`}
+                    href={item.href}
+                    key={item.href}
+                  >
+                    {item.label}
+                    {isActive && (
+                      <span className="absolute inset-x-4 -bottom-1 h-0.5 rounded-full bg-[#d89b47]" />
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2">
+          <div className="flex shrink-0 items-center justify-self-end gap-1.5 xl:gap-2">
             <button
               aria-label="Thông báo"
               className="relative hidden rounded-md p-2 text-[#646a61] transition hover:bg-[#f7f3ec] hover:text-[#1f2421] sm:block"
@@ -320,23 +362,66 @@ export default function Navigation() {
             </button>
           </div>
         </div>
-      </div>
 
-      <nav aria-label="Danh mục nội thất" className="border-t border-[#eee7dc] bg-white/95">
-        <div className="mx-auto flex max-w-[1680px] justify-start gap-2 overflow-x-auto px-4 py-2.5 text-xs font-bold text-[#5f665d] scrollbar-hide md:justify-center">
-          {categoryItems.map(([icon, label, category]) => (
-            <Link
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3.5 py-2 transition hover:border-[#d9e7b4] hover:bg-[#f2f8df] hover:text-[#66862e]"
-              href={`/products?category=${encodeURIComponent(category)}`}
-              key={label}
-              onClick={closeMenus}
-            >
-              <span aria-hidden="true">{icon}</span>
-              {label}
-            </Link>
-          ))}
-        </div>
-      </nav>
+        <nav aria-label="Category discovery" className="border-t border-[#eee7dc] py-2.5">
+          <div className="mx-auto w-full max-w-[1180px] overflow-x-auto overflow-y-visible scrollbar-hide lg:overflow-visible">
+            <div className="flex min-w-max items-center justify-start gap-1.5 px-1 text-xs font-semibold text-[#5f665d] lg:min-w-0 lg:justify-center lg:gap-2">
+              {categoryItems.map(({ icon: CategoryIcon, label, category }) => (
+                <Link
+                  className="group flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[#e5ddcf] bg-[#fbfaf7] px-3.5 text-[#5f665d] shadow-[0_1px_0_rgba(31,36,33,0.04)] transition hover:border-[#bdd682] hover:bg-[#f4f9e5] hover:text-[#2f6f5e] lg:flex-1 lg:px-2.5 xl:flex-none xl:px-4"
+                  href={`/products?category=${encodeURIComponent(category)}`}
+                  key={label}
+                  onClick={closeMenus}
+                >
+                  <CategoryIcon
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 text-[#78933c] transition group-hover:text-[#2f6f5e]"
+                    strokeWidth={2}
+                  />
+                  <span className="whitespace-nowrap">{label}</span>
+                </Link>
+              ))}
+
+              <div className="relative shrink-0">
+                <button
+                  aria-expanded={isMoreCategoriesOpen}
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-full border border-[#d9cfbf] bg-white px-4 text-xs font-bold text-[#394036] shadow-[0_1px_0_rgba(31,36,33,0.04)] transition hover:border-[#bdd682] hover:bg-[#f4f9e5] hover:text-[#2f6f5e]"
+                  onClick={() => setIsMoreCategoriesOpen((value) => !value)}
+                  type="button"
+                >
+                  More
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 transition ${
+                      isMoreCategoriesOpen ? "rotate-180" : ""
+                    }`}
+                    strokeWidth={2.4}
+                  />
+                </button>
+                {isMoreCategoriesOpen && (
+                  <div className="absolute right-0 top-full z-30 mt-2 grid w-56 gap-1 rounded-xl border border-[#ded6c9] bg-white p-2 shadow-xl">
+                    {moreCategoryItems.map(({ icon: MoreIcon, label, category }) => (
+                      <Link
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#51564f] transition hover:bg-[#f4f9e5] hover:text-[#2f6f5e]"
+                        href={`/products?category=${encodeURIComponent(category)}`}
+                        key={label}
+                        onClick={closeMenus}
+                      >
+                        <MoreIcon
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 text-[#78933c]"
+                          strokeWidth={2}
+                        />
+                        {label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </nav>
+      </div>
 
       {isMobileMenuOpen && (
         <div className="border-t border-[#ded6c9] bg-white xl:hidden">

@@ -11,7 +11,7 @@ import BeforeAfterImage from "./BeforeAfterImage";
 
 const tabs = [
   ["for-you", "Dành cho bạn"], ["following", "Đang theo dõi"], ["trending", "Xu hướng"],
-  ["makeovers", "Cải tạo"], ["tips", "Mẹo hay"],
+  ["makeovers", "Cải tạo"], ["tips", "Mẹo hay"], ["saved", "Đã lưu"],
 ] as const;
 
 function avatar(value?: CommunityUser["avatar"]) {
@@ -57,6 +57,7 @@ export default function CommunityView() {
   const [error, setError] = useState("");
   const [modal, setModal] = useState(false);
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const token = typeof window === "undefined" ? null : getAccessToken();
   const session = typeof window === "undefined" ? null : getSessionUser();
 
@@ -68,10 +69,12 @@ export default function CommunityView() {
     } catch (value) {
       if (token && value instanceof ApiError && value.status === 401) {
         clearSessionUser();
-        setFeed(await apiClient.get<CommunityFeed>(`/community/posts?tab=${tab}`));
+        setFeed(tab === "following" || tab === "saved"
+          ? { items: [], total: 0, page: 1, limit: 10, totalPages: 0 }
+          : await apiClient.get<CommunityFeed>(`/community/posts?tab=${tab}`));
         setError("Phiên đăng nhập đã hết hạn. Bảng tin công khai vẫn được hiển thị; hãy đăng nhập lại để tương tác.");
       } else {
-        setError(tab === "following" && !token ? "Hãy đăng nhập để xem những người bạn đang theo dõi." : "Chưa thể tải bảng tin cộng đồng.");
+        setError((tab === "following" || tab === "saved") && !token ? "Hãy đăng nhập để xem nội dung cá nhân của bạn." : "Chưa thể tải bảng tin cộng đồng.");
       }
     }
     finally { setLoading(false); }
@@ -79,9 +82,9 @@ export default function CommunityView() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      if (tab === "following" && !token) {
+      if ((tab === "following" || tab === "saved") && !token) {
         setFeed({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 });
-        setError("Hãy đăng nhập để xem những người bạn đang theo dõi.");
+        setError("Hãy đăng nhập để xem nội dung cá nhân của bạn.");
         setLoading(false);
         return;
       }
@@ -90,11 +93,22 @@ export default function CommunityView() {
     return () => window.clearTimeout(timeoutId);
   }, [load, tab, token]);
   useEffect(() => { void apiClient.get<CommunityCreator[]>("/community/creators").then(setCreators).catch(() => setCreators([])); }, []);
+  useEffect(() => {
+    if (!token) return;
+    void apiClient.get<{ userIds: string[] }>("/community/following", { token })
+      .then(({ userIds }) => setFollowingIds(new Set(userIds)))
+      .catch(() => setFollowingIds(new Set()));
+  }, [token]);
 
   async function action(post: CommunityPost, kind: "like" | "save") {
     if (!token) return setError("Bạn cần đăng nhập để thực hiện thao tác này.");
-    const result = await apiClient.post<{active:boolean;count:number}>(`/community/posts/${post._id}/${kind}`, undefined, { token });
-    setFeed((old) => old ? { ...old, items: old.items.map((item) => item._id === post._id ? { ...item, [kind === "like" ? "liked" : "saved"]: result.active, ...(kind === "like" ? { likeCount: result.count } : {}) } : item) } : old);
+    try {
+      const result = await apiClient.post<{active:boolean;count:number}>(`/community/posts/${post._id}/${kind}`, undefined, { token });
+      setFeed((old) => old ? { ...old, items: old.items
+        .filter((item) => !(tab === "saved" && kind === "save" && item._id === post._id && !result.active))
+        .map((item) => item._id === post._id ? { ...item, [kind === "like" ? "liked" : "saved"]: result.active, ...(kind === "like" ? { likeCount: result.count } : {}) } : item) } : old);
+      setError("");
+    } catch { setError("Không thể cập nhật bài viết. Vui lòng thử lại."); }
   }
 
   async function submitComment(event: FormEvent, post: CommunityPost) {
@@ -106,7 +120,19 @@ export default function CommunityView() {
 
   async function follow(id: string) {
     if (!token) return setError("Bạn cần đăng nhập để theo dõi nhà sáng tạo.");
-    await apiClient.post(`/community/users/${id}/follow`, undefined, { token });
+    try {
+      const result = await apiClient.post<{ following: boolean }>(`/community/users/${id}/follow`, undefined, { token });
+      setFollowingIds((old) => {
+        const next = new Set(old);
+        if (result.following) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      setFeed((old) => old ? { ...old, items: old.items
+        .filter((post) => !(tab === "following" && post.userId._id === id && !result.following))
+        .map((post) => post.userId._id === id ? { ...post, userId: { ...post.userId, following: result.following } } : post) } : old);
+      setError("");
+    } catch { setError("Không thể cập nhật theo dõi. Vui lòng thử lại."); }
   }
 
   return <main className="min-h-screen bg-[#faf6ef]">
@@ -124,7 +150,7 @@ export default function CommunityView() {
         {loading && <div className="rounded-3xl border border-[#e2d8c9] bg-white p-12 text-center text-[#777d74]">Đang tải câu chuyện thật từ cộng đồng...</div>}
         {!loading && feed?.items.length === 0 && <div className="rounded-3xl border border-dashed border-[#cfc3b2] bg-white p-14 text-center"><Sparkles className="mx-auto text-[#78953b]"/><h2 className="mt-3 text-2xl">Chưa có bài viết trong mục này</h2><p className="mt-2 text-[#747970]">Hãy là người đầu tiên chia sẻ màn cải tạo của mình.</p></div>}
         {feed?.items.map((post) => <article className="overflow-hidden rounded-[26px] border border-[#e0d6c8] bg-white shadow-sm" key={post._id}>
-          <div className="flex items-center justify-between p-5"><div className="flex items-center gap-3"><Avatar user={post.userId}/><div><h2 className="font-sans text-base font-extrabold tracking-normal">{post.userId.fullName}</h2><p className="text-xs text-[#7b8078]">{post.userId.businessAddress || post.roomType} · {new Date(post.createdAt).toLocaleDateString("vi-VN")}</p></div></div><button className="rounded-full border border-[#cad6a8] px-4 py-2 text-xs font-bold text-[#66832d]" onClick={() => void follow(post.userId._id)}>+ Theo dõi</button></div>
+          <div className="flex items-center justify-between p-5"><div className="flex items-center gap-3"><Avatar user={post.userId}/><div><h2 className="font-sans text-base font-extrabold tracking-normal">{post.userId.fullName}</h2><p className="text-xs text-[#7b8078]">{post.userId.businessAddress || post.roomType} · {new Date(post.createdAt).toLocaleDateString("vi-VN")}</p></div></div><button className={`rounded-full border px-4 py-2 text-xs font-bold ${followingIds.has(post.userId._id) || post.userId.following ? "border-[#78953b] bg-[#eef5dc] text-[#526d21]" : "border-[#cad6a8] text-[#66832d]"}`} onClick={() => void follow(post.userId._id)}>{followingIds.has(post.userId._id) || post.userId.following ? "Đang theo dõi" : "+ Theo dõi"}</button></div>
           <BeforeAfterImage after={post.afterImageUrl} before={post.beforeImageUrl}/>
           <div className="p-5"><p className="leading-7 text-[#424740]">{post.description}</p><div className="mt-2 flex flex-wrap gap-2">{post.hashtags.map((tag) => <span className="text-sm font-semibold text-[#739137]" key={tag}>#{tag}</span>)}</div>
             <div className="mt-4 flex items-center gap-1 border-y border-[#eee7dc] py-2"><button className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${post.liked ? "text-[#ee6f62]" : "text-[#626960]"}`} onClick={() => void action(post,"like")}><Heart fill={post.liked ? "currentColor" : "none"} size={20}/>{post.likeCount}</button><span className="flex items-center gap-2 px-3 text-sm text-[#626960]"><MessageCircle size={20}/>{post.commentCount}</span><button aria-label="Chia sẻ" className="rounded-xl p-2 text-[#626960]"><Share2 size={20}/></button><button aria-label="Lưu bài" className={`ml-auto rounded-xl p-2 ${post.saved ? "text-[#78953b]" : "text-[#626960]"}`} onClick={() => void action(post,"save")}><Bookmark fill={post.saved ? "currentColor" : "none"} size={20}/></button></div>
@@ -135,7 +161,7 @@ export default function CommunityView() {
       </section>
 
       <aside className="space-y-5 lg:sticky lg:top-36 lg:self-start">
-        <div className="rounded-[24px] border border-[#e0d6c8] bg-white p-5"><div className="flex items-center gap-2"><Users className="text-[#78953b]"/><h2 className="font-sans text-lg font-extrabold tracking-normal">Nhà sáng tạo nổi bật</h2></div><div className="mt-4 space-y-4">{creators.length ? creators.slice(0,5).map((creator) => <div className="flex items-center gap-3" key={creator.userId}><Avatar user={{fullName:creator.fullName,avatar:creator.avatar}}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{creator.fullName}</p><p className="text-xs text-[#7b8078]">{creator.posts} bài · {creator.likes} lượt thích</p></div><button className="text-xs font-bold text-[#718d34]" onClick={() => void follow(creator.userId)}>Theo dõi</button></div>) : <p className="text-sm text-[#7b8078]">Danh sách sẽ xuất hiện khi có bài đăng thật.</p>}</div></div>
+        <div className="rounded-[24px] border border-[#e0d6c8] bg-white p-5"><div className="flex items-center gap-2"><Users className="text-[#78953b]"/><h2 className="font-sans text-lg font-extrabold tracking-normal">Nhà sáng tạo nổi bật</h2></div><div className="mt-4 space-y-4">{creators.length ? creators.slice(0,5).map((creator) => <div className="flex items-center gap-3" key={creator.userId}><Avatar user={{fullName:creator.fullName,avatar:creator.avatar}}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{creator.fullName}</p><p className="text-xs text-[#7b8078]">{creator.posts} bài · {creator.likes} lượt thích</p></div><button className="text-xs font-bold text-[#718d34]" onClick={() => void follow(creator.userId)}>{followingIds.has(creator.userId) ? "Đang theo dõi" : "Theo dõi"}</button></div>) : <p className="text-sm text-[#7b8078]">Danh sách sẽ xuất hiện khi có bài đăng thật.</p>}</div></div>
         <div className="overflow-hidden rounded-[24px] bg-[#ddecaa] p-6"><p className="text-xs font-extrabold uppercase tracking-[.2em] text-[#637d2c]">Thử thách tuần</p><h2 className="mt-2 text-3xl">Góc xanh trong nhà</h2><p className="mt-2 text-sm leading-6 text-[#53613e]">Chia sẻ màn biến đổi cùng cây xanh và hashtag #GocXanhDecoho.</p><button className="mt-4 rounded-full bg-[#263020] px-5 py-2.5 text-sm font-bold text-white" onClick={() => setModal(true)}>Tham gia ngay</button></div>
         <div className="rounded-[24px] border border-[#e0d6c8] bg-white p-5"><h2 className="font-sans text-base font-extrabold tracking-normal">Nguyên tắc cộng đồng</h2><p className="mt-2 text-sm leading-6 text-[#737970]">Tôn trọng tác giả, chia sẻ hình ảnh bạn có quyền sử dụng và cùng giữ DECOHO là nơi truyền cảm hứng tích cực.</p><Link className="mt-3 inline-block text-sm font-bold text-[#718d34]" href="/">Tìm hiểu thêm →</Link></div>
       </aside>

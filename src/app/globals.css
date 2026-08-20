@@ -1,11 +1,13 @@
+@import url("https://fonts.googleapis.com/css2?family=Charmonman:wght@400;700&family=Mali:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700;800;900&display=swap");
 @import "tailwindcss";
 
 :root {
   --background: #f7f3ec;
   --foreground: #1f2421;
-  --font-body: "Avenir Next", Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-display: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
-  --font-accent: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  --font-body: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-accent: Charmonman, cursive;
+  --font-hand-small: Mali, Calibri, sans-serif;
 }
 
 @theme inline {
@@ -41,6 +43,7 @@ textarea {
 
 .font-display { font-family: var(--font-display); }
 .font-accent { font-family: var(--font-accent); letter-spacing: -0.04em; }
+.font-hand-small { font-family: var(--font-hand-small); }
 
 ::selection { background: #cbe782; color: #20251f; }
 
@@ -81,4 +84,13 @@ textarea {
 img {
   max-width: 100%;
   display: block;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
