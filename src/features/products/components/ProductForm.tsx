@@ -60,6 +60,7 @@ type ApiProductLite = {
   category?: string;
   brand?: string;
   description?: string;
+  color?: string;
   dimensions?:
     | { length?: string; width?: string; height?: string }
     | string;

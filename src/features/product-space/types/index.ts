@@ -72,6 +72,7 @@ export type ProductSpaceProduct = {
   price?: number;
   images?: string[];
   image?: string;
+  brand?: string;
 };
 
 /**
