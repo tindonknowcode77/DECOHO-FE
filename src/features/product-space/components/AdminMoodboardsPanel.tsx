@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getProducts } from "@/src/features/products/services/productService";
+import type { ProductLite } from "@/src/features/products/types";
 import {
   listAllProductSpacesForAdmin,
 } from "../services/productSpaceService";
@@ -17,8 +18,6 @@ type View =
   | { mode: "list" }
   | { mode: "create" }
   | { mode: "edit"; space: ProductSpace };
-
-type ProductLite = { id: string; name: string; image?: string };
 
 export default function AdminMoodboardsPanel() {
   const [view, setView] = useState<View>({ mode: "list" });
@@ -42,6 +41,9 @@ export default function AdminMoodboardsPanel() {
           id: String(p.id ?? p.sku ?? ""),
           name: p.name,
           image: p.image,
+          priceVND: p.priceVND,
+          brand: p.brand,
+          category: p.category,
         })),
       );
     } catch (e) {

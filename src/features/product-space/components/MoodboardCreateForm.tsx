@@ -3,6 +3,10 @@
 import { useCallback, useState } from "react";
 import { createProductSpaceAsAdmin } from "../services/productSpaceService";
 import {
+  MOODBOARD_DESCRIPTION_MAXLENGTH,
+  MOODBOARD_TITLE_MAXLENGTH,
+  ROOM_DIMENSION_MIN,
+  ROOM_DIMENSION_STEP,
   ROOM_TYPES,
   ROOM_TYPE_LABELS,
   type ProductSpace,
@@ -41,8 +45,13 @@ export default function MoodboardCreateForm({ onSaved, onCancel }: Props) {
       }
       const w = Number(width);
       const l = Number(length);
-      if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(l) || l <= 0) {
-        setError("Chiều dài và chiều rộng phải > 0.");
+      if (
+        !Number.isFinite(w) ||
+        w < ROOM_DIMENSION_MIN ||
+        !Number.isFinite(l) ||
+        l < ROOM_DIMENSION_MIN
+      ) {
+        setError(`Chiều dài và chiều rộng phải ≥ ${ROOM_DIMENSION_MIN}.`);
         return;
       }
       setSubmitting(true);
@@ -155,10 +164,10 @@ export default function MoodboardCreateForm({ onSaved, onCancel }: Props) {
               <span className="mb-1 block font-bold">Rộng (m) *</span>
               <input
                 className="w-full rounded-lg border border-[#dcd5c3] px-3 py-2.5"
-                min="0.1"
+                min={ROOM_DIMENSION_MIN}
                 onChange={(event) => setWidth(event.target.value)}
                 required
-                step="0.1"
+                step={ROOM_DIMENSION_STEP}
                 type="number"
                 value={width}
               />
@@ -167,10 +176,10 @@ export default function MoodboardCreateForm({ onSaved, onCancel }: Props) {
               <span className="mb-1 block font-bold">Dài (m) *</span>
               <input
                 className="w-full rounded-lg border border-[#dcd5c3] px-3 py-2.5"
-                min="0.1"
+                min={ROOM_DIMENSION_MIN}
                 onChange={(event) => setLength(event.target.value)}
                 required
-                step="0.1"
+                step={ROOM_DIMENSION_STEP}
                 type="number"
                 value={length}
               />
@@ -181,7 +190,7 @@ export default function MoodboardCreateForm({ onSaved, onCancel }: Props) {
             <span className="mb-1 block font-bold">Tiêu đề</span>
             <input
               className="w-full rounded-lg border border-[#dcd5c3] px-3 py-2.5"
-              maxLength={160}
+              maxLength={MOODBOARD_TITLE_MAXLENGTH}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="VD: Phòng khách Japandi ấm cúng"
               value={title}
@@ -192,7 +201,7 @@ export default function MoodboardCreateForm({ onSaved, onCancel }: Props) {
             <span className="mb-1 block font-bold">Mô tả</span>
             <textarea
               className="w-full rounded-lg border border-[#dcd5c3] px-3 py-2.5"
-              maxLength={1000}
+              maxLength={MOODBOARD_DESCRIPTION_MAXLENGTH}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Cảm hứng, vật liệu chính, mood tổng thể..."
               rows={3}

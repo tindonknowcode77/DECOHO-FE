@@ -1,3 +1,4 @@
+import { getAccessToken } from "@/src/features/auth/services/session";
 import type {
   Product,
   ProductStatus,
@@ -21,6 +22,7 @@ type ApiProduct = {
   price?: string | number;
   discount?: string | number;
   stock?: string | number;
+  soldCount?: string | number;
   status?: string;
   material?: string;
   color?: string;
@@ -34,6 +36,10 @@ type ApiProduct = {
   image?: string;
   tags?: string[];
   styleTags?: string[];
+  ecommercePlatform?: string;
+  productLink?: string;
+  isFeatured?: boolean;
+  ratingAvg?: number | string;
 };
 
 function getApiUrl() {
@@ -157,7 +163,8 @@ function normalizeProduct(product: ApiProduct): Product {
       "Tồn kho": `${toNumber(product.stock)} sản phẩm`,
       "Trạng thái": product.status ?? "Đang cập nhật",
     },
-  };
+    __raw: product,
+  } as Product;
 }
 
 export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
@@ -231,4 +238,164 @@ export function getRecommendedProducts(
     )
     .slice(0, limit)
     .map(({ product }) => product);
+}
+
+function authHeaders(extra: HeadersInit = {}): HeadersInit {
+  const token = getAccessToken();
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+export type CreateProductPayload = {
+  name: string;
+  price: number;
+  image?: string;
+  category?: string;
+  brand?: string;
+  description?: string;
+  discount?: number;
+  stock?: number;
+  material?: string;
+  color?: string;
+  dimensions?: { length?: string; width?: string; height?: string };
+  weight?: string;
+  origin?: string;
+  warranty?: string;
+  tags?: string[];
+  styleTags?: string[];
+  images?: string[];
+  productLink?: string;
+  ecommercePlatform?: string;
+};
+
+export async function createProduct(
+  payload: CreateProductPayload,
+): Promise<Product> {
+  const response = await fetch(getApiUrl(), {
+    method: "POST",
+    headers: authHeaders({
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    }),
+    body: JSON.stringify(payload),
+  });
+
+  const text = await response.text();
+  const data: ApiProduct | ApiProduct[] | null = text
+    ? (JSON.parse(text) as ApiProduct | ApiProduct[])
+    : null;
+
+  if (!response.ok) {
+    throw new Error(
+      extractError(data) ??
+        `Không thể tạo sản phẩm (${response.status}).`,
+    );
+  }
+
+  const single = Array.isArray(data) ? data[0] : data;
+  if (!single) {
+    throw new Error("Backend không trả về sản phẩm vừa tạo.");
+  }
+  return normalizeProduct(single);
+}
+
+export async function updateProduct(
+  id: string,
+  payload: Partial<CreateProductPayload>,
+): Promise<Product> {
+  const response = await fetch(
+    `${getApiUrl()}/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: authHeaders({
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      }),
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const text = await response.text();
+  const data: ApiProduct | null = text ? (JSON.parse(text) as ApiProduct) : null;
+  if (!response.ok) {
+    throw new Error(
+      extractError(data) ?? `Không thể cập nhật sản phẩm (${response.status}).`,
+    );
+  }
+  if (!data) {
+    throw new Error("Backend không trả về sản phẩm vừa cập nhật.");
+  }
+  return normalizeProduct(data);
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  const response = await fetch(
+    `${getApiUrl()}/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      headers: authHeaders({ Accept: "application/json" }),
+    },
+  );
+  if (!response.ok) {
+    const text = await response.text();
+    let parsed: ApiProduct | null = null;
+    try {
+      parsed = text ? (JSON.parse(text) as ApiProduct) : null;
+    } catch {
+      // ignore
+    }
+    throw new Error(
+      extractError(parsed) ?? `Không thể xoá sản phẩm (${response.status}).`,
+    );
+  }
+}
+
+export async function uploadProductImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
+  const response = await fetch(`${base}/upload/image`, {
+    method: "POST",
+    headers: authHeaders({ Accept: "application/json" }),
+    body: formData,
+  });
+
+  const text = await response.text();
+  const data: { secureUrl?: string; url?: string } | null = text
+    ? (JSON.parse(text) as { secureUrl?: string; url?: string })
+    : null;
+  if (!response.ok) {
+    throw new Error(
+      extractError(data as unknown as ApiProduct) ??
+        `Upload thất bại (${response.status}).`,
+    );
+  }
+  const url = data?.secureUrl ?? data?.url;
+  if (!url) {
+    throw new Error("Backend không trả về URL ảnh.");
+  }
+  return url;
+}
+
+function extractError(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const record = data as Record<string, unknown>;
+  const candidate =
+    (typeof record.message === "string" && record.message) ||
+    (typeof record.error === "string" && record.error);
+  if (candidate) return candidate;
+
+  const details = record.message;
+  if (Array.isArray(details) && details.length) {
+    const first = details[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object") {
+      const message = (first as Record<string, unknown>).message;
+      if (typeof message === "string") return message;
+    }
+  }
+  return undefined;
 }

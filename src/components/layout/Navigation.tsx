@@ -127,6 +127,7 @@ export default function Navigation() {
   const [cartCount, setCartCount] = useState(
     initialCartItems.reduce((total, item) => total + item.quantity, 0),
   );
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -146,6 +147,7 @@ export default function Navigation() {
         ),
       initialCartItems,
     );
+    setMounted(true);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -166,7 +168,7 @@ export default function Navigation() {
     router.push("/login");
   }
 
-  if (authPaths.includes(pathname)) {
+  if (mounted && authPaths.includes(pathname)) {
     return null;
   }
 
@@ -188,7 +190,7 @@ export default function Navigation() {
 
             <nav className="hidden min-w-0 items-center justify-center gap-0.5 xl:flex">
               {menuItems.map((item) => {
-                const isActive = isActivePath(pathname, item.href);
+                const isActive = mounted && isActivePath(pathname, item.href);
 
                 return (
                   <Link
@@ -427,7 +429,7 @@ export default function Navigation() {
         <div className="border-t border-[#ded6c9] bg-white xl:hidden">
           <div className="space-y-1 px-5 py-3">
             {menuItems.map((item) => {
-              const isActive = isActivePath(pathname, item.href);
+              const isActive = mounted && isActivePath(pathname, item.href);
 
               return (
                 <Link

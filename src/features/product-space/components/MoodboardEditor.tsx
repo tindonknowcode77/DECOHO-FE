@@ -64,7 +64,7 @@ export default function MoodboardEditor({
       if (point.product?.id) return productIndex.get(String(point.product.id));
       if (point.product?.name) {
         // Fallback khi product point trỏ tới SP đã bị xoá khỏi catalog.
-        const fallbackImage = point.product.image ?? point.product.images?.[0];
+        const fallbackImage = point.product.image ?? point.product.images?.[0] ?? "";
         return {
           id: "",
           name: point.product.name,

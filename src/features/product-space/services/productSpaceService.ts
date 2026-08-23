@@ -1,6 +1,7 @@
 import { getAccessToken } from "@/src/features/auth/services/session";
 import type {
   CreateProductSpacePayload,
+  ProductPointInput,
   ProductSpace,
   UpdateProductSpacePayload,
 } from "../types";
@@ -171,7 +172,7 @@ export function updateProductSpace(
  */
 export function addProductPoint(
   spaceId: string,
-  point: { productId: string; x: number; y: number },
+  point: ProductPointInput,
 ): Promise<ProductSpace> {
   return request<ProductSpace>(
     `/product-spaces/admin/${encodeURIComponent(spaceId)}/points`,
@@ -188,7 +189,7 @@ export function addProductPoint(
 export function updateProductPoint(
   spaceId: string,
   pointId: string,
-  point: { productId: string; x: number; y: number },
+  point: ProductPointInput,
 ): Promise<ProductSpace> {
   return request<ProductSpace>(
     `/product-spaces/admin/${encodeURIComponent(spaceId)}/points/${encodeURIComponent(pointId)}`,
