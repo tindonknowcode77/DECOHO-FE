@@ -26,4 +26,17 @@ export type Product = {
   reviewsCount: number;
   status?: ProductStatus;
   specifications: Record<string, string>;
+  __raw?: Record<string, unknown>;
 };
+
+/**
+ * Phiên bản rút gọn của `Product` dùng khi chỉ cần hiển thị / chọn nhanh.
+ * Thường dùng ở danh sách chọn sản phẩm (ví dụ: gắn vào Product Space point).
+ *
+ * Khai báo bằng `Pick` để khi `Product` đổi → `ProductLite` tự cập nhật,
+ * tránh lặp lại shape.
+ */
+export type ProductLite = Pick<
+  Product,
+  "id" | "name" | "image" | "priceVND" | "brand" | "category"
+>;

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import {
   addProductPoint,
@@ -8,9 +7,14 @@ import {
   updateProductPoint,
   updateProductSpace,
 } from "../services/productSpaceService";
-import type { ProductPoint, ProductSpace } from "../types";
-
-type ProductLite = { id: string; name: string; image?: string };
+import type { ProductLite } from "@/src/features/products/types";
+import {
+  PRODUCT_POINT_PERCENT_MAX,
+  PRODUCT_POINT_PERCENT_MIN,
+  type ProductPoint,
+  type ProductPointCoord,
+  type ProductSpace,
+} from "../types";
 
 type Props = {
   space: ProductSpace;
@@ -38,9 +42,7 @@ export default function MoodboardEditor({
   const [view, setView] = useState<View>({ mode: "view" });
   const [pickingPoint, setPickingPoint] = useState<ProductLite | null>(null);
   const [workingPoints, setWorkingPoints] = useState(space.productPoints ?? []);
-  const [pendingCoord, setPendingCoord] = useState<{ x: number; y: number } | null>(
-    null,
-  );
+  const [pendingCoord, setPendingCoord] = useState<ProductPointCoord | null>(null);
 
   const productIndex = useMemo(() => {
     const map = new Map<string, ProductLite>();
@@ -61,7 +63,16 @@ export default function MoodboardEditor({
       if (id && productIndex.has(id)) return productIndex.get(id);
       if (point.product?.id) return productIndex.get(String(point.product.id));
       if (point.product?.name) {
-        return { id: "", name: point.product.name, image: point.product.image };
+        // Fallback khi product point trỏ tới SP đã bị xoá khỏi catalog.
+        const fallbackImage = point.product.image ?? point.product.images?.[0];
+        return {
+          id: "",
+          name: point.product.name,
+          image: fallbackImage,
+          priceVND: 0,
+          brand: "",
+          category: "",
+        };
       }
       return undefined;
     },
@@ -90,11 +101,12 @@ export default function MoodboardEditor({
     (event: React.MouseEvent<HTMLDivElement>) => {
       if (!pickingPoint) return;
       const rect = event.currentTarget.getBoundingClientRect();
-      const x = Math.round(((event.clientX - rect.left) / rect.width) * 100);
-      const y = Math.round(((event.clientY - rect.top) / rect.height) * 100);
+      const range = PRODUCT_POINT_PERCENT_MAX - PRODUCT_POINT_PERCENT_MIN;
+      const x = Math.round(((event.clientX - rect.left) / rect.width) * range + PRODUCT_POINT_PERCENT_MIN);
+      const y = Math.round(((event.clientY - rect.top) / rect.height) * range + PRODUCT_POINT_PERCENT_MIN);
       setPendingCoord({
-        x: Math.max(0, Math.min(100, x)),
-        y: Math.max(0, Math.min(100, y)),
+        x: Math.max(PRODUCT_POINT_PERCENT_MIN, Math.min(PRODUCT_POINT_PERCENT_MAX, x)),
+        y: Math.max(PRODUCT_POINT_PERCENT_MIN, Math.min(PRODUCT_POINT_PERCENT_MAX, y)),
       });
     },
     [pickingPoint],
@@ -143,8 +155,9 @@ export default function MoodboardEditor({
   const movePoint = useCallback(
     async (point: ProductPoint) => {
       const id = point._id ?? point.id ?? "";
+      const rangeText = `${PRODUCT_POINT_PERCENT_MIN}..${PRODUCT_POINT_PERCENT_MAX}`;
       const target = prompt(
-        "Nhập toạ độ mới dạng 'x,y' (0..100). Ví dụ: 45,60",
+        `Nhập toạ độ mới dạng 'x,y' (${rangeText}). Ví dụ: 45,60`,
         `${Math.round(point.x ?? 0)},${Math.round(point.y ?? 0)}`,
       );
       if (!target) return;
@@ -152,10 +165,10 @@ export default function MoodboardEditor({
       if (
         !Number.isFinite(xs) ||
         !Number.isFinite(ys) ||
-        xs < 0 ||
-        xs > 100 ||
-        ys < 0 ||
-        ys > 100
+        xs < PRODUCT_POINT_PERCENT_MIN ||
+        xs > PRODUCT_POINT_PERCENT_MAX ||
+        ys < PRODUCT_POINT_PERCENT_MIN ||
+        ys > PRODUCT_POINT_PERCENT_MAX
       ) {
         window.alert("Toạ độ không hợp lệ.");
         return;
