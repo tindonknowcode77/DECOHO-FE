@@ -12,10 +12,6 @@ import {
   SlidersHorizontal,
   Sofa,
   Sparkles,
-  Truck,
-  Shield,
-  Headphones,
-  RefreshCcw,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -35,13 +31,6 @@ const CATEGORY_TABS: Array<{ id: string; label: string; icon?: LucideIcon }> = [
   { id: "Đèn", label: "Đèn" },
   { id: "Cây", label: "Cây" },
   { id: "Bình hoa", label: "Bình hoa" },
-];
-
-const TRUST_ITEMS: Array<{ icon: LucideIcon; title: string; subtitle: string }> = [
-  { icon: RefreshCcw, title: "Đổi hàng 7 ngày", subtitle: "Đền hoặc hỗ trợ" },
-  { icon: Truck, title: "Giao hàng cẩn thận", subtitle: "Vận chuyển tận nơi" },
-  { icon: Shield, title: "Thanh toán an toàn", subtitle: "Bảo mật, đa dạng" },
-  { icon: Headphones, title: "Hỗ trợ 24/7", subtitle: "Tư vấn tận tình" },
 ];
 
 const SPACE_ICONS: Array<{ label: string; icon: LucideIcon; count: string }> = [
@@ -193,64 +182,11 @@ export default function ProductsExplorePage() {
                 className="object-cover"
                 fill
                 sizes="(min-width:768px) 50vw,100vw"
-                src="/images/products/hero-living-room.png"
+                src="https://i.pinimg.com/736x/a3/91/da/a391da70585d1a0ab3a153fe988a1c77.jpg"
                 unoptimized
               />
-
-              {/* Stickers */}
-              <span className="absolute left-4 top-4 rounded-full bg-[#5786B6] px-3 py-1.5 text-xs font-bold text-white shadow-lg">
-                Mới
-              </span>
-              <span className="absolute right-4 top-4 rounded-full bg-[#EC9C32] px-3 py-1.5 text-xs font-bold text-white shadow-lg">
-                Bán chạy
-              </span>
-              <div className="absolute bottom-6 right-6 grid h-20 w-20 place-items-center rounded-full bg-[#d89b47] text-center text-[10px] font-black text-white shadow-xl">
-                Mới
-              </div>
-            </div>
-
-            {/* Floating cards */}
-            <div className="absolute -bottom-6 -left-4 hidden rounded-2xl bg-white p-3 shadow-2xl sm:flex sm:items-center sm:gap-3">
-              <div className="h-12 w-12 overflow-hidden rounded-xl bg-[#f4f0e6]">
-                <Image
-                  alt="Bình hoa"
-                  className="h-full w-full object-cover"
-                  height={48}
-                  src="/images/products/decor-vase-small.png"
-                  unoptimized
-                  width={48}
-                />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-[#646a61]">Mới</p>
-                <p className="text-sm font-bold text-[#2f6f5e]">Bình gốm Bắc Âu</p>
-                <p className="text-xs font-bold text-[#7e9a3f]">223.000đ</p>
-              </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* SECTION 2 — Trust Bar */}
-      <section className="mt-12 border-y border-[#e8e1d4] bg-white">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 divide-[#e8e1d4] px-5 sm:px-8 md:grid-cols-4 md:divide-x">
-          {TRUST_ITEMS.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <div
-                className={`flex items-center gap-3 py-5 ${idx > 0 ? "md:pl-6" : ""} ${idx < 2 ? "border-b border-[#e8e1d4] md:border-b-0" : ""}`}
-                key={item.title}
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#f0f5e8]">
-                  <Icon className="h-4 w-4 text-[#78933c]" strokeWidth={2.2} />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-[#2f6f5e]">{item.title}</p>
-                  <p className="text-xs text-[#646a61]">{item.subtitle}</p>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 

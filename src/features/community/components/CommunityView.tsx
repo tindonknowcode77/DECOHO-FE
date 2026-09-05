@@ -84,7 +84,7 @@ function PublishModal({ close, published }: { close: () => void; published: () =
     if (!token) return setError("Bạn cần đăng nhập để chia sẻ không gian.");
     if (!previews.length) return setError("Hãy chọn ít nhất 1 ảnh hoặc video.");
     const data = new FormData(event.currentTarget);
-    previews.forEach((p) => data.append("media", p.file));
+    previews.forEach((p) => data.append("files", p.file));
     setBusy(true); setError("");
     try {
       await apiClient.post("/community/posts", data, { token });
