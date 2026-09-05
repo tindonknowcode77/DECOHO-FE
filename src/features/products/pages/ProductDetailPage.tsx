@@ -37,7 +37,7 @@ export default async function ProductDetailPage({
   const recommendedProducts = getRecommendedProducts(product, products);
 
   return (
-    <main className="min-h-screen bg-[#f6f1e9] px-5 py-8 text-[#1f2421] sm:px-8 sm:py-10">
+    <main className="min-h-screen bg-[#f6f1e9] px-5 py-8 text-[#2f6f5e] sm:px-8 sm:py-10">
       <section className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link

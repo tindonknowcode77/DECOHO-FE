@@ -39,7 +39,7 @@ export default function GlobalSearch() {
     ["Thương hiệu", data.brands, (item:SearchItem)=>`/products?brand=${encodeURIComponent(item.name ?? "")}`],
     ["Supplier", data.suppliers, ()=>"/store"],
   ] as const : [];
-  return <div className="relative hidden w-56 shrink-0 lg:block 2xl:w-72" ref={root}>
+  return <div className="relative hidden w-44 shrink-0 sm:block lg:w-56 2xl:w-72" ref={root}>
     <label className="flex h-10 items-center gap-2 rounded-full border border-[#ded6c9] bg-[#fbfaf7] px-3 text-[#687068] transition focus-within:border-[#91ad52] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#bcd77d]/15">
       <span aria-hidden="true">⌕</span>
       <input

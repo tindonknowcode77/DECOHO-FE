@@ -2,9 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Heart } from "lucide-react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import { initialCartItems } from "@/src/features/cart/mock/cartItems";
 import { addCartItem } from "@/src/features/cart/services/cartStorage";
+import {
+  getWishlistProductIds,
+  saveProductMeta,
+  subscribeWishlistProducts,
+  toggleWishlistProduct,
+  type WishlistProduct,
+} from "@/src/features/profile/services/wishlistStorage";
 import ProductImage from "./ProductImage";
 import { getProducts } from "../services/productService";
 import type { Product } from "../types";
@@ -72,7 +80,7 @@ function ProductStatusBadge({ product }: { product: Product }) {
   const classes = {
     hot: "bg-[#bc3d2b] text-white",
     new: "bg-[#2f6f5e] text-white",
-    sale: "bg-[#d89b47] text-[#1f2421]",
+    sale: "bg-[#d89b47] text-[#2f6f5e]",
   };
 
   const labels = {
@@ -101,6 +109,7 @@ export default function ProductCatalog() {
   const [maxBudget, setMaxBudget] = useState(25000000);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const controller = new AbortController();
@@ -133,6 +142,33 @@ export default function ProductCatalog() {
 
     return () => controller.abort();
   }, [reloadToken]);
+
+  useEffect(() => {
+    setWishlistIds(new Set(getWishlistProductIds()));
+    return subscribeWishlistProducts((ids) => setWishlistIds(new Set(ids)));
+  }, []);
+
+  function toggleWishlist(event: React.MouseEvent, product: Product) {
+    event.preventDefault();
+    event.stopPropagation();
+    const id = String(product.id);
+    const nowSaved = toggleWishlistProduct(id);
+    if (nowSaved) {
+      const meta: WishlistProduct = {
+        brand: product.brand,
+        category: product.category,
+        id,
+        image: product.image,
+        name: product.name,
+        priceVND: product.priceVND,
+        savedAt: Date.now(),
+        style: product.style,
+      };
+      saveProductMeta(meta);
+      setNotice(`Đã lưu "${product.name}" vào danh sách yêu thích.`);
+      window.setTimeout(() => setNotice(""), 2400);
+    }
+  }
 
   const categories = useMemo(
     () => ["all", ...Array.from(new Set(products.map((product) => product.category)))],
@@ -225,7 +261,7 @@ export default function ProductCatalog() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f1e9] px-5 py-10 text-[#1f2421] sm:px-8">
+    <main className="min-h-screen bg-[#f6f1e9] px-5 py-10 text-[#2f6f5e] sm:px-8">
       <section className="mx-auto max-w-7xl">
         <div className="flex flex-col justify-between gap-6 border-b border-[#ded6c9] pb-7 lg:flex-row lg:items-end">
           <div>
@@ -241,7 +277,7 @@ export default function ProductCatalog() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              className="inline-flex h-11 items-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-4 text-sm font-bold text-[#1f2421] shadow-sm transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
+              className="inline-flex h-11 items-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-4 text-sm font-bold text-[#2f6f5e] shadow-sm transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
               href="/cart"
             >
               Giỏ hàng
@@ -392,7 +428,7 @@ export default function ProductCatalog() {
             </h2>
             <p className="mt-3 text-sm text-[#745c57]">{loadError}</p>
             <button
-              className="mt-5 inline-flex items-center gap-2 rounded-md bg-[#1f2421] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
+              className="mt-5 inline-flex items-center gap-2 rounded-md bg-[#2f6f5e] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
               onClick={() => setReloadToken((value) => value + 1)}
               type="button"
             >
@@ -437,6 +473,25 @@ export default function ProductCatalog() {
                       <div className="absolute left-3 top-3">
                         <ProductStatusBadge product={product} />
                       </div>
+                      <button
+                        aria-label={
+                          wishlistIds.has(String(product.id))
+                            ? "Bỏ yêu thích"
+                            : "Thêm vào yêu thích"
+                        }
+                        className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 backdrop-blur transition hover:bg-white"
+                        onClick={(event) => toggleWishlist(event, product)}
+                        type="button"
+                      >
+                        <Heart
+                          className={`h-4 w-4 transition ${
+                            wishlistIds.has(String(product.id))
+                              ? "text-[#d83a52]"
+                              : "text-[#2f6f5e]"
+                          }`}
+                          fill={wishlistIds.has(String(product.id)) ? "currentColor" : "none"}
+                        />
+                      </button>
                     </div>
                     <div className="p-5">
                       <div className="flex flex-wrap items-center gap-2">
@@ -466,7 +521,7 @@ export default function ProductCatalog() {
 
                   <div className="grid grid-cols-[1fr_40px_40px] gap-2 border-t border-[#eee7dc] bg-[#fcfaf6] p-4">
                     <button
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#1f2421] px-3 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#2f6f5e] px-3 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
                       onClick={() => addToCart(product)}
                       type="button"
                     >
@@ -510,6 +565,25 @@ export default function ProductCatalog() {
                     <div className="absolute left-2 top-2">
                       <ProductStatusBadge product={product} />
                     </div>
+                    <button
+                      aria-label={
+                        wishlistIds.has(String(product.id))
+                          ? "Bỏ yêu thích"
+                          : "Thêm vào yêu thích"
+                      }
+                      className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/95 backdrop-blur transition hover:bg-white"
+                      onClick={(event) => toggleWishlist(event, product)}
+                      type="button"
+                    >
+                      <Heart
+                        className={`h-4 w-4 transition ${
+                          wishlistIds.has(String(product.id))
+                            ? "text-[#d83a52]"
+                            : "text-[#2f6f5e]"
+                        }`}
+                        fill={wishlistIds.has(String(product.id)) ? "currentColor" : "none"}
+                      />
+                    </button>
                   </Link>
 
                   <div>
@@ -543,7 +617,7 @@ export default function ProductCatalog() {
                     <p className="text-xl font-bold">{formatPrice(product.priceVND)}</p>
                     <div className="flex gap-2">
                       <button
-                        className="h-10 rounded-md bg-[#1f2421] px-4 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
+                        className="h-10 rounded-md bg-[#2f6f5e] px-4 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
                         onClick={() => addToCart(product)}
                         type="button"
                       >

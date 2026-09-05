@@ -130,7 +130,7 @@ export default function RegisterView() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf1e7] p-0 text-[#1f2421] lg:grid lg:place-items-center lg:p-8">
+    <main className="min-h-screen bg-[#fbf1e7] p-0 text-[#2f6f5e] lg:grid lg:place-items-center lg:p-8">
       <div className="grid min-h-screen w-full overflow-hidden bg-white shadow-[0_24px_70px_rgba(72,55,35,0.16)] lg:min-h-0 lg:max-w-6xl lg:grid-cols-[1.08fr_.92fr] lg:rounded-[28px] lg:border lg:border-[#e5d9c9]">
       <section className="relative hidden min-h-[820px] overflow-hidden bg-[#fff8ef] px-10 pb-8 pt-10 lg:flex lg:flex-col">
         <BrandLogo className="h-14 w-52" variant="horizontal" />
@@ -152,7 +152,7 @@ export default function RegisterView() {
       <section className="flex items-center justify-center bg-white px-5 py-10 sm:px-10 lg:min-h-[820px] lg:px-14">
         <div className="w-full max-w-md">
           <Link
-            className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[#646a61] hover:text-[#1f2421]"
+            className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[#646a61] hover:text-[#2f6f5e]"
             href="/"
           >
             <Icon name="home" />

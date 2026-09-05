@@ -13,14 +13,25 @@ export type CommunityComment = {
   createdAt: string;
 };
 
+export type CommunityMedia = {
+  url: string;
+  publicId: string;
+  type: 'image' | 'video';
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  format?: string;
+  bytes?: number;
+};
+
 export type CommunityPost = {
   _id: string;
   userId: CommunityUser;
   description: string;
   roomType: string;
   hashtags: string[];
-  beforeImageUrl: string;
-  afterImageUrl: string;
+  media: CommunityMedia[];
   likeCount: number;
   commentCount: number;
   liked: boolean;

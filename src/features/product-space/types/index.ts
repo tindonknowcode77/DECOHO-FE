@@ -97,6 +97,8 @@ export type ProductSpace = {
   id?: string;
   roomId?: string;
   userId?: string;
+  /** Tác giả moodboard — chỉ dùng cho demo/list phổ thông; không có trong response backend chính. */
+  author?: string | { name?: string };
   /** Discriminator: 'moodboard' cho Product Space, 'room' cho ảnh phòng thường. */
   kind?: RoomKind;
 
@@ -117,6 +119,10 @@ export type ProductSpace = {
   isFeatured?: boolean;
 
   productPoints?: ProductPoint[];
+  /** Thẻ tag hiển thị trên demo moodboards (public listing). */
+  tags?: string[];
+  /** Số like — dùng cho demo/sort. */
+  likes?: number;
 
   createdAt?: string;
   updatedAt?: string;

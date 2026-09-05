@@ -7,19 +7,23 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  Copy,
   CreditCard,
+  FileText,
   Landmark,
   MapPin,
   PackageCheck,
+  QrCode,
   ShieldCheck,
   ShoppingBag,
   Store,
   Truck,
+  Wallet,
   WalletCards,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { getSessionUser } from "@/src/features/auth/services/session";
-import { initialCartItems, promoCodes } from "../mock/cartItems";
+import { initialCartItems } from "../mock/cartItems";
 import {
   clearStoredPromoCode,
   getStoredCartItems,
@@ -27,14 +31,20 @@ import {
   saveStoredCartItems,
   subscribeCartItems,
 } from "../services/cartStorage";
-import { saveCheckoutOrder } from "../services/orderStorage";
+import {
+  createOrder,
+  createVNPayPayment,
+  createMoMoPayment,
+  getBankAccountInfo,
+  type Order,
+} from "../services/orderApi";
 import type { CartItem } from "../types";
 
 const FREE_SHIPPING_THRESHOLD = 15000000;
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 type ShippingMethod = "standard" | "express" | "pickup";
-type PaymentMethod = "cod" | "bank" | "card";
+type PaymentMethodOption = "COD" | "BANK_TRANSFER" | "VNPAY" | "MOMO";
 
 type CustomerForm = {
   address: string;
@@ -51,14 +61,6 @@ type CardForm = {
   expiry: string;
   name: string;
   number: string;
-};
-
-type Confirmation = {
-  email: string;
-  id: string;
-  paymentLabel: string;
-  shippingLabel: string;
-  totalVND: number;
 };
 
 const initialCustomerForm: CustomerForm = {
@@ -92,12 +94,6 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
-function createOrderId() {
-  const datePart = new Date().toISOString().slice(2, 10).replaceAll("-", "");
-  const randomPart = Math.floor(1000 + Math.random() * 9000);
-  return `DCH-${datePart}-${randomPart}`;
-}
-
 export default function CheckoutView() {
   const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
   const [hasLoadedCart, setHasLoadedCart] = useState(false);
@@ -106,14 +102,24 @@ export default function CheckoutView() {
   const [card, setCard] = useState<CardForm>(initialCardForm);
   const [shippingMethod, setShippingMethod] =
     useState<ShippingMethod>("standard");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethodOption>("COD");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [orderError, setOrderError] = useState("");
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(true);
+  const [bankInfo, setBankInfo] = useState<{
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+    branch: string;
+  } | null>(null);
+  const [copiedAccount, setCopiedAccount] = useState(false);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(async () => {
       setCartItems(getStoredCartItems(initialCartItems));
       setPromoCode(getStoredPromoCode());
 
@@ -121,10 +127,14 @@ export default function CheckoutView() {
       if (sessionUser) {
         setCustomer((current) => ({
           ...current,
-          email: sessionUser.email,
-          name: sessionUser.name,
+          email: sessionUser.email ?? "",
+          name: sessionUser.name ?? "",
+          phone: sessionUser.phone ?? "",
         }));
       }
+
+      const bank = await getBankAccountInfo();
+      setBankInfo(bank);
 
       setHasLoadedCart(true);
     }, 0);
@@ -151,11 +161,11 @@ export default function CheckoutView() {
     [cartItems],
   );
   const itemCount = useMemo(
-    () => cartItems.reduce((total, item) => total + item.quantity, 0),
+    () =>
+      cartItems.reduce((total, item) => total + item.quantity, 0),
     [cartItems],
   );
-  const activePromo = promoCodes.find((promo) => promo.code === promoCode);
-  const discountVND = subtotal * (activePromo?.discount ?? 0);
+  const discountVND = 0;
   const shippingFeeVND =
     shippingMethod === "pickup"
       ? 0
@@ -195,22 +205,28 @@ export default function CheckoutView() {
 
   const paymentOptions = [
     {
-      description: "Thanh toán khi sản phẩm được giao và kiểm tra.",
+      description: "Thanh toán khi nhận hàng và kiểm tra sản phẩm.",
       icon: WalletCards,
-      id: "cod" as const,
-      label: "Thanh toán khi nhận hàng",
+      id: "COD" as const,
+      label: "Thanh toán khi nhận hàng (COD)",
     },
     {
-      description: "Thông tin chuyển khoản hiển thị sau khi đặt đơn.",
+      description: "Chuyển khoản ngân hàng hoặc quét mã QR.",
       icon: Landmark,
-      id: "bank" as const,
+      id: "BANK_TRANSFER" as const,
       label: "Chuyển khoản ngân hàng",
     },
     {
-      description: "Thanh toán thẻ demo, không phát sinh giao dịch thật.",
+      description: "Thanh toán qua cổng VNPay (ATM, Visa, MasterCard).",
       icon: CreditCard,
-      id: "card" as const,
-      label: "Thẻ tín dụng hoặc ghi nợ",
+      id: "VNPAY" as const,
+      label: "Thanh toán qua VNPay",
+    },
+    {
+      description: "Thanh toán qua ví MoMo.",
+      icon: QrCode,
+      id: "MOMO" as const,
+      label: "Thanh toán qua MoMo",
     },
   ];
 
@@ -256,25 +272,10 @@ export default function CheckoutView() {
   }
 
   function validatePayment() {
-    if (paymentMethod !== "card") {
-      setErrors({});
-      return true;
-    }
-
-    const nextErrors: Record<string, string> = {};
-    if (card.number.replace(/\s/g, "").length < 12) {
-      nextErrors["card-number"] = "Số thẻ cần ít nhất 12 chữ số.";
-    }
-    if (!card.name.trim()) nextErrors["card-name"] = "Vui lòng nhập tên trên thẻ.";
-    if (!/^\d{2}\/\d{2}$/.test(card.expiry)) {
-      nextErrors["card-expiry"] = "Nhập theo định dạng MM/YY.";
-    }
-    if (!/^\d{3,4}$/.test(card.cvv)) {
-      nextErrors["card-cvv"] = "CVV gồm 3 hoặc 4 chữ số.";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    // Chỉ các phương thức đã định nghĩa trong PaymentMethodOption (COD / BANK_TRANSFER / VNPAY / MOMO)
+    // đều không yêu cầu nhập liệu thêm → luôn hợp lệ.
+    setErrors({});
+    return true;
   }
 
   function continueCheckout(event?: FormEvent<HTMLFormElement>) {
@@ -285,46 +286,68 @@ export default function CheckoutView() {
     if (step < 4) goToStep((step + 1) as CheckoutStep);
   }
 
-  function placeOrder() {
-    const orderId = createOrderId();
+  async function placeOrder() {
+    setOrderLoading(true);
+    setOrderError("");
+
     const shippingLabel =
       shippingOptions.find((option) => option.id === shippingMethod)?.label ??
       "Giao tiêu chuẩn";
     const paymentLabel =
       paymentOptions.find((option) => option.id === paymentMethod)?.label ??
-      "Thanh toán khi nhận hàng";
+      "COD";
 
-    saveCheckoutOrder({
-      createdAt: new Date().toISOString(),
-      customer: {
-        ...customer,
-        address: customer.address.trim(),
-        district: customer.district.trim(),
-        email: customer.email.trim(),
-        name: customer.name.trim(),
-        note: customer.note.trim(),
-        phone: customer.phone.trim(),
-      },
-      discountVND,
-      id: orderId,
-      items: cartItems,
-      paymentMethod,
-      promoCode: activePromo?.code ?? null,
-      shippingFeeVND,
-      shippingMethod,
-      status: "confirmed",
-      subtotalVND: subtotal,
-      totalVND,
-    });
-    saveStoredCartItems([]);
-    clearStoredPromoCode();
-    setConfirmation({
-      email: customer.email.trim(),
-      id: orderId,
-      paymentLabel,
-      shippingLabel,
-      totalVND,
-    });
+    const fullAddress = `${customer.address}, ${customer.district}, ${customer.city}`;
+
+    const items = cartItems.map((item) => ({
+      productId: item.id.replace(/^catalog-/, ""),
+      quantity: item.quantity,
+    }));
+
+    try {
+      const createdOrder = await createOrder({
+        items,
+        customerName: customer.name.trim(),
+        customerEmail: customer.email.trim() || "khachhang@decoho.vn",
+        customerPhone: customer.phone.trim(),
+        shippingAddress: fullAddress,
+        paymentMethod,
+        promotionCode: promoCode ?? undefined,
+      });
+
+      saveStoredCartItems([]);
+      clearStoredPromoCode();
+
+      if (paymentMethod === "VNPAY") {
+        const { paymentUrl } = await createVNPayPayment(createdOrder._id, totalVND);
+        if (paymentUrl) {
+          window.location.href = paymentUrl;
+          return;
+        }
+      }
+
+      if (paymentMethod === "MOMO") {
+        const { paymentUrl } = await createMoMoPayment(createdOrder._id, totalVND);
+        if (paymentUrl) {
+          window.location.href = paymentUrl;
+          return;
+        }
+      }
+
+      setOrder(createdOrder);
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : "Không thể tạo đơn hàng. Vui lòng thử lại.");
+    } finally {
+      setOrderLoading(false);
+    }
+  }
+
+  async function copyAccountNumber() {
+    if (bankInfo?.accountNumber) {
+      await navigator.clipboard.writeText(bankInfo.accountNumber);
+      setCopiedAccount(true);
+      setTimeout(() => setCopiedAccount(false), 2000);
+    }
   }
 
   if (!hasLoadedCart) {
@@ -341,9 +364,16 @@ export default function CheckoutView() {
     );
   }
 
-  if (confirmation) {
+  if (order) {
+    const shippingLabel =
+      shippingOptions.find((option) => option.id === shippingMethod)?.label ??
+      "Giao tiêu chuẩn";
+    const paymentLabel =
+      paymentOptions.find((option) => option.id === paymentMethod)?.label ??
+      "COD";
+
     return (
-      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#1f2421] sm:px-8">
+      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#2f6f5e] sm:px-8">
         <section className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-[#d8cebf] bg-white shadow-[0_18px_50px_rgba(57,45,29,.12)]">
           <div className="bg-[#173b2d] px-6 py-10 text-center text-white sm:px-10">
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/12">
@@ -363,13 +393,13 @@ export default function CheckoutView() {
               <div>
                 <p className="text-xs font-bold uppercase text-[#7b7f78]">Mã đơn hàng</p>
                 <p className="mt-2 text-xl font-bold text-[#2f6f5e]">
-                  {confirmation.id}
+                  {order.orderCode}
                 </p>
               </div>
               <div className="sm:text-right">
                 <p className="text-xs font-bold uppercase text-[#7b7f78]">Tổng thanh toán</p>
                 <p className="mt-2 text-xl font-bold">
-                  {formatPrice(confirmation.totalVND)}
+                  {formatPrice(order.totalAmount)}
                 </p>
               </div>
             </div>
@@ -377,40 +407,34 @@ export default function CheckoutView() {
             <dl className="mt-6 space-y-4 text-sm">
               <div className="flex justify-between gap-4">
                 <dt className="text-[#646a61]">Vận chuyển</dt>
-                <dd className="text-right font-bold">{confirmation.shippingLabel}</dd>
+                <dd className="text-right font-bold">{shippingLabel}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-[#646a61]">Thanh toán</dt>
-                <dd className="text-right font-bold">{confirmation.paymentLabel}</dd>
+                <dd className="text-right font-bold">{paymentLabel}</dd>
               </div>
-              {confirmation.email && (
+              {order.customerEmail && (
                 <div className="flex justify-between gap-4">
                   <dt className="text-[#646a61]">Xác nhận qua</dt>
-                  <dd className="break-all text-right font-bold">{confirmation.email}</dd>
+                  <dd className="break-all text-right font-bold">{order.customerEmail}</dd>
                 </div>
               )}
             </dl>
 
-            {paymentMethod === "bank" && (
-              <div className="mt-6 rounded-md border border-[#ecd5ab] bg-[#fff7e8] p-4 text-sm leading-6 text-[#765022]">
-                Nội dung chuyển khoản: <strong>{confirmation.id}</strong>. Bộ phận
-                chăm sóc khách hàng sẽ gửi thông tin tài khoản xác nhận.
-              </div>
-            )}
-
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               <Link
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#1f2421] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#2f6f5e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#2f6f5e]"
                 href="/products"
               >
                 Tiếp tục mua sắm
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                className="inline-flex items-center justify-center rounded-md border border-[#ded6c9] px-5 py-3 text-sm font-bold transition hover:bg-[#f7f3ec]"
-                href="/"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-[#ded6c9] px-5 py-3 text-sm font-bold transition hover:bg-[#f7f3ec]"
+                href="/orders"
               >
-                Về trang chủ
+                <FileText className="h-4 w-4" />
+                Xem đơn hàng
               </Link>
             </div>
           </div>
@@ -421,7 +445,7 @@ export default function CheckoutView() {
 
   if (cartItems.length === 0) {
     return (
-      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#1f2421]">
+      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#2f6f5e]">
         <section className="mx-auto max-w-md rounded-lg border border-[#ded6c9] bg-white p-8 text-center shadow-sm">
           <ShoppingBag className="mx-auto h-12 w-12 text-[#2f6f5e]" />
           <h1 className="mt-5 text-2xl font-bold">Chưa có sản phẩm để thanh toán</h1>
@@ -429,7 +453,7 @@ export default function CheckoutView() {
             Thêm sản phẩm vào giỏ rồi quay lại để bắt đầu đặt hàng.
           </p>
           <Link
-            className="mt-6 inline-flex items-center gap-2 rounded-md bg-[#1f2421] px-5 py-3 text-sm font-bold text-white"
+            className="mt-6 inline-flex items-center gap-2 rounded-md bg-[#2f6f5e] px-5 py-3 text-sm font-bold text-white"
             href="/products"
           >
             Mở catalog
@@ -441,12 +465,12 @@ export default function CheckoutView() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f3ec] px-5 py-8 text-[#1f2421] sm:px-8 sm:py-10">
+    <main className="min-h-screen bg-[#f7f3ec] px-5 py-8 text-[#2f6f5e] sm:px-8 sm:py-10">
       <section className="mx-auto max-w-7xl">
         <div className="flex flex-col justify-between gap-4 border-b border-[#ded6c9] pb-6 sm:flex-row sm:items-end">
           <div>
             <Link
-              className="inline-flex items-center gap-2 text-sm font-bold text-[#2f6f5e] transition hover:text-[#1f2421]"
+              className="inline-flex items-center gap-2 text-sm font-bold text-[#2f6f5e] transition hover:text-[#2f6f5e]"
               href="/cart"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -459,7 +483,7 @@ export default function CheckoutView() {
           </div>
           <span className="inline-flex w-fit items-center gap-2 rounded-md bg-[#eef6f2] px-3 py-2 text-xs font-bold text-[#2f6f5e]">
             <ShieldCheck className="h-4 w-4" />
-            Dữ liệu thanh toán demo được bảo mật
+            Thanh toán bảo mật SSL
           </span>
         </div>
 
@@ -492,6 +516,12 @@ export default function CheckoutView() {
             );
           })}
         </ol>
+
+        {orderError && (
+          <div className="mt-4 rounded-md border border-[#bc3d2b] bg-[#fff1ee] p-4 text-sm text-[#bc3d2b]">
+            {orderError}
+          </div>
+        )}
 
         <div className="mt-7 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_380px]">
           <section
@@ -680,17 +710,17 @@ export default function CheckoutView() {
               <div>
                 <div className="flex items-start gap-3 border-b border-[#eee7dc] pb-5">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[#eef6f2] text-[#2f6f5e]">
-                    <CreditCard className="h-5 w-5" />
+                    <Wallet className="h-5 w-5" />
                   </span>
                   <div>
                     <h2 className="text-xl font-bold">Phương thức thanh toán</h2>
                     <p className="mt-1 text-sm text-[#646a61]">
-                      Đây là luồng demo, hệ thống không thu tiền thật.
+                      Chọn hình thức thanh toán phù hợp với bạn.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-3">
+                <div className="mt-6 space-y-3">
                   {paymentOptions.map((option) => {
                     const OptionIcon = option.icon;
                     const isSelected = paymentMethod === option.id;
@@ -714,7 +744,9 @@ export default function CheckoutView() {
                           }}
                           type="radio"
                         />
-                        <OptionIcon className="h-6 w-6 shrink-0 text-[#2f6f5e]" />
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white text-[#2f6f5e] shadow-sm">
+                          <OptionIcon className="h-5 w-5" />
+                        </span>
                         <span className="min-w-0 flex-1">
                           <strong className="block text-sm">{option.label}</strong>
                           <span className="mt-1 block text-xs leading-5 text-[#646a61]">
@@ -735,75 +767,43 @@ export default function CheckoutView() {
                   })}
                 </div>
 
-                {paymentMethod === "card" && (
-                  <div className="mt-5 grid gap-4 rounded-lg border border-[#ded6c9] bg-[#fcfaf6] p-4 sm:grid-cols-2">
-                    <label className="sm:col-span-2">
-                      <span className="text-xs font-bold uppercase text-[#646a61]">Số thẻ</span>
-                      <input
-                        className={`mt-2 h-11 w-full rounded-md border bg-white px-3 text-sm outline-none ${
-                          errors["card-number"] ? "border-[#bc3d2b]" : "border-[#ded6c9]"
-                        }`}
-                        inputMode="numeric"
-                        onChange={(event) =>
-                          updateCard(
-                            "number",
-                            event.target.value.replace(/[^\d\s]/g, "").slice(0, 19),
-                          )
-                        }
-                        placeholder="4242 4242 4242 4242"
-                        value={card.number}
-                      />
-                      {errors["card-number"] && (
-                        <span className="mt-1 block text-xs text-[#bc3d2b]">{errors["card-number"]}</span>
-                      )}
-                    </label>
-                    <label className="sm:col-span-2">
-                      <span className="text-xs font-bold uppercase text-[#646a61]">Tên trên thẻ</span>
-                      <input
-                        className={`mt-2 h-11 w-full rounded-md border bg-white px-3 text-sm outline-none ${
-                          errors["card-name"] ? "border-[#bc3d2b]" : "border-[#ded6c9]"
-                        }`}
-                        onChange={(event) => updateCard("name", event.target.value)}
-                        placeholder="NGUYEN MINH ANH"
-                        value={card.name}
-                      />
-                      {errors["card-name"] && (
-                        <span className="mt-1 block text-xs text-[#bc3d2b]">{errors["card-name"]}</span>
-                      )}
-                    </label>
-                    <label>
-                      <span className="text-xs font-bold uppercase text-[#646a61]">Hết hạn</span>
-                      <input
-                        className={`mt-2 h-11 w-full rounded-md border bg-white px-3 text-sm outline-none ${
-                          errors["card-expiry"] ? "border-[#bc3d2b]" : "border-[#ded6c9]"
-                        }`}
-                        inputMode="numeric"
-                        onChange={(event) => updateCard("expiry", event.target.value.slice(0, 5))}
-                        placeholder="MM/YY"
-                        value={card.expiry}
-                      />
-                      {errors["card-expiry"] && (
-                        <span className="mt-1 block text-xs text-[#bc3d2b]">{errors["card-expiry"]}</span>
-                      )}
-                    </label>
-                    <label>
-                      <span className="text-xs font-bold uppercase text-[#646a61]">CVV</span>
-                      <input
-                        className={`mt-2 h-11 w-full rounded-md border bg-white px-3 text-sm outline-none ${
-                          errors["card-cvv"] ? "border-[#bc3d2b]" : "border-[#ded6c9]"
-                        }`}
-                        inputMode="numeric"
-                        onChange={(event) =>
-                          updateCard("cvv", event.target.value.replace(/\D/g, "").slice(0, 4))
-                        }
-                        placeholder="123"
-                        type="password"
-                        value={card.cvv}
-                      />
-                      {errors["card-cvv"] && (
-                        <span className="mt-1 block text-xs text-[#bc3d2b]">{errors["card-cvv"]}</span>
-                      )}
-                    </label>
+                {paymentMethod === "BANK_TRANSFER" && bankInfo && (
+                  <div className="mt-5 rounded-lg border border-[#ecd5ab] bg-[#fff7e8] p-5">
+                    <h3 className="flex items-center gap-2 font-bold text-[#765022]">
+                      <Landmark className="h-5 w-5" />
+                      Thông tin tài khoản DECOHO
+                    </h3>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-[#765022]/70">Ngân hàng</span>
+                        <span className="font-bold">{bankInfo.bankName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[#765022]/70">Số tài khoản</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold">{bankInfo.accountNumber}</span>
+                          <button
+                            className="flex items-center gap-1 rounded bg-white/80 px-2 py-1 text-xs font-bold text-[#765022] hover:bg-white"
+                            onClick={copyAccountNumber}
+                            type="button"
+                          >
+                            <Copy className="h-3 w-3" />
+                            {copiedAccount ? "Đã copy!" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[#765022]/70">Tên tài khoản</span>
+                        <span className="font-bold">{bankInfo.accountHolder}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[#765022]/70">Chi nhánh</span>
+                        <span className="font-bold">{bankInfo.branch}</span>
+                      </div>
+                    </div>
+                    <p className="mt-4 rounded bg-white/80 p-3 text-xs text-[#765022]">
+                      <strong>Nội dung chuyển khoản:</strong> Quý khách vui lòng ghi rõ số điện thoại hoặc mã đơn hàng khi chuyển khoản để chúng tôi xác nhận nhanh hơn.
+                    </p>
                   </div>
                 )}
 
@@ -902,13 +902,22 @@ export default function CheckoutView() {
                     Quay lại
                   </button>
                   <button
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#1f2421] transition hover:bg-[#e4aa55] disabled:cursor-not-allowed disabled:bg-[#d7d3cb] disabled:text-[#7b7f78]"
-                    disabled={!termsAccepted}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#2f6f5e] transition hover:bg-[#e4aa55] disabled:cursor-not-allowed disabled:bg-[#d7d3cb] disabled:text-[#7b7f78]"
+                    disabled={!termsAccepted || orderLoading}
                     onClick={placeOrder}
                     type="button"
                   >
-                    Xác nhận đặt hàng · {formatPrice(totalVND)}
-                    <CheckCircle2 className="h-4 w-4" />
+                    {orderLoading ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Đang xử lý...
+                      </>
+                    ) : (
+                      <>
+                        Xác nhận đặt hàng · {formatPrice(totalVND)}
+                        <CheckCircle2 className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -938,7 +947,7 @@ export default function CheckoutView() {
                       src={item.image}
                       unoptimized={item.image.startsWith("data:")}
                     />
-                    <span className="absolute right-0 top-0 grid h-5 min-w-5 place-items-center rounded-bl-md bg-[#1f2421] px-1 text-[10px] font-bold text-white">
+                    <span className="absolute right-0 top-0 grid h-5 min-w-5 place-items-center rounded-bl-md bg-[#2f6f5e] px-1 text-[10px] font-bold text-white">
                       {item.quantity}
                     </span>
                   </div>
@@ -958,9 +967,9 @@ export default function CheckoutView() {
                 <dt>Tạm tính ({itemCount} món)</dt>
                 <dd>{formatPrice(subtotal)}</dd>
               </div>
-              {activePromo && (
+              {promoCode && (
                 <div className="flex justify-between gap-3 text-[#2f6f5e]">
-                  <dt>Ưu đãi {activePromo.code}</dt>
+                  <dt>Ưu đãi ({promoCode})</dt>
                   <dd>-{formatPrice(discountVND)}</dd>
                 </div>
               )}
@@ -976,7 +985,7 @@ export default function CheckoutView() {
 
             <p className="mt-5 flex items-center justify-center gap-2 rounded-md bg-[#eef6f2] px-3 py-2 text-xs text-[#2f6f5e]">
               <ShieldCheck className="h-4 w-4" />
-              Không lưu thông tin thẻ demo
+              Thanh toán bảo mật &amp; mã hóa SSL
             </p>
           </aside>
         </div>

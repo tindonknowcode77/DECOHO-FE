@@ -1523,7 +1523,7 @@ export default function RoomShowroom3D() {
   }, [activePreset, selectShowroomItem]);
 
   return (
-    <main className="min-h-[calc(100svh-4rem)] bg-[#b9bcba] text-[#1f2421]">
+    <main className="min-h-[calc(100svh-4rem)] bg-[#b9bcba] text-[#2f6f5e]">
       <section className="relative h-[calc(100svh-4rem)] min-h-[680px] overflow-hidden">
         <div
           aria-label="Không gian showroom isometric 3D"
@@ -1548,7 +1548,7 @@ export default function RoomShowroom3D() {
             className="inline-flex items-center gap-3 rounded-md border border-white/55 bg-white/82 px-3 py-2 shadow-lg backdrop-blur transition hover:bg-white"
             href="/"
           >
-            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#1f2421] text-[#f0bd65]">
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-[#2f6f5e] text-[#f0bd65]">
               <Box className="h-5 w-5" />
             </span>
             <span>
@@ -1563,7 +1563,7 @@ export default function RoomShowroom3D() {
         <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
           <button
             aria-label={isAutoRotating ? "Dừng tự xoay" : "Bật tự xoay"}
-            className="grid h-11 w-11 place-items-center rounded-md border border-white/55 bg-white/82 text-[#1f2421] shadow-lg backdrop-blur transition hover:bg-white"
+            className="grid h-11 w-11 place-items-center rounded-md border border-white/55 bg-white/82 text-[#2f6f5e] shadow-lg backdrop-blur transition hover:bg-white"
             onClick={toggleAutoRotate}
             title={isAutoRotating ? "Dừng tự xoay" : "Bật tự xoay"}
             type="button"
@@ -1576,7 +1576,7 @@ export default function RoomShowroom3D() {
           </button>
           <button
             aria-label="Đặt lại góc nhìn"
-            className="grid h-11 w-11 place-items-center rounded-md border border-white/55 bg-white/82 text-[#1f2421] shadow-lg backdrop-blur transition hover:bg-white"
+            className="grid h-11 w-11 place-items-center rounded-md border border-white/55 bg-white/82 text-[#2f6f5e] shadow-lg backdrop-blur transition hover:bg-white"
             onClick={resetView}
             title="Đặt lại góc nhìn"
             type="button"
@@ -1585,7 +1585,7 @@ export default function RoomShowroom3D() {
           </button>
           <Link
             aria-label="Mở toàn bộ sản phẩm"
-            className="hidden h-11 items-center gap-2 rounded-md bg-[#1f2421] px-4 text-sm font-bold text-white shadow-lg transition hover:bg-[#2f6f5e] sm:inline-flex"
+            className="hidden h-11 items-center gap-2 rounded-md bg-[#2f6f5e] px-4 text-sm font-bold text-white shadow-lg transition hover:bg-[#2f6f5e] sm:inline-flex"
             href="/products"
           >
             Sản phẩm
@@ -1594,7 +1594,7 @@ export default function RoomShowroom3D() {
         </div>
 
         {!selectedItem && (
-          <div className="pointer-events-none absolute bottom-20 left-1/2 z-20 hidden -translate-x-1/2 rounded-md border border-white/45 bg-[#1f2421]/78 px-4 py-2 text-xs font-bold text-white shadow-xl backdrop-blur md:flex md:items-center md:gap-2">
+          <div className="pointer-events-none absolute bottom-20 left-1/2 z-20 hidden -translate-x-1/2 rounded-md border border-white/45 bg-[#2f6f5e]/78 px-4 py-2 text-xs font-bold text-white shadow-xl backdrop-blur md:flex md:items-center md:gap-2">
             <Maximize2 className="h-4 w-4 text-[#f0bd65]" />
             Kéo để xoay · cuộn để zoom · bấm vào nội thất
           </div>
@@ -1609,7 +1609,7 @@ export default function RoomShowroom3D() {
               <button
                 className={`h-9 rounded-md px-3 text-xs font-bold transition ${
                   activeStyle === styleId
-                    ? "bg-[#1f2421] text-white"
+                    ? "bg-[#2f6f5e] text-white"
                     : "text-[#555c57] hover:bg-white"
                 }`}
                 key={styleId}
@@ -1637,7 +1637,7 @@ export default function RoomShowroom3D() {
           <aside className="absolute inset-x-3 bottom-3 z-40 max-h-[calc(100%-5.5rem)] overflow-y-auto rounded-lg border border-white/60 bg-white/94 p-4 shadow-[0_24px_70px_rgba(31,36,33,.28)] backdrop-blur sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-20 sm:w-[350px] sm:p-5">
             <button
               aria-label="Đóng thông tin sản phẩm"
-              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md text-[#646a61] transition hover:bg-[#f2eee7] hover:text-[#1f2421]"
+              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md text-[#646a61] transition hover:bg-[#f2eee7] hover:text-[#2f6f5e]"
               onClick={() => selectShowroomItem(null)}
               title="Đóng"
               type="button"
@@ -1713,7 +1713,7 @@ export default function RoomShowroom3D() {
                 className={`inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-black transition ${
                   addedItemId === selectedItem.id
                     ? "bg-[#2f6f5e] text-white"
-                    : "bg-[#d89b47] text-[#1f2421] hover:bg-[#e4aa55]"
+                    : "bg-[#d89b47] text-[#2f6f5e] hover:bg-[#e4aa55]"
                 }`}
                 onClick={addSelectedItemToCart}
                 type="button"

@@ -1,1 +1,5 @@
-export { default } from "@/src/features/products/pages/ProductsPage";
+import ProductsExplorePage from "@/src/features/products/pages/ProductsExplorePage";
+
+export default function Page() {
+  return <ProductsExplorePage />;
+}

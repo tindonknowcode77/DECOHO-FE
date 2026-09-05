@@ -43,7 +43,7 @@ export default function ProcessView() {
   const step = processSteps[activeStep];
 
   return (
-    <main className="min-h-screen bg-[#f7f3ec] px-5 py-10 text-[#1f2421] sm:px-8">
+    <main className="min-h-screen bg-[#f7f3ec] px-5 py-10 text-[#2f6f5e] sm:px-8">
       <section className="mx-auto max-w-7xl">
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
@@ -61,14 +61,14 @@ export default function ProcessView() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#1f2421]"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#2f6f5e]"
                 href="/product-space"
               >
                 Mở Moodboard
                 <Icon name="arrow" />
               </Link>
               <Link
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-5 py-3 text-sm font-bold text-[#1f2421]"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-5 py-3 text-sm font-bold text-[#2f6f5e]"
                 href="/showroom"
               >
                 Xem phòng 3D
@@ -86,7 +86,7 @@ export default function ProcessView() {
               sizes="(min-width: 1024px) 45vw, 100vw"
               src={processImage}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#1f2421]/75 via-[#1f2421]/10 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#2f6f5e]/75 via-[#2f6f5e]/10 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
               <p className="text-sm font-semibold text-[#f7ead7]">DECOHO workflow</p>
               <p className="mt-2 max-w-lg text-2xl font-bold">
@@ -106,8 +106,8 @@ export default function ProcessView() {
                 <button
                   className={`grid w-full grid-cols-[auto_1fr_auto] items-center gap-4 rounded-md border p-4 text-left transition ${
                     isActive
-                      ? "border-[#1f2421] bg-[#1f2421] text-white shadow-md"
-                      : "border-[#ded6c9] bg-white text-[#1f2421] hover:border-[#b8ad9e]"
+                      ? "border-[#2f6f5e] bg-[#2f6f5e] text-white shadow-md"
+                      : "border-[#ded6c9] bg-white text-[#2f6f5e] hover:border-[#b8ad9e]"
                   }`}
                   key={item.number}
                   onClick={() => setActiveStep(index)}
@@ -133,7 +133,7 @@ export default function ProcessView() {
                   <span
                     className={`grid h-8 w-8 place-items-center rounded-full border ${
                       isActive
-                        ? "border-[#d89b47] bg-[#d89b47] text-[#1f2421]"
+                        ? "border-[#d89b47] bg-[#d89b47] text-[#2f6f5e]"
                         : "border-[#ded6c9] text-[#646a61]"
                     }`}
                   >

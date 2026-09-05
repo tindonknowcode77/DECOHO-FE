@@ -39,7 +39,7 @@ export default function AddToCartButton({ item }: AddToCartButtonProps) {
       className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md px-5 py-3 text-center text-sm font-bold shadow-sm transition ${
         isAdded
           ? "bg-[#2f6f5e] text-white"
-          : "bg-[#d89b47] text-[#1f2421] hover:bg-[#e4aa55]"
+          : "bg-[#d89b47] text-[#2f6f5e] hover:bg-[#e4aa55]"
       } disabled:cursor-not-allowed disabled:bg-[#d7d3cb] disabled:text-[#7b7f78]`}
       disabled={isOutOfStock}
       onClick={handleAddToCart}

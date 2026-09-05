@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
-import { initialCartItems, promoCodes } from "../mock/cartItems";
+import { initialCartItems } from "../mock/cartItems";
 import {
   clearStoredPromoCode,
   getStoredCartItems,
@@ -13,6 +13,7 @@ import {
   saveStoredPromoCode,
   subscribeCartItems,
 } from "../services/cartStorage";
+import { validatePromoCode, type PromoValidation } from "../services/orderApi";
 import type { CartItem } from "../types";
 
 const FREE_SHIPPING_THRESHOLD = 15000000;
@@ -54,8 +55,8 @@ export default function CartView() {
   const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
   const [hasLoadedCart, setHasLoadedCart] = useState(false);
   const [promoInput, setPromoInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [appliedPromo, setAppliedPromo] = useState<PromoValidation | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
   const [promoMessage, setPromoMessage] = useState("");
 
   useEffect(() => {
@@ -63,12 +64,8 @@ export default function CartView() {
       setCartItems(getStoredCartItems(initialCartItems));
 
       const storedCode = getStoredPromoCode();
-      const storedPromo = promoCodes.find((promo) => promo.code === storedCode);
-
-      if (storedPromo) {
-        setAppliedPromo(storedPromo.code);
-        setPromoDiscount(storedPromo.discount);
-        setPromoInput(storedPromo.code);
+      if (storedCode) {
+        setPromoInput(storedCode);
       }
 
       setHasLoadedCart(true);
@@ -95,7 +92,7 @@ export default function CartView() {
     () => cartItems.reduce((total, item) => total + item.quantity, 0),
     [cartItems],
   );
-  const discountAmount = subtotal * promoDiscount;
+  const discountAmount = appliedPromo?.finalDiscount ?? 0;
   const shippingFee = subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : DEFAULT_SHIPPING_FEE;
   const total = subtotal - discountAmount + shippingFee;
   const amountToFreeShipping = Math.max(FREE_SHIPPING_THRESHOLD - subtotal, 0);
@@ -122,33 +119,49 @@ export default function CartView() {
     saveStoredCartItems(nextItems);
   }
 
-  function applyPromo(event: FormEvent<HTMLFormElement>) {
+  async function applyPromo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = promoInput.trim().toUpperCase();
-    const promo = promoCodes.find((item) => item.code === code);
 
     if (!code) {
       setPromoMessage("Vui lòng nhập mã giảm giá.");
       return;
     }
 
-    if (!promo) {
-      setAppliedPromo(null);
-      setPromoDiscount(0);
-      setPromoMessage("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
-      clearStoredPromoCode();
-      return;
-    }
+    setPromoLoading(true);
+    setPromoMessage("");
 
-    setAppliedPromo(promo.code);
-    setPromoDiscount(promo.discount);
-    setPromoMessage(`Áp dụng thành công ${promo.code}: ${promo.description}.`);
-    saveStoredPromoCode(promo.code);
+    try {
+      const validation = await validatePromoCode(code, subtotal);
+
+      if (!validation.valid) {
+        setAppliedPromo(null);
+        setPromoMessage(validation.message ?? "Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+        clearStoredPromoCode();
+        return;
+      }
+
+      if (subtotal < validation.minimumOrderAmount) {
+        setAppliedPromo(null);
+        setPromoMessage(`Đơn hàng cần tối thiểu ${new Intl.NumberFormat("vi-VN", { currency: "VND", style: "currency" }).format(validation.minimumOrderAmount)} để sử dụng mã này.`);
+        clearStoredPromoCode();
+        return;
+      }
+
+      setAppliedPromo(validation);
+      setPromoMessage(`Áp dụng thành công! Giảm ${validation.discountType === "percentage" ? `${validation.discountValue}%` : new Intl.NumberFormat("vi-VN", { currency: "VND", style: "currency" }).format(validation.discountValue)}`);
+      saveStoredPromoCode(validation.code);
+    } catch {
+      setAppliedPromo(null);
+      setPromoMessage("Không thể xác thực mã giảm giá. Vui lòng thử lại.");
+      clearStoredPromoCode();
+    } finally {
+      setPromoLoading(false);
+    }
   }
 
   function removePromo() {
     setAppliedPromo(null);
-    setPromoDiscount(0);
     setPromoInput("");
     setPromoMessage("");
     clearStoredPromoCode();
@@ -156,7 +169,7 @@ export default function CartView() {
 
   if (!hasLoadedCart) {
     return (
-      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#1f2421]">
+      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#2f6f5e]">
         <section className="mx-auto max-w-7xl">
           <div className="h-10 w-64 animate-pulse rounded-md bg-[#e9e1d5]" />
           <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_390px]">
@@ -170,7 +183,7 @@ export default function CartView() {
 
   if (cartItems.length === 0) {
     return (
-      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#1f2421]">
+      <main className="min-h-screen bg-[#f7f3ec] px-5 py-12 text-[#2f6f5e]">
         <section className="mx-auto flex max-w-md flex-col items-center rounded-md bg-white p-8 text-center shadow-sm">
           <span className="grid h-20 w-20 place-items-center rounded-full bg-[#f7f3ec] text-[#2f6f5e]">
             <Icon name="cart" />
@@ -182,13 +195,13 @@ export default function CartView() {
           </p>
           <div className="mt-6 grid w-full gap-3">
             <Link
-              className="rounded-md bg-[#1f2421] px-5 py-3 text-sm font-bold text-white"
+              className="rounded-md bg-[#2f6f5e] px-5 py-3 text-sm font-bold text-white"
               href="/products"
             >
               Khám phá sản phẩm
             </Link>
             <Link
-              className="rounded-md border border-[#ded6c9] px-5 py-3 text-sm font-bold text-[#1f2421]"
+              className="rounded-md border border-[#ded6c9] px-5 py-3 text-sm font-bold text-[#2f6f5e]"
               href="/product-space"
             >
               Mở Moodboard
@@ -200,7 +213,7 @@ export default function CartView() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f3ec] px-5 py-10 text-[#1f2421] sm:px-8">
+    <main className="min-h-screen bg-[#f7f3ec] px-5 py-10 text-[#2f6f5e] sm:px-8">
       <section className="mx-auto max-w-7xl">
         <div className="flex flex-col justify-between gap-5 border-b border-[#ded6c9] pb-6 md:flex-row md:items-end">
           <div>
@@ -219,7 +232,7 @@ export default function CartView() {
             </p>
           </div>
           <Link
-            className="inline-flex w-fit items-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-4 py-2 text-sm font-bold text-[#1f2421]"
+            className="inline-flex w-fit items-center gap-2 rounded-md border border-[#cfc6b8] bg-white px-4 py-2 text-sm font-bold text-[#2f6f5e]"
             href="/products"
           >
             Tiếp tục mua sắm
@@ -245,7 +258,7 @@ export default function CartView() {
                     height={160}
                     sizes="112px"
                     src={item.image}
-                    unoptimized={item.image.startsWith("data:")}
+                    unoptimized={item.image.startsWith("data:") || item.image.startsWith("http")}
                     width={160}
                   />
                 </Link>
@@ -315,7 +328,7 @@ export default function CartView() {
                 <div className="mt-4 flex items-center justify-between rounded-md border border-[#b7dfc4] bg-[#eefbf2] p-3 text-sm text-[#23643b]">
                   <span className="flex items-center gap-2 font-bold">
                     <Icon name="check" />
-                    {appliedPromo}
+                    {appliedPromo.code}
                   </span>
                   <button
                     className="text-xs font-bold text-[#9b5148]"
@@ -330,27 +343,22 @@ export default function CartView() {
                   <input
                     className="min-w-0 flex-1 rounded-md border border-[#ded6c9] bg-[#fbf7ef] px-3 py-3 text-sm font-semibold uppercase outline-none focus:border-[#2f6f5e]"
                     onChange={(event) => setPromoInput(event.target.value)}
-                    placeholder="DECOHO10"
+                    placeholder="Nhập mã giảm giá"
                     type="text"
                     value={promoInput}
                   />
                   <button
-                    className="rounded-md bg-[#1f2421] px-4 py-3 text-sm font-bold text-white"
+                    className="rounded-md bg-[#2f6f5e] px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                    disabled={promoLoading}
                     type="submit"
                   >
-                    Áp dụng
+                    {promoLoading ? "..." : "Áp dụng"}
                   </button>
                 </form>
               )}
 
               {promoMessage && (
                 <p className="mt-3 text-xs leading-5 text-[#646a61]">{promoMessage}</p>
-              )}
-
-              {!appliedPromo && (
-                <div className="mt-4 rounded-md bg-[#f7f3ec] p-3 text-xs leading-5 text-[#646a61]">
-                  Mã dùng thử: <strong>DECOHO10</strong> hoặc <strong>KIENTAO5</strong>.
-                </div>
               )}
             </section>
 
@@ -363,9 +371,9 @@ export default function CartView() {
                   <span>{formatPrice(subtotal)}</span>
                 </div>
 
-                {promoDiscount > 0 && (
+                {appliedPromo && appliedPromo.finalDiscount && appliedPromo.finalDiscount > 0 && (
                   <div className="flex justify-between text-[#2f6f5e]">
-                    <span>Khuyến mãi ({promoDiscount * 100}%)</span>
+                    <span>Khuyến mãi ({appliedPromo.code})</span>
                     <span>-{formatPrice(discountAmount)}</span>
                   </div>
                 )}
@@ -391,7 +399,7 @@ export default function CartView() {
               </div>
 
               <Link
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#1f2421] transition hover:bg-[#e4aa5b]"
+                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#d89b47] px-5 py-3 text-sm font-bold text-[#2f6f5e] transition hover:bg-[#e4aa5b]"
                 href="/checkout"
               >
                 Tiến hành thanh toán

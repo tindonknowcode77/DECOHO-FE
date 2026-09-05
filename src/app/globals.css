@@ -1,13 +1,14 @@
-@import url("https://fonts.googleapis.com/css2?family=Charmonman:wght@400;700&family=Mali:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Patrick+Hand&display=swap");
 @import "tailwindcss";
 
 :root {
   --background: #f7f3ec;
-  --foreground: #1f2421;
+  --foreground: #2f6f5e;
   --font-body: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
-  --font-display: "Playfair Display", Georgia, serif;
-  --font-accent: Charmonman, cursive;
-  --font-hand-small: Mali, Calibri, sans-serif;
+  --font-display: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+  --font-heading: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+  --font-accent: "Patrick Hand", cursive;
+  --font-hand-small: "Patrick Hand", cursive;
 }
 
 @theme inline {
@@ -27,7 +28,10 @@ body {
 
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.035em;
@@ -41,7 +45,19 @@ textarea {
   font: inherit;
 }
 
+/* Các chữ lớn dùng Calibri */
+.text-2xl,
+.text-3xl,
+.text-4xl,
+.text-5xl,
+.text-6xl,
+.text-7xl {
+  font-family: var(--font-display);
+}
+
 .font-display { font-family: var(--font-display); }
+.font-heading { font-family: var(--font-heading); }
+.font-serif   { font-family: var(--font-display); } /* đồng nghĩa với font-display */
 .font-accent { font-family: var(--font-accent); letter-spacing: -0.04em; }
 .font-hand-small { font-family: var(--font-hand-small); }
 

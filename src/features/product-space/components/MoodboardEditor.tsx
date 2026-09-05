@@ -406,7 +406,7 @@ export default function MoodboardEditor({
                 onChange={(event) => setIsPublic(event.target.checked)}
                 type="checkbox"
               />
-              Công khai với cộng đồng
+              Công khai với diễn đàn
             </label>
             <label className="mt-2 flex items-center gap-2 text-xs font-semibold">
               <input
