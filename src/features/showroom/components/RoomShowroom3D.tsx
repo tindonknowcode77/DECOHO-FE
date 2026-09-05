@@ -11,6 +11,7 @@ import {
   Play,
   RotateCcw,
   ShoppingCart,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -1539,6 +1540,55 @@ export default function RoomShowroom3D() {
             </div>
           </div>
         )}
+
+        {/* Coming Soon overlay — blur toàn bộ 3D và hiển thị thông báo */}
+        <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#b9bcba]/60 backdrop-blur-2xl supports-[backdrop-filter]:bg-[#b9bcba]/35">
+          <div className="pointer-events-auto flex flex-col items-center gap-6 px-6 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#2f6f5e]/30 bg-white/70 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.32em] text-[#2f6f5e] shadow-md backdrop-blur animate-pulse-soft">
+              <Sparkles className="h-3.5 w-3.5 text-[#d89b47]" />
+              Decoho 3D · Phiên bản mới
+            </span>
+
+            <h1 className="font-display text-[clamp(3.5rem,14vw,10rem)] font-black leading-[0.92] tracking-[-0.04em] text-[#2f6f5e] drop-shadow-[0_8px_24px_rgba(47,111,94,0.25)]">
+              Coming
+              <br />
+              <span className="bg-gradient-to-br from-[#2f6f5e] via-[#4d8a76] to-[#d89b47] bg-clip-text text-transparent">
+                Soon
+              </span>
+            </h1>
+
+            <p className="max-w-xl text-base font-semibold leading-relaxed text-[#3a4944] sm:text-lg">
+              Showroom 3D tương tác đang được tái thiết kế với trải nghiệm
+              isometric hoàn toàn mới — mượt mà hơn, chân thực hơn và cá nhân
+              hoá theo không gian của bạn.
+            </p>
+
+            <div className="flex items-center gap-3 text-xs font-bold text-[#5b615d]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#d89b47] animate-pulse-soft" />
+                Lighting
+              </span>
+              <span className="h-3 w-px bg-[#2f6f5e]/20" />
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#2f6f5e] animate-pulse-soft" />
+                Materials
+              </span>
+              <span className="h-3 w-px bg-[#2f6f5e]/20" />
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#7e9a3f] animate-pulse-soft" />
+                Layout
+              </span>
+            </div>
+
+            <Link
+              className="pointer-events-auto group inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-6 py-3 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_18px_40px_-12px_rgba(47,111,94,0.55)] transition hover:scale-[1.03] hover:bg-[#265a4d]"
+              href="/products"
+            >
+              Khám phá sản phẩm ngay
+              <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
+            </Link>
+          </div>
+        </div>
 
         <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-[#aeb1af]/75 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#aeb1af]/75 to-transparent" />
