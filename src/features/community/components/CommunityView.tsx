@@ -24,8 +24,18 @@ import {
 } from "lucide-react";
 import { ApiError, apiClient } from "@/src/services/axios";
 import { clearSessionUser, getAccessToken, getSessionUser } from "@/src/features/auth/services/session";
-import type { CommunityCreator, CommunityFeed, CommunityPost, CommunityUser } from "../types";
+import {
+  REACTION_LIST,
+  REACTION_META,
+  type CommunityCreator,
+  type CommunityFeed,
+  type CommunityPost,
+  type CommunityUser,
+  type ReactionType,
+} from "../types";
 import MediaGallery from "./MediaGallery";
+import ReactionPicker from "./ReactionPicker";
+import CommentModal from "./CommentModal";
 
 const tabs = [
   ["for-you", "Tất cả"], ["following", "Đang theo dõi"], ["trending", "Xu hướng"],
@@ -44,7 +54,7 @@ function Avatar({ user, size = 44 }: { user: Pick<CommunityUser, "fullName" | "a
 
 type PreviewItem = { file: File; preview: string; type: "image" | "video" };
 
-function PublishModal({ close, published }: { close: () => void; published: () => void }) {
+function PublishModal({ close, onCreated }: { close: () => void; onCreated: (post: CommunityPost) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
@@ -87,8 +97,8 @@ function PublishModal({ close, published }: { close: () => void; published: () =
     previews.forEach((p) => data.append("files", p.file));
     setBusy(true); setError("");
     try {
-      await apiClient.post("/community/posts", data, { token });
-      published();
+      const newPost = await apiClient.post<CommunityPost>("/community/posts", data, { token });
+      onCreated(newPost);
       close();
     } catch (value) {
       setError(value instanceof ApiError ? value.message : "Không thể đăng bài. Vui lòng thử lại.");
@@ -214,6 +224,8 @@ export default function CommunityView() {
   const [modal, setModal] = useState(false);
   const [comments, setComments] = useState<Record<string, string>>({});
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [pendingReactions, setPendingReactions] = useState<Set<string>>(new Set());
+  const [commentModalPost, setCommentModalPost] = useState<CommunityPost | null>(null);
   const token = typeof window === "undefined" ? null : getAccessToken();
   const session = typeof window === "undefined" ? null : getSessionUser();
 
@@ -256,28 +268,164 @@ export default function CommunityView() {
       .catch(() => setFollowingIds(new Set()));
   }, [token]);
 
-  async function action(post: CommunityPost, kind: "like" | "save") {
+  async function react(post: CommunityPost, type: ReactionType) {
+    if (!token) return setError("Bạn cần đăng nhập để bày tỏ cảm xúc.");
+    if (pendingReactions.has(post._id)) return;
+
+    const previous = post;
+    setPendingReactions((set) => {
+      const next = new Set(set);
+      next.add(post._id);
+      return next;
+    });
+
+    // Optimistic update
+    const prevMy = post.myReaction ?? null;
+    const nextMy: ReactionType | null = prevMy === type ? null : type;
+    const counts = { ...(post.reactionCounts ?? {}) } as Partial<Record<ReactionType, number>>;
+    if (prevMy) {
+      counts[prevMy] = Math.max(0, (counts[prevMy] ?? 1) - 1);
+      if (counts[prevMy] === 0) delete counts[prevMy];
+    }
+    if (nextMy) {
+      counts[nextMy] = (counts[nextMy] ?? 0) + 1;
+    }
+    const nextTotal = Object.values(counts).reduce((sum, v) => sum + (v ?? 0), 0);
+    setFeed((old) => old ? {
+      ...old,
+      items: old.items.map((item) => item._id === post._id ? {
+        ...item,
+        myReaction: nextMy,
+        reactionCounts: counts,
+        reactionTotal: nextTotal,
+        liked: nextMy === "like",
+        likeCount: counts.like ?? item.likeCount,
+      } : item),
+    } : old);
+
+    try {
+      const result = await apiClient.post<{
+        active: boolean;
+        myType: ReactionType | null;
+        counts: Partial<Record<ReactionType, number>>;
+        total: number;
+      }>(`/community/posts/${post._id}/react`, { type }, { token });
+      setFeed((old) => old ? {
+        ...old,
+        items: old.items.map((item) => item._id === post._id ? {
+          ...item,
+          myReaction: result.myType,
+          reactionCounts: result.counts,
+          reactionTotal: result.total,
+          liked: result.myType === "like",
+          likeCount: result.counts.like ?? item.likeCount,
+        } : item),
+      } : old);
+      setError("");
+    } catch (value) {
+      // Rollback
+      setFeed((old) => old ? {
+        ...old,
+        items: old.items.map((item) => item._id === post._id ? previous : item),
+      } : old);
+      console.error("react failed", {
+        postId: post._id,
+        type,
+        error: value instanceof Error
+          ? { name: value.name, message: value.message, status: (value as { status?: number }).status }
+          : value,
+      });
+      const msg = value instanceof ApiError
+        ? `${value.status} - ${value.message}`
+        : value instanceof Error
+          ? value.message
+          : "Không thể cập nhật cảm xúc. Vui lòng thử lại.";
+      setError(`Lỗi cảm xúc: ${msg}`);
+    } finally {
+      setPendingReactions((set) => {
+        const next = new Set(set);
+        next.delete(post._id);
+        return next;
+      });
+    }
+  }
+
+  async function toggleSave(post: CommunityPost) {
     if (!token) return setError("Bạn cần đăng nhập để thực hiện thao tác này.");
     try {
-      const result = await apiClient.post<{active:boolean;count:number}>(`/community/posts/${post._id}/${kind}`, undefined, { token });
-      setFeed((old) => old ? { ...old, items: old.items
-        .filter((item) => !(tab === "saved" && kind === "save" && item._id === post._id && !result.active))
-        .map((item) => item._id === post._id ? { ...item, [kind === "like" ? "liked" : "saved"]: result.active, ...(kind === "like" ? { likeCount: result.count } : {}) } : item) } : old);
+      const result = await apiClient.post<{ active: boolean }>(
+        `/community/posts/${post._id}/save`,
+        undefined,
+        { token },
+      );
+      setFeed((old) => old ? {
+        ...old,
+        items: old.items.map((item) => item._id === post._id ? { ...item, saved: result.active } : item),
+      } : old);
       setError("");
-    } catch { setError("Không thể cập nhật bài viết. Vui lòng thử lại."); }
+    } catch (value) {
+      console.error("save failed", { postId: post._id, err: value });
+      const msg = value instanceof ApiError
+        ? `${value.status} - ${value.message}`
+        : "Không thể lưu bài viết. Vui lòng thử lại.";
+      setError(`Lỗi lưu: ${msg}`);
+    }
   }
 
   async function submitComment(event: FormEvent, post: CommunityPost) {
-    event.preventDefault(); const content = comments[post._id]?.trim();
-    if (!token) return setError("Bạn cần đăng nhập để bình luận."); if (!content) return;
-    await apiClient.post(`/community/posts/${post._id}/comments`, { content }, { token });
-    setComments((old) => ({ ...old, [post._id]: "" })); await load();
+    event.preventDefault();
+    const content = comments[post._id]?.trim();
+    if (!token) return setError("Bạn cần đăng nhập để bình luận.");
+    if (!content) return;
+    try {
+      const newComment = await apiClient.post<{
+        _id: string;
+        content: string;
+        createdAt: string;
+        userId: CommunityUser;
+      }>(`/community/posts/${post._id}/comments`, { content }, { token });
+      setComments((old) => ({ ...old, [post._id]: "" }));
+      setError("");
+      setFeed((old) => old ? {
+        ...old,
+        items: old.items.map((item) => item._id === post._id ? {
+          ...item,
+          commentCount: item.commentCount + 1,
+          comments: [...(item.comments ?? []), newComment],
+        } : item),
+      } : old);
+      setCommentModalPost((current) => current && current._id === post._id ? {
+        ...current,
+        commentCount: current.commentCount + 1,
+        comments: [...(current.comments ?? []), newComment],
+      } : current);
+    } catch (value) {
+      console.error("submitComment failed", {
+        postId: post._id,
+        content,
+        error: value instanceof Error
+          ? { name: value.name, message: value.message, status: (value as { status?: number }).status }
+          : value,
+      });
+      const msg = value instanceof ApiError
+        ? `${value.status} - ${value.message}`
+        : value instanceof Error
+          ? value.message
+          : "Không thể gửi bình luận. Vui lòng thử lại.";
+      setError(`Lỗi bình luận: ${msg}`);
+    }
   }
 
   async function follow(id: string) {
     if (!token) return setError("Bạn cần đăng nhập để theo dõi nhà sáng tạo.");
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7585/ingest/62ddf151-99e7-43e4-94fd-6eea656c826d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1552f3'},body:JSON.stringify({sessionId:'1552f3',location:'CommunityView.tsx:314',message:'FE follow() request',data:{targetId:id,hasToken:!!token},runId:'run1',hypothesisId:'FE_follow',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const result = await apiClient.post<{ following: boolean }>(`/community/users/${id}/follow`, undefined, { token });
+      // #region agent log
+      fetch('http://127.0.0.1:7585/ingest/62ddf151-99e7-43e4-94fd-6eea656c826d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1552f3'},body:JSON.stringify({sessionId:'1552f3',location:'CommunityView.tsx:320',message:'FE follow() response',data:{following:result?.following},runId:'run1',hypothesisId:'FE_follow',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setFollowingIds((old) => {
         const next = new Set(old);
         if (result.following) next.add(id);
@@ -288,10 +436,30 @@ export default function CommunityView() {
         .filter((post) => !(tab === "following" && post.userId._id === id && !result.following))
         .map((post) => post.userId._id === id ? { ...post, userId: { ...post.userId, following: result.following } } : post) } : old);
       setError("");
-    } catch { setError("Không thể cập nhật theo dõi. Vui lòng thử lại."); }
+    } catch (value) {
+      // #region agent log
+      fetch('http://127.0.0.1:7585/ingest/62ddf151-99e7-43e4-94fd-6eea656c826d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1552f3'},body:JSON.stringify({sessionId:'1552f3',location:'CommunityView.tsx:333',message:'FE follow() THROW',data:{err:value instanceof Error ? value.message : String(value)},runId:'run1',hypothesisId:'FE_follow',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      console.error("follow failed", { id, err: value });
+      const msg = value instanceof ApiError
+        ? `${value.status} - ${value.message}`
+        : "Không thể cập nhật theo dõi. Vui lòng thử lại.";
+      setError(`Lỗi theo dõi: ${msg}`);
+    }
   }
 
   return <main className="min-h-screen bg-[#faf7f2] text-[#2f6f5e]">
+    {error && (
+      <div className="sticky top-0 z-40 mx-auto flex max-w-7xl items-center justify-between gap-3 border-b border-[#efb6aa] bg-[#fff3ef] px-5 py-3 text-sm text-[#a33f31] sm:px-8">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4" />
+          <span className="font-bold">{error}</span>
+        </div>
+        <button aria-label="Đóng thông báo" className="rounded-full p-1 hover:bg-[#efb6aa]/50" onClick={() => setError("")}>
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    )}
     <div className="mx-auto grid max-w-7xl gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[1fr_320px]">
       <div className="space-y-8">
         {/* Hero Section */}
@@ -457,8 +625,12 @@ export default function CommunityView() {
                     <p className="text-xs text-[#7b8078]">{post.userId.businessAddress || post.roomType} · {new Date(post.createdAt).toLocaleDateString("vi-VN")}</p>
                   </div>
                 </div>
-                <button className={`rounded-full border px-4 py-2 text-xs font-bold ${followingIds.has(post.userId._id) || post.userId.following ? "border-[#78953b] bg-[#eef5dc] text-[#526d21]" : "border-[#cad6a8] text-[#66832d]"}`} onClick={() => void follow(post.userId._id)}>
-                  {followingIds.has(post.userId._id) || post.userId.following ? "Đang theo dõi" : "+ Theo dõi"}
+                <button
+                  className={`rounded-full border px-4 py-2 text-xs font-bold ${followingIds.has(post.userId._id) || post.userId.following ? "border-[#78953b] bg-[#eef5dc] text-[#526d21]" : session?._id === post.userId._id ? "cursor-not-allowed border-[#ccc] text-[#aaa]" : "border-[#cad6a8] text-[#66832d]"}`}
+                  disabled={session?._id === post.userId._id}
+                  onClick={() => session?._id !== post.userId._id && void follow(post.userId._id)}
+                >
+                  {session?._id === post.userId._id ? "Đây là bạn" : followingIds.has(post.userId._id) || post.userId.following ? "Đang theo dõi" : "+ Theo dõi"}
                 </button>
               </div>
 
@@ -468,19 +640,67 @@ export default function CommunityView() {
                 <p className="leading-7 text-[#424740]">{post.description}</p>
                 <div className="mt-2 flex flex-wrap gap-2">{post.hashtags.map((tag) => <span className="text-sm font-semibold text-[#739137]" key={tag}>#{tag}</span>)}</div>
                 <div className="mt-4 flex items-center gap-1 border-y border-[#eee7dc] py-2">
-                  <button className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${post.liked ? "text-[#ee6f62]" : "text-[#626960]"}`} onClick={() => void action(post, "like")}>
-                    <Heart fill={post.liked ? "currentColor" : "none"} size={20} />{post.likeCount}
-                  </button>
+                  <ReactionPicker
+                    myReaction={post.myReaction ?? null}
+                    busy={pendingReactions.has(post._id)}
+                    onPick={(type) => void react(post, type)}
+                  >
+                    <span className="flex items-center gap-2">
+                      {post.myReaction ? (
+                        <span className="text-lg leading-none">{REACTION_META[post.myReaction].emoji}</span>
+                      ) : (
+                        <Heart size={20} />
+                      )}
+                      {post.reactionTotal ?? post.likeCount}
+                    </span>
+                  </ReactionPicker>
                   <span className="flex items-center gap-2 px-3 text-sm text-[#626960]"><MessageCircle size={20} />{post.commentCount}</span>
                   <button aria-label="Chia sẻ" className="rounded-xl p-2 text-[#626960]"><Share2 size={20} /></button>
-                  <button aria-label="Lưu bài" className={`ml-auto rounded-xl p-2 ${post.saved ? "text-[#78953b]" : "text-[#626960]"}`} onClick={() => void action(post, "save")}>
+                  <button aria-label="Lưu bài" className={`ml-auto rounded-xl p-2 ${post.saved ? "text-[#78953b]" : "text-[#626960]"}`} onClick={() => void toggleSave(post)}>
                     <Bookmark fill={post.saved ? "currentColor" : "none"} size={20} />
                   </button>
                 </div>
+                {post.reactionTotal && post.reactionTotal > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#626960]">
+                    <div className="flex -space-x-1.5">
+                      {REACTION_LIST.filter((t) => (post.reactionCounts?.[t] ?? 0) > 0)
+                        .slice(0, 6)
+                        .map((t) => (
+                          <span
+                            className="grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-white text-base"
+                            key={t}
+                          >
+                            {REACTION_META[t].emoji}
+                          </span>
+                        ))}
+                    </div>
+                    <span>
+                      {post.reactionTotal} lượt cảm xúc
+                    </span>
+                  </div>
+                )}
+                {post.commentCount > post.comments.length ? (
+                  <button
+                    className="mt-3 text-xs font-semibold text-[#78953b] hover:underline"
+                    onClick={() => setCommentModalPost(post)}
+                    type="button"
+                  >
+                    Xem tất cả {post.commentCount} bình luận
+                  </button>
+                ) : null}
                 {post.comments.slice(-2).map((comment) => <div className="mt-3 flex gap-2 text-sm" key={comment._id}>
                   <Avatar size={30} user={comment.userId} />
                   <p className="rounded-2xl bg-[#f6f2eb] px-3 py-2"><strong>{comment.userId.fullName}</strong> {comment.content}</p>
                 </div>)}
+                <button
+                  className="mt-2 text-xs font-semibold text-[#78953b] hover:underline"
+                  onClick={() => setCommentModalPost(post)}
+                  type="button"
+                >
+                  {post.commentCount > post.comments.length
+                    ? `Mở hộp thoại bình luận`
+                    : "Mở hộp thoại bình luận"}
+                </button>
                 <form className="mt-4 flex gap-2" onSubmit={(event) => void submitComment(event, post)}>
                   <input className="min-w-0 flex-1 rounded-full border border-[#ddd4c7] bg-[#fbf9f5] px-4 py-2.5 text-sm outline-none focus:border-[#78953b]" onChange={(e) => setComments((old) => ({ ...old, [post._id]: e.target.value }))} placeholder={session ? `Bình luận với tên ${session.name}...` : "Đăng nhập để bình luận..."} value={comments[post._id] ?? ""} />
                   <button aria-label="Gửi bình luận" className="grid h-10 w-10 place-items-center rounded-full bg-[#78953b] text-white"><Send size={17} /></button>
@@ -517,8 +737,12 @@ export default function CommunityView() {
                 <p className="truncate text-sm font-bold">{creator.fullName}</p>
                 <p className="text-xs text-[#7b8078]">{creator.posts} bài · {creator.likes} lượt thích</p>
               </div>
-              <button className="text-xs font-bold text-[#718d34]" onClick={() => void follow(creator.userId)}>
-                {followingIds.has(creator.userId) ? "Đang theo dõi" : "Theo dõi"}
+              <button
+                className={`text-xs font-bold ${session?._id === creator.userId ? "text-[#aaa] cursor-not-allowed" : followingIds.has(creator.userId) ? "text-[#718d34]" : "text-[#2f6f5e]"}`}
+                disabled={session?._id === creator.userId}
+                onClick={() => session?._id !== creator.userId && void follow(creator.userId)}
+              >
+                {session?._id === creator.userId ? "Đây là bạn" : followingIds.has(creator.userId) ? "Đang theo dõi" : "Theo dõi"}
               </button>
             </div>) : <p className="text-sm text-[#7b8078]">Danh sách sẽ xuất hiện khi có bài đăng thật.</p>}
           </div>
@@ -563,6 +787,28 @@ export default function CommunityView() {
       </aside>
     </div>
 
-    {modal && <PublishModal close={() => setModal(false)} published={() => void load()} />}
+    {modal && <PublishModal close={() => setModal(false)} onCreated={(newPost) => {
+      setFeed((old) => {
+        if (!old) return old;
+        const exists = old.items.some((item) => item._id === newPost._id);
+        if (exists) return old;
+        return { ...old, items: [newPost, ...old.items], total: old.total + 1 };
+      });
+    }} />}
+    {commentModalPost && (
+      <CommentModal
+        onClose={() => setCommentModalPost(null)}
+        onCommentAdded={(postId, newTotal) => {
+          setFeed((old) => old ? {
+            ...old,
+            items: old.items.map((item) => item._id === postId ? { ...item, commentCount: newTotal } : item),
+          } : old);
+          setCommentModalPost((current) => current && current._id === postId
+            ? { ...current, commentCount: newTotal }
+            : current);
+        }}
+        post={commentModalPost}
+      />
+    )}
   </main>;
 }

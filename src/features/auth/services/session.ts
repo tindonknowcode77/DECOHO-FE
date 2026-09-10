@@ -19,6 +19,7 @@ function parseSessionUser(value: string | null): AuthSessionUser | null {
 
     if (typeof parsed.email === "string" && typeof parsed.name === "string") {
       return {
+        _id: typeof parsed._id === "string" ? parsed._id : undefined,
         address: parsed.address,
         avatar: parsed.avatar,
         email: parsed.email,

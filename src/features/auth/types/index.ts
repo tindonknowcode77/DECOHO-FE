@@ -13,6 +13,7 @@ export type RegisterFormState = {
 };
 
 export type AuthSessionUser = {
+  _id?: string;
   address?: string;
   avatar?: string;
   email: string;

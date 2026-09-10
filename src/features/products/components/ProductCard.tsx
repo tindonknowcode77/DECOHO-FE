@@ -2,9 +2,9 @@
 
 import { Heart } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import ProductImage from "./ProductImage";
 import type { Product } from "../types";
+import { useProductFavorites } from "../hooks/useProductFavorites";
 
 interface ProductCardProps {
   product: Product;
@@ -45,14 +45,15 @@ function getBadge(product: Product): "new" | "hot" | "sale" | "best" | null {
 }
 
 export default function ProductCard({ product, view = "grid" }: ProductCardProps) {
-  const [saved, setSaved] = useState(false);
+  const { isLiked, toggle } = useProductFavorites();
+  const saved = isLiked(product.id);
   const badge = getBadge(product);
   const soldCount = product.reviewsCount ?? 0;
 
-  function toggleSave(event: React.MouseEvent) {
+  async function toggleSave(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
-    setSaved((prev) => !prev);
+    await toggle(product.id);
   }
 
   if (view === "list") {

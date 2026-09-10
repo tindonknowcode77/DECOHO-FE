@@ -70,6 +70,9 @@ import {
   type WishlistProduct,
 } from "@/src/features/profile/services/wishlistStorage";
 import {
+  loadFavoritesFromBackend,
+} from "@/src/features/profile/services/favoritesBackend";
+import {
   avatarOptions,
   favoriteMaterials,
   preferredStyles,
@@ -291,6 +294,7 @@ export default function ProfileView() {
     );
     setWishlist(getWishlistProducts());
     setSavedMoods(getSavedMoodboards());
+    void loadFavoritesFromBackend(setWishlist);
 
     return () => {
       window.clearTimeout(timeoutId);
