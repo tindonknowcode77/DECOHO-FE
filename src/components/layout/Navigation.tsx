@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import GlobalSearch from "./GlobalSearch";
 import {
@@ -36,7 +37,14 @@ const menuItems = [
   { href: "/showroom", label: "Phòng mẫu 3D" },
 ];
 
-const authPaths = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/onboarding"];
+const authPaths = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/onboarding",
+];
 
 function Icon({ name }: { name: IconName }) {
   const paths = {
@@ -44,10 +52,12 @@ function Icon({ name }: { name: IconName }) {
     cart: "M6 6h15l-1.5 8.5H8L6 3H3m5 16.5h.01M18 19.5h.01",
     close: "M6 6l12 12M18 6 6 18",
     login: "M14 17l5-5-5-5M19 12H7m4-8H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5",
-    logout: "M10 17l5-5-5-5M15 12H3m8-8h6a2 2 0 0 1 2 2v3m0 6v3a2 2 0 0 1-2 2h-6",
+    logout:
+      "M10 17l5-5-5-5M15 12H3m8-8h6a2 2 0 0 1 2 2v3m0 6v3a2 2 0 0 1-2 2h-6",
     menu: "M4 6h16M4 12h16M4 18h16",
     shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Zm-3-10 2 2 4-5",
-    store: "M4 10h16l-1-6H5l-1 6Zm2 0v10h12V10M9 20v-6h6v6M4 10a3 3 0 0 0 6 0m0 0a3 3 0 0 0 6 0m0 0a3 3 0 0 0 6 0",
+    store:
+      "M4 10h16l-1-6H5l-1 6Zm2 0v10h12V10M9 20v-6h6v6M4 10a3 3 0 0 0 6 0m0 0a3 3 0 0 0 6 0m0 0a3 3 0 0 0 6 0",
     user: "M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
   };
 
@@ -67,14 +77,20 @@ function Icon({ name }: { name: IconName }) {
 function MobileSearchButton() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="sm:hidden">
+    <div className="sm:hidden" onKeyDown={event => { if (event.key === "Escape") setOpen(false); }}>
       <button
         aria-label="Mở tìm kiếm"
+        aria-expanded={open}
         className="rounded-md p-2 text-[#646a61] transition hover:bg-[#f7f3ec] hover:text-[#2f6f5e]"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
-        <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <svg
+          aria-hidden="true"
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
           <path
             d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Z"
             stroke="currentColor"
@@ -114,6 +130,7 @@ export default function Navigation() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
+      setMounted(true);
       setCurrentUser(getSessionUser());
       setCartCount(
         getStoredCartItems(initialCartItems).reduce(
@@ -125,12 +142,9 @@ export default function Navigation() {
     const unsubscribe = subscribeSessionUser(setCurrentUser);
     const unsubscribeCart = subscribeCartItems(
       (items) =>
-        setCartCount(
-          items.reduce((total, item) => total + item.quantity, 0),
-        ),
+        setCartCount(items.reduce((total, item) => total + item.quantity, 0)),
       initialCartItems,
     );
-    setMounted(true);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -150,84 +164,57 @@ export default function Navigation() {
     router.push("/login");
   }
 
-  if (pathname === "/admin" || pathname.startsWith("/admin/") || (mounted && authPaths.includes(pathname))) {
+  if (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    (mounted && authPaths.includes(pathname))
+  ) {
     return null;
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#ded6c9] bg-white/95 shadow-sm backdrop-blur">
-      <div className="mx-auto max-w-[1680px] px-3 sm:px-5 xl:px-8">
-        <div className="grid min-h-[72px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 xl:gap-4">
+    <header
+      onKeyDown={(event) => {
+        if (event.key === "Escape") closeMenus();
+      }}
+      className="sticky top-0 z-50 border-b border-[#e2e5d9] bg-[#fffefb]/95 shadow-[0_4px_24px_#253c2e05] backdrop-blur-xl"
+    >
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-8 lg:px-12">
+        <div className="grid min-h-[72px] grid-cols-[1fr_auto] items-center gap-4 sm:min-h-[86px] sm:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-10">
           <Link
             aria-label="DECOHO home"
             className="justify-self-start"
             href="/"
             onClick={closeMenus}
           >
-            <BrandLogo className="h-12 w-[170px] shrink-0" variant="horizontal" />
+            <BrandLogo
+              className="h-10 w-[140px] shrink-0 sm:h-12 sm:w-[175px]"
+              variant="horizontal"
+            />
           </Link>
 
-          <div className="hidden min-w-0 items-center justify-center gap-3 lg:flex">
+          <div className="hidden w-full max-w-lg justify-self-center sm:block">
             <GlobalSearch />
-
-            <nav className="hidden min-w-0 items-center justify-center gap-0.5 xl:flex">
-              {menuItems.map((item) => {
-                const isActive = mounted && isActivePath(pathname, item.href);
-
-                return (
-                  <Link
-                    className={`relative whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition 2xl:px-3.5 2xl:text-sm ${
-                      isActive
-                        ? "text-[#2f6f5e]"
-                        : "text-[#646a61] hover:bg-[#f7f3ec] hover:text-[#2f6f5e]"
-                    }`}
-                    href={item.href}
-                    key={item.href}
-                  >
-                    {item.label}
-                    {isActive && (
-                      <span className="absolute inset-x-4 -bottom-1 h-0.5 rounded-full bg-[#d89b47]" />
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
           </div>
 
           <div className="flex shrink-0 items-center justify-self-end gap-1.5 xl:gap-2">
-            <button
-              aria-label="Thông báo"
-              className="relative hidden rounded-md p-2 text-[#646a61] transition hover:bg-[#f7f3ec] hover:text-[#2f6f5e] sm:block"
-              type="button"
-            >
-              <Icon name="bell" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#d89b47]" />
-            </button>
 
             <MobileSearchButton />
 
-            <Link
-              aria-label="Giỏ hàng"
-              className="relative rounded-md p-2 text-[#646a61] transition hover:bg-[#f7f3ec] hover:text-[#2f6f5e]"
-              href="/cart"
-              onClick={closeMenus}
-            >
-              <Icon name="cart" />
-              <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#2f6f5e] px-1 text-[10px] font-bold text-white">
-                {cartCount}
-              </span>
-            </Link>
 
             {currentUser ? (
               <div className="relative hidden sm:block">
                 <button
-                  className="flex items-center gap-2 rounded-md border border-transparent p-1.5 transition hover:border-[#ded6c9] hover:bg-[#f7f3ec]"
+                  aria-label="Menu tài khoản"
+                  aria-expanded={isProfileOpen}
+                  className="flex items-center gap-2 rounded-full border border-[#e4e8db] bg-[#f5f6ee] p-1 pr-2 transition hover:bg-[#e9efdf]"
                   onClick={() => setIsProfileOpen((value) => !value)}
                   type="button"
                 >
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-[#d89b47] text-xs font-bold text-[#2f6f5e]">
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-[#dfe8d3] text-xs font-bold text-[#2f6f5e]">
                     {currentUser.name.slice(0, 2).toUpperCase()}
                   </span>
+                  <ChevronDown size={14} className="text-[#708164]" />
                 </button>
 
                 {isProfileOpen && (
@@ -238,9 +225,11 @@ export default function Navigation() {
                       onClick={() => setIsProfileOpen(false)}
                       type="button"
                     />
-                    <div className="absolute right-0 z-20 mt-2 w-60 rounded-md border border-[#ded6c9] bg-white p-2 shadow-xl">
+                    <div className="absolute right-0 z-20 mt-3 w-64 rounded-2xl border border-[#ded6c9] bg-white p-2 shadow-xl">
                       <div className="mb-1 border-b border-[#eee7dc] px-3 py-3">
-                        <p className="text-xs text-[#646a61]">Tài khoản cá nhân</p>
+                        <p className="text-xs text-[#646a61]">
+                          Tài khoản cá nhân
+                        </p>
                         <p className="mt-1 truncate text-sm font-bold text-[#2f6f5e]">
                           {currentUser.name}
                         </p>
@@ -249,7 +238,8 @@ export default function Navigation() {
                         </p>
                       </div>
 
-                      {(currentUser.role === "admin" || currentUser.role === "super_admin") && (
+                      {(currentUser.role === "admin" ||
+                        currentUser.role === "super_admin") && (
                         <Link
                           className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
                             pathname === "/admin"
@@ -307,14 +297,13 @@ export default function Navigation() {
             ) : (
               <div className="hidden items-center gap-2 sm:flex">
                 <Link
-                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-[#ded6c9] bg-white px-3 py-2.5 text-sm font-bold text-[#2f6f5e] transition hover:bg-[#f7f3ec]"
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-2.5 text-xs font-semibold text-[#2f6f5e] transition hover:bg-[#f7f3ec]"
                   href="/login"
                 >
-                  <Icon name="login" />
                   Đăng nhập
                 </Link>
                 <Link
-                  className="whitespace-nowrap rounded-lg bg-[#2f6f5e] px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-[#285f51]"
+                  className="whitespace-nowrap rounded-full bg-[#2f6f5e] px-5 py-3 text-xs font-semibold text-white transition hover:bg-[#285f51]"
                   href="/register"
                 >
                   Đăng ký
@@ -323,8 +312,10 @@ export default function Navigation() {
             )}
 
             <button
-              aria-label="Mở menu"
-              className="rounded-md p-2 text-[#51564f] transition hover:bg-[#f7f3ec] xl:hidden"
+              aria-label={isMobileMenuOpen ? "Đóng menu" : "Mở menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="site-mobile-menu"
+              className="rounded-md p-2 text-[#51564f] transition hover:bg-[#f7f3ec] lg:hidden"
               onClick={() => setIsMobileMenuOpen((value) => !value)}
               type="button"
             >
@@ -334,8 +325,34 @@ export default function Navigation() {
         </div>
       </div>
 
+      <nav
+        aria-label="Điều hướng chính"
+        className="hidden items-center justify-center gap-2 border-t border-[#eef0e7] px-5 py-2 lg:flex"
+      >
+        {menuItems.map((item) => {
+          const active =
+            isActivePath(pathname, item.href) ||
+            (item.href === "/product-space" &&
+              pathname.startsWith("/moodboards"));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              onClick={closeMenus}
+              className={`rounded-full px-6 py-2 text-[13px] font-medium transition ${active ? "bg-[#edf2e6] text-[#2f6f5e]" : "text-[#78816f] hover:bg-[#f4f5ee] hover:text-[#2f6f5e]"}`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
       {isMobileMenuOpen && (
-        <div className="border-t border-[#ded6c9] bg-white xl:hidden">
+        <div
+          id="site-mobile-menu"
+          className="max-h-[calc(100dvh-72px)] overflow-y-auto border-t border-[#e3e7da] bg-[#fffefb] lg:hidden"
+        >
           <div className="space-y-1 px-5 py-3">
             {menuItems.map((item) => {
               const isActive = mounted && isActivePath(pathname, item.href);
@@ -360,7 +377,9 @@ export default function Navigation() {
 
             <Link
               className={`block rounded-md px-4 py-3 text-sm font-semibold ${
-                pathname === "/cart" ? "bg-[#2f6f5e] text-white" : "text-[#51564f]"
+                pathname === "/cart"
+                  ? "bg-[#2f6f5e] text-white"
+                  : "text-[#51564f]"
               }`}
               href="/cart"
               onClick={() => setIsMobileMenuOpen(false)}
@@ -370,10 +389,13 @@ export default function Navigation() {
 
             {currentUser ? (
               <>
-                {(currentUser.role === "admin" || currentUser.role === "super_admin") && (
+                {(currentUser.role === "admin" ||
+                  currentUser.role === "super_admin") && (
                   <Link
                     className={`block rounded-md px-4 py-3 text-sm font-semibold ${
-                      pathname === "/admin" ? "bg-[#2f6f5e] text-white" : "text-[#51564f]"
+                      pathname === "/admin"
+                        ? "bg-[#2f6f5e] text-white"
+                        : "text-[#51564f]"
                     }`}
                     href="/admin"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -384,7 +406,9 @@ export default function Navigation() {
                 {currentUser.role === "supplier" && (
                   <Link
                     className={`block rounded-md px-4 py-3 text-sm font-semibold ${
-                      pathname === "/store" ? "bg-[#2f6f5e] text-white" : "text-[#51564f]"
+                      pathname === "/store"
+                        ? "bg-[#2f6f5e] text-white"
+                        : "text-[#51564f]"
                     }`}
                     href="/store"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -394,7 +418,9 @@ export default function Navigation() {
                 )}
                 <Link
                   className={`block rounded-md px-4 py-3 text-sm font-semibold ${
-                    pathname === "/profile" ? "bg-[#2f6f5e] text-white" : "text-[#51564f]"
+                    pathname === "/profile"
+                      ? "bg-[#2f6f5e] text-white"
+                      : "text-[#51564f]"
                   }`}
                   href="/profile"
                   onClick={() => setIsMobileMenuOpen(false)}

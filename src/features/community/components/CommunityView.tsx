@@ -1,4 +1,6 @@
 "use client";
+import PostOptions from "./PostOptions";
+import DeletePostButton from "./DeletePostButton";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -581,6 +583,7 @@ export default function CommunityView() {
               >
                 <div className="flex items-center gap-3 p-5">
                   <CommunityAvatar user={post.userId} />
+
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                       {post.userId.fullName}
@@ -589,19 +592,56 @@ export default function CommunityView() {
                       {formatCommunityDate(post.createdAt)}
                     </p>
                   </div>
-                  {post.userId._id && post.userId._id !== session?._id && (
-                    <button
-                      disabled={
-                        pending.has(`follow:${post.userId._id}`) || loading
+                  <PostOptions>
+                    <DeletePostButton
+                      postId={post._id}
+                      authorId={post.userId._id}
+                      onDeleted={() =>
+                        setPosts((current) =>
+                          current.filter((item) => item._id !== post._id),
+                        )
                       }
-                      onClick={() => follow(post.userId._id)}
-                      className="rounded-full border border-[#dce4d4] px-3 py-1.5 text-xs font-medium text-[#4f7859] disabled:opacity-40"
+                    />
+
+                    {post.userId._id && post.userId._id !== session?._id && (
+                      <button
+                        disabled={
+                          pending.has(`follow:${post.userId._id}`) || loading
+                        }
+                        onClick={() => follow(post.userId._id)}
+                        className="rounded-full border border-[#dce4d4] px-3 py-1.5 text-xs font-medium text-[#4f7859] disabled:opacity-40"
+                      >
+                        {following.has(post.userId._id) || post.userId.following
+                          ? "Đang theo dõi"
+                          : "+ Theo dõi"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => void share(post)}
+                      aria-label="Chia sẻ bài viết"
+                      className="ml-auto rounded-xl p-2 text-[#737c6c] hover:bg-[#f5f6ef]"
                     >
-                      {following.has(post.userId._id) || post.userId.following
-                        ? "Đang theo dõi"
-                        : "+ Theo dõi"}
+                      <Share2 size={18} />
+                      <span>Chia sẻ</span>
                     </button>
-                  )}
+                    <button
+                      onClick={() => save(post)}
+                      disabled={loading || pending.has(`save:${post._id}`)}
+                      aria-label={
+                        post.saved ? "Bỏ lưu bài viết" : "Lưu bài viết"
+                      }
+                      aria-pressed={post.saved}
+                      className="rounded-xl p-2 text-[#527c55] hover:bg-[#f5f6ef] disabled:opacity-40"
+                    >
+                      <Bookmark
+                        size={18}
+                        fill={post.saved ? "currentColor" : "none"}
+                      />
+                      <span>
+                        {post.saved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
+                      </span>
+                    </button>
+                  </PostOptions>
                 </div>
                 <div className="px-5 pb-4">
                   <span className="rounded-md bg-[#f0f3e9] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#77815e]">
@@ -656,27 +696,6 @@ export default function CommunityView() {
                     >
                       <MessageCircle size={18} />
                       <span>Bình luận</span>
-                    </button>
-                    <button
-                      onClick={() => void share(post)}
-                      aria-label="Chia sẻ bài viết"
-                      className="ml-auto rounded-xl p-2 text-[#737c6c] hover:bg-[#f5f6ef]"
-                    >
-                      <Share2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => save(post)}
-                      disabled={loading || pending.has(`save:${post._id}`)}
-                      aria-label={
-                        post.saved ? "Bỏ lưu bài viết" : "Lưu bài viết"
-                      }
-                      aria-pressed={post.saved}
-                      className="rounded-xl p-2 text-[#527c55] hover:bg-[#f5f6ef] disabled:opacity-40"
-                    >
-                      <Bookmark
-                        size={18}
-                        fill={post.saved ? "currentColor" : "none"}
-                      />
                     </button>
                   </div>
                   {post.comments

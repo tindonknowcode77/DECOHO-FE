@@ -1,0 +1,55 @@
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes settle {
+  from { transform: scale(1.055); }
+  to { transform: scale(1); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+.page > section:first-child h1 {
+  animation: arrive 800ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.page > section:first-child h1 + p {
+  animation: arrive 800ms 120ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.page > section:first-child img {
+  animation: settle 1500ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.heroCaption {
+  animation: float 6s 1s ease-in-out 2;
+}
+
+.page a, .page button {
+  transition: background-color 200ms, color 200ms, box-shadow 250ms, transform 250ms;
+}
+
+.page a:focus-visible, .page button:focus-visible {
+  outline: 2px solid #2f6f5e;
+  outline-offset: 4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .page section[aria-label] > div > a:hover,
+  .page section[aria-label] article:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 16px 36px #31452a12;
+  }
+  .page article { transition: transform 250ms, box-shadow 250ms; }
+  .page a:hover > svg:last-child { transform: translate(3px, -2px); }
+  .page a > svg { transition: transform 250ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *, .heroCaption { animation: none !important; transition: none !important; }
+  .page a:hover, .page article:hover, .page a:hover > svg { transform: none !important; }
+}

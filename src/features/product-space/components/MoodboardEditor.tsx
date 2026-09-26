@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import MoodboardImageEditor from "./MoodboardImageEditor";
 import {
   addProductPoint,
   removeProductPoint,
@@ -200,6 +201,7 @@ export default function MoodboardEditor({
 
   return (
     <div className="space-y-6 rounded-2xl border border-[#e5dfd2] bg-white p-6 shadow-sm">
+      <MoodboardImageEditor space={space} onChange={onChange} />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <button

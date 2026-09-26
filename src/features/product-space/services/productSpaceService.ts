@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/src/features/auth/services/session";
+import { authenticatedFetch } from "@/src/features/auth/services/authenticatedFetch";
 import type {
   CreateProductSpacePayload,
   ProductPointInput,
@@ -40,7 +41,7 @@ async function request<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${apiBase()}${path}`, {
+  const response = await authenticatedFetch(`${apiBase()}${path}`, {
     ...init,
     headers: authHeaders({
       Accept: "application/json",
@@ -55,6 +56,9 @@ async function request<T>(
   const data: T | null = text ? (JSON.parse(text) as T) : null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại để tải moodboard.");
+    }
     throw new Error(
       extractError(data) ?? `Lỗi ${response.status} khi gọi ${path}.`,
     );
@@ -154,6 +158,12 @@ export function createProductSpaceAsAdmin(
 /**
  * Admin: cập nhật title/description/visibility/featured.
  */
+export function updateProductSpaceImage(id: string, image: File): Promise<ProductSpace> {
+  const body = new FormData();
+  body.append("image", image);
+  return request<ProductSpace>(`/product-spaces/admin/${encodeURIComponent(id)}/image`, { method: "PATCH", body });
+}
+
 export function updateProductSpace(
   id: string,
   payload: UpdateProductSpacePayload,

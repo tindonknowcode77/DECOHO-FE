@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { getProducts } from "@/src/features/products/services/productService";
 import type { ProductLite } from "@/src/features/products/types";
 import {
@@ -22,7 +23,7 @@ type View =
 export default function AdminMoodboardsPanel() {
   const [view, setView] = useState<View>({ mode: "list" });
   const [spaces, setSpaces] = useState<ProductSpace[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<ProductLite[]>([]);
@@ -54,7 +55,8 @@ export default function AdminMoodboardsPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const filtered = useMemo(() => {
@@ -117,8 +119,7 @@ export default function AdminMoodboardsPanel() {
         <div>
           <h2 className="text-2xl font-black text-[#17211b]">Moodboard</h2>
           <p className="text-xs text-[#777e77]">
-            {counts.total} moodboard · {counts.public} công khai ·{" "}
-            {counts.featured} nổi bật · {counts.points} điểm ghim
+            {loading ? "Đang tải dữ liệu…" : error ? "Chưa tải được dữ liệu moodboard" : `${counts.total} moodboard · ${counts.public} công khai · ${counts.featured} nổi bật · ${counts.points} điểm ghim`}
           </p>
         </div>
         <button
@@ -147,8 +148,9 @@ export default function AdminMoodboardsPanel() {
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
+          {error.includes("đăng nhập lại") && <Link href="/login" className="ml-3 inline-block font-bold underline">Đăng nhập lại</Link>}
         </div>
       ) : null}
 
@@ -156,7 +158,7 @@ export default function AdminMoodboardsPanel() {
         <div className="rounded-2xl border border-[#e5dfd2] bg-white p-12 text-center text-sm">
           Đang tải...
         </div>
-      ) : filtered.length === 0 ? (
+      ) : error ? null : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#e5dfd2] bg-white p-12 text-center">
           <h3 className="text-lg font-black text-[#17211b]">Chưa có Moodboard nào</h3>
           <p className="mt-2 text-sm text-[#777e77]">

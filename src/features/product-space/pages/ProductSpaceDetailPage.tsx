@@ -90,21 +90,15 @@ export default function ProductSpaceDetailPage({
     setLoading(true);
     setError("");
 
-    // 1) Demo id (vd: "demo-2") -> dùng dữ liệu mock, không gọi API.
-    if (!isLikelyMongoId(id)) {
-      const demo = findDemoMoodboard(id);
-      if (demo) {
-        setSpace(demo);
-        setLoading(false);
-        return;
-      }
-      setError("Moodboard không tồn tại");
-      setSpace(null);
+    // Only known demo IDs use fixtures. Imported boards may also have string IDs.
+    const demo = findDemoMoodboard(id);
+    if (demo) {
+      setSpace(demo);
       setLoading(false);
       return;
     }
 
-    // 2) MongoId -> gọi API thật
+    // Both ObjectIds and legacy IDs are resolved by the backend.
     try {
       const data = await getProductSpace(id);
       setSpace(data);

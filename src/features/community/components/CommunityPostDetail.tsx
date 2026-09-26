@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import DeletePostButton from "./DeletePostButton";
 import { useEffect, useState } from "react";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { apiClient } from "@/src/services/axios";
@@ -16,6 +18,7 @@ import MediaGallery from "./MediaGallery";
 import CommentModal from "./CommentModal";
 
 export default function CommunityPostDetail({ id }: { id: string }) {
+  const router = useRouter();
   const [post, setPost] = useState<CommunityPost | null>(null);
   const [error, setError] = useState("");
   const [discussion, setDiscussion] = useState(false);
@@ -75,6 +78,7 @@ export default function CommunityPostDetail({ id }: { id: string }) {
             <div className="p-6">
               <div className="flex items-center gap-3">
                 <CommunityAvatar user={post.userId} />
+
                 <div>
                   <h1 className="text-base font-semibold">
                     {post.userId.fullName}
@@ -83,6 +87,11 @@ export default function CommunityPostDetail({ id }: { id: string }) {
                     {formatCommunityDate(post.createdAt)} · {post.roomType}
                   </p>
                 </div>
+                  <DeletePostButton
+                    postId={post._id}
+                    authorId={post.userId._id}
+                    onDeleted={() => router.replace("/community")}
+                  />
               </div>
               <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-7">
                 {post.description}
