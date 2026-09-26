@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const polaroids = [
   { src: "/images/product-space/urban-warmth.png", user: "Mộc Trà", rotate: -6 },
@@ -18,7 +19,7 @@ export default function CommunityBanner() {
             Diễn đàn DECOHO
           </p>
           <h2 className="mt-3 font-serif text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            Nơi chia sẻ cảm hứng decor
+            <MagneticText strength={22}>Nơi chia sẻ cảm hứng decor</MagneticText>
           </h2>
           <p className="mt-4 max-w-md text-sm leading-7 text-[#646a61]">
             Chia sẻ không gian, hỏi đáp, gợi ý decor để không gian của bạn luôn

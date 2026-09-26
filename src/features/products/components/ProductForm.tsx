@@ -62,7 +62,7 @@ type ApiProductLite = {
   description?: string;
   color?: string;
   dimensions?:
-    | { length?: string; width?: string; height?: string }
+    | { length?: string | number | null; width?: string | number | null; height?: string | number | null }
     | string;
   weight?: string;
   origin?: string;
@@ -105,9 +105,9 @@ function fromProduct(p?: Product | null): FormState {
     stock: meta.stock !== undefined ? String(meta.stock) : p ? String(p.stock ?? 0) : "0",
     material: (productSpec(p, "Chất liệu") as string | undefined) ?? "",
     color: meta.color ?? p?.color ?? "",
-    dimensionLength: dimensions?.length ?? "",
-    dimensionWidth: dimensions?.width ?? "",
-    dimensionHeight: dimensions?.height ?? "",
+    dimensionLength: String(dimensions?.length ?? ""),
+    dimensionWidth: String(dimensions?.width ?? ""),
+    dimensionHeight: String(dimensions?.height ?? ""),
     weight: meta.weight ?? "",
     origin: meta.origin ?? "",
     warranty: meta.warranty ?? "",

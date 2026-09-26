@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Bookmark, Sparkles } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const styles = [
   {
@@ -42,7 +43,7 @@ export default function StyleCategories() {
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#d89b47]" strokeWidth={2.5} />
           <h2 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-            Khám phá theo phong cách
+            <MagneticText strength={12}>Khám phá theo phong cách</MagneticText>
           </h2>
         </div>
         <Link

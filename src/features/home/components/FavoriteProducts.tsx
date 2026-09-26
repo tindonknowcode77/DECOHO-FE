@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
 import { ArrowLeft, ArrowRight, Bookmark, Sparkles } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const products = [
   { name: "Đèn bàn Bắc Âu", price: "580.000đ", oldPrice: "750.000đ", badge: "NEW", image: "/images/product-space/urban-warmth.png" },
@@ -30,7 +31,7 @@ export default function FavoriteProducts() {
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#d89b47]" strokeWidth={2.5} />
           <h2 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-            Sản phẩm được yêu thích
+            <MagneticText strength={12}>Sản phẩm được yêu thích</MagneticText>
           </h2>
         </div>
         <div className="flex items-center gap-2">

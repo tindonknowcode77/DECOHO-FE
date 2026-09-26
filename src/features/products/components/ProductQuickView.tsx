@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import type { ProductSpaceProduct } from "../../product-space/types";
@@ -20,6 +21,10 @@ function formatPrice(value: number): string {
   }).format(value);
 }
 
+function isMongoId(value: string): boolean {
+  return /^[a-f\d]{24}$/i.test(value);
+}
+
 export default function ProductQuickView({
   product,
   onClose,
@@ -31,16 +36,19 @@ export default function ProductQuickView({
   const productId = product?._id ?? product?.id;
 
   const loadProduct = useCallback(async () => {
-    if (!productId) {
+    const normalizedId = String(productId ?? "");
+    setFullProduct(null);
+    setError("");
+
+    if (!normalizedId || !isMongoId(normalizedId)) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    setError("");
 
     try {
-      const result = await getProductById(String(productId));
+      const result = await getProductById(normalizedId);
       setFullProduct(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tải thông tin sản phẩm");
@@ -67,6 +75,9 @@ export default function ProductQuickView({
 
   if (!product) return null;
 
+  const body =
+    typeof document !== "undefined" ? document.body : null;
+
   const displayProduct = fullProduct ?? {
     id: String(productId ?? ""),
     sku: "Đang cập nhật",
@@ -92,9 +103,9 @@ export default function ProductQuickView({
     specifications: {},
   };
 
-  return (
+  const overlay = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -102,9 +113,9 @@ export default function ProductQuickView({
       aria-modal="true"
       aria-labelledby="quickview-title"
     >
-      <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+      <div className="relative my-auto max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <button
-          className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-xl font-bold text-[#646a61] shadow-lg transition hover:bg-white hover:text-[#2f6f5e]"
+          className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-lg font-bold text-[#646a61] shadow-lg transition hover:bg-white hover:text-[#bc3d2b]"
           onClick={onClose}
           aria-label="Đóng"
         >
@@ -240,4 +251,7 @@ export default function ProductQuickView({
       </div>
     </div>
   );
+
+  // Render vào document.body để né stacking context từ PageTransition (transform/scale)
+  return body ? createPortal(overlay, body) : overlay;
 }

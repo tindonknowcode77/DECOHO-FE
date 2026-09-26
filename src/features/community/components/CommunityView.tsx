@@ -2,813 +2,831 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowRight,
   Bookmark,
+  Check,
+  Compass,
   Heart,
-  ImageIcon,
   ImagePlus,
+  LoaderCircle,
   MessageCircle,
-  Search,
-  Send,
+  Plus,
+  RefreshCw,
   Share2,
-  ShoppingCart,
-  Bell,
-  Sparkles,
-  TrendingUp,
   Users,
-  ChevronDown,
-  Star,
-  Video,
   X,
 } from "lucide-react";
-import { ApiError, apiClient } from "@/src/services/axios";
-import { clearSessionUser, getAccessToken, getSessionUser } from "@/src/features/auth/services/session";
+import { apiClient } from "@/src/services/axios";
 import {
-  REACTION_LIST,
+  getAccessToken,
+  getSessionUser,
+  subscribeSessionUser,
+} from "@/src/features/auth/services/session";
+import type { AuthSessionUser } from "@/src/features/auth/types";
+import {
   REACTION_META,
+  type CommunityComment,
   type CommunityCreator,
-  type CommunityFeed,
   type CommunityPost,
-  type CommunityUser,
   type ReactionType,
 } from "../types";
+import {
+  communityError,
+  formatCommunityDate,
+  normalizePost,
+  normalizeUser,
+} from "../services/community-data";
+import CommunityAvatar from "./CommunityAvatar";
+import PublishModal from "./PublishModal";
+import CommentModal from "./CommentModal";
 import MediaGallery from "./MediaGallery";
 import ReactionPicker from "./ReactionPicker";
-import CommentModal from "./CommentModal";
 
 const tabs = [
-  ["for-you", "Tất cả"], ["following", "Đang theo dõi"], ["trending", "Xu hướng"],
-  ["saved", "Đã lưu"],
-] as const;
-
-function avatar(value?: CommunityUser["avatar"]) {
-  return typeof value === "string" ? value : value?.secureUrl;
-}
-
-function Avatar({ user, size = 44 }: { user: Pick<CommunityUser, "fullName" | "avatar">; size?: number }) {
-  const src = avatar(user.avatar);
-  return src ? <Image alt={user.fullName} className="rounded-full object-cover" height={size} src={src} unoptimized width={size} /> :
-    <span className="grid shrink-0 place-items-center rounded-full bg-[#dcebb2] font-bold text-[#42551f]" style={{ height: size, width: size }}>{user.fullName.slice(0, 2).toUpperCase()}</span>;
-}
-
-type PreviewItem = { file: File; preview: string; type: "image" | "video" };
-
-function PublishModal({ close, onCreated }: { close: () => void; onCreated: (post: CommunityPost) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [previews, setPreviews] = useState<PreviewItem[]>([]);
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  function handleFiles(list: FileList | null) {
-    if (!list) return;
-    const next: PreviewItem[] = [];
-    Array.from(list).forEach((file) => {
-      const isVideo = file.type.startsWith("video/");
-      next.push({
-        file,
-        preview: URL.createObjectURL(file),
-        type: isVideo ? "video" : "image",
-      });
-    });
-    setPreviews((old) => [...old, ...next].slice(0, 10));
-  }
-
-  function removePreview(index: number) {
-    setPreviews((old) => {
-      const item = old[index];
-      if (item) URL.revokeObjectURL(item.preview);
-      return old.filter((_, i) => i !== index);
-    });
-  }
-
-  useEffect(() => {
-    return () => {
-      previews.forEach((p) => URL.revokeObjectURL(p.preview));
-    };
-  }, [previews]);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const token = getAccessToken();
-    if (!token) return setError("Bạn cần đăng nhập để chia sẻ không gian.");
-    if (!previews.length) return setError("Hãy chọn ít nhất 1 ảnh hoặc video.");
-    const data = new FormData(event.currentTarget);
-    previews.forEach((p) => data.append("files", p.file));
-    setBusy(true); setError("");
-    try {
-      const newPost = await apiClient.post<CommunityPost>("/community/posts", data, { token });
-      onCreated(newPost);
-      close();
-    } catch (value) {
-      setError(value instanceof ApiError ? value.message : "Không thể đăng bài. Vui lòng thử lại.");
-    } finally { setBusy(false); }
-  }
-
-  return <div className="fixed inset-0 z-[80] grid place-items-center bg-[#2f6f5e]/55 p-4" onMouseDown={close}>
-    <form className="w-full max-w-xl rounded-[28px] bg-[#fffdf8] p-6 shadow-2xl" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="font-accent text-lg text-[#718d34]">Chia sẻ cảm hứng ✦</p>
-          <h2 className="text-3xl">Đăng không gian của bạn</h2>
-        </div>
-        <button aria-label="Đóng" onClick={close} type="button"><X /></button>
-      </div>
-
-      <textarea
-        className="mt-5 min-h-28 w-full rounded-2xl border border-[#ddd2c2] bg-white p-4 outline-none focus:border-[#78953b]"
-        maxLength={3000}
-        name="description"
-        placeholder="Kể câu chuyện không gian của bạn..."
-        required
-      />
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <input className="rounded-xl border border-[#ddd2c2] bg-white px-4 py-3" maxLength={60} name="roomType" placeholder="Loại phòng (Phòng khách...)" required />
-        <input className="rounded-xl border border-[#ddd2c2] bg-white px-4 py-3" name="hashtags" placeholder="cozy, decor, tips" />
-      </div>
-
-      {/* Upload area */}
-      <div
-        className="mt-3 cursor-pointer rounded-2xl border-2 border-dashed border-[#a9b878] bg-[#f5f8e9] p-5 transition hover:border-[#78953b]"
-        onClick={() => fileInput.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
-      >
-        <div className="flex flex-col items-center gap-2 py-2 text-center">
-          <div className="flex items-center gap-2 text-sm font-bold text-[#78953b]">
-            <ImagePlus size={20} /> <Video size={20} />
-          </div>
-          <p className="text-sm font-bold text-[#42551f]">Kéo thả hoặc nhấp để chọn ảnh/video</p>
-          <p className="text-xs text-[#7b8078]">Tối đa 10 file · Ảnh: JPEG/PNG/WEBP (10MB) · Video: MP4/WEBM/MOV (50MB)</p>
-        </div>
-        <input
-          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
-          className="sr-only"
-          multiple
-          onChange={(e) => handleFiles(e.target.files)}
-          ref={fileInput}
-          type="file"
-        />
-      </div>
-
-      {/* Preview */}
-      {previews.length > 0 && (
-        <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {previews.map((item, idx) => (
-            <div key={idx} className="group relative aspect-square overflow-hidden rounded-xl border border-[#e8e1d4] bg-[#f7f3ec]">
-              {item.type === "video" ? (
-                <>
-                  <video className="h-full w-full object-cover" src={item.preview} />
-                  <span className="absolute left-1.5 top-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">VIDEO</span>
-                </>
-              ) : (
-                <Image alt={`Preview ${idx + 1}`} className="object-cover" fill sizes="120px" src={item.preview} unoptimized />
-              )}
-              <button
-                aria-label="Xóa"
-                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"
-                onClick={(e) => { e.stopPropagation(); removePreview(idx); }}
-                type="button"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      <button className="mt-5 w-full rounded-xl bg-[#78953b] py-3 font-bold text-white disabled:opacity-60" disabled={busy}>
-        {busy ? "Đang đăng..." : "Chia sẻ với diễn đàn"}
-      </button>
-    </form>
-  </div>;
-}
-
-const featuredTopics = [
-  { title: "Chọn sofa cho phòng khách nhỏ dưới 15m² thì chọn loại nào?", tag: "Hỏi đáp decor", image: "/images/product-space/urban-warmth.png", likes: 234, comments: 42, author: "Minh Anh" },
-  { title: "Setup góc làm việc tại nhà 5m² với ngân sách 5 triệu", tag: "DIY", image: "/images/product-space/organic-calm.png", likes: 189, comments: 28, author: "Phong Trần" },
-  { title: "Review thảm lau sàn bằng tre có đáng tiền không?", tag: "Review sản phẩm", image: "/images/product-space/soft-evening.png", likes: 156, comments: 35, author: "Ngọc Linh" },
-  { title: "Màu sơn nào hợp với phòng ngủ hướng Tây?", tag: "Hỏi đáp decor", image: "/images/moodboards/contemporary-living-moodboard-v2.png", likes: 312, comments: 67, author: "Hà My" },
+  { id: "for-you", label: "Khám phá", icon: Compass },
+  { id: "following", label: "Đang theo dõi", icon: Users },
+  { id: "saved", label: "Bài viết đã lưu", icon: Bookmark },
 ];
-
-const trendingQuestions = [
-  { title: "Chọn sofa cho phòng khách nhỏ dưới 15m² thì chọn loại nào?", time: "5 giờ trước", likes: 234 },
-  { title: "Màu sơn nào hợp với phòng ngủ hướng Tây?", time: "1 ngày trước", likes: 312 },
-  { title: "Có nên mua nệm online không?", time: "2 ngày trước", likes: 178 },
-];
-
-const inspirationImages = [
-  "/images/decoho-home-interior-v2.png",
-  "/images/product-space/organic-calm.png",
-  "/images/product-space/urban-warmth.png",
-  "/images/product-space/soft-evening.png",
-  "/images/moodboards/contemporary-living-moodboard-v2.png",
-  "/images/product-space/organic-calm.png",
-];
-
-const communityRules = [
-  "Tôn trọng mọi người, không spam quảng cáo",
-  "Chia sẻ thật, review có tâm",
-  "Ghi nguồn khi dùng ảnh của người khác",
-  "Hỏi đáp cụ thể, dễ hiểu",
-];
+const empty: Record<string, [string, string]> = {
+  "for-you": [
+    "Câu chuyện đầu tiên bắt đầu từ bạn",
+    "Chia sẻ một góc nhà yêu thích để cùng nhau tìm thêm cảm hứng.",
+  ],
+  following: [
+    "Thêm những người truyền cảm hứng",
+    "Theo dõi thành viên để xem những bài viết mới của họ ở đây.",
+  ],
+  saved: [
+    "Giữ lại những ý tưởng bạn thích",
+    "Nhấn biểu tượng lưu trên bài viết để dễ dàng tìm lại sau.",
+  ],
+};
 
 export default function CommunityView() {
+  const [session, setSession] = useState<AuthSessionUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [tab, setTab] = useState("for-you");
-  const [feed, setFeed] = useState<CommunityFeed | null>(null);
-  const [creators, setCreators] = useState<CommunityCreator[]>([]);
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [modal, setModal] = useState(false);
-  const [comments, setComments] = useState<Record<string, string>>({});
-  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
-  const [pendingReactions, setPendingReactions] = useState<Set<string>>(new Set());
-  const [commentModalPost, setCommentModalPost] = useState<CommunityPost | null>(null);
-  const token = typeof window === "undefined" ? null : getAccessToken();
-  const session = typeof window === "undefined" ? null : getSessionUser();
-
-  const load = useCallback(async () => {
-    try {
-      const path = token ? `/community/feed?tab=${tab}` : `/community/posts?tab=${tab}`;
-      setFeed(await apiClient.get<CommunityFeed>(path, token ? { token } : undefined));
-      setError("");
-    } catch (value) {
-      if (token && value instanceof ApiError && value.status === 401) {
-        clearSessionUser();
-        setFeed(tab === "following" || tab === "saved"
-          ? { items: [], total: 0, page: 1, limit: 10, totalPages: 0 }
-          : await apiClient.get<CommunityFeed>(`/community/posts?tab=${tab}`));
-        setError("Phiên đăng nhập đã hết hạn. Bảng tin công khai vẫn được hiển thị; hãy đăng nhập lại để tương tác.");
-      } else {
-        setError((tab === "following" || tab === "saved") && !token ? "Hãy đăng nhập để xem nội dung cá nhân của bạn." : "Chưa thể tải bảng tin diễn đàn.");
-      }
-    }
-    finally { setLoading(false); }
-  }, [tab, token]);
+  const [notice, setNotice] = useState("");
+  const [creators, setCreators] = useState<CommunityCreator[]>([]);
+  const [creatorsError, setCreatorsError] = useState(false);
+  const [creatorsLoading, setCreatorsLoading] = useState(true);
+  const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const locks = useRef(new Set<string>());
+  const [publish, setPublish] = useState(false);
+  const [discussion, setDiscussion] = useState<CommunityPost | null>(null);
+  const lastCreated = useRef<CommunityPost | null>(null);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      if ((tab === "following" || tab === "saved") && !token) {
-        setFeed({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 });
-        setError("Hãy đăng nhập để xem nội dung cá nhân của bạn.");
-        setLoading(false);
-        return;
-      }
-      void load();
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [load, tab, token]);
-  useEffect(() => { void apiClient.get<CommunityCreator[]>("/community/creators").then(setCreators).catch(() => setCreators([])); }, []);
+    const sync = () => {
+      setSession(getSessionUser());
+      setToken(getAccessToken());
+      setFollowing(new Set());
+      setPosts([]);
+      setTab("for-you");
+      setPage(1);
+      setLoading(true);
+      setReady(true);
+      setRevision((value) => value + 1);
+    };
+    sync();
+    return subscribeSessionUser(sync);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const controller = new AbortController();
+    if (tab !== "for-you" && !token) return;
+    apiClient
+      .get<{ items?: unknown[]; totalPages?: number }>(
+        `/community/${token ? "feed" : "posts"}?tab=${tab}&page=${page}&limit=10`,
+        { ...(token ? { token } : {}), signal: controller.signal },
+      )
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        const incoming = (Array.isArray(data.items) ? data.items : [])
+          .map(normalizePost)
+          .filter((post) => post._id);
+        const created = lastCreated.current;
+        if (
+          page === 1 &&
+          tab === "for-you" &&
+          created &&
+          !incoming.some((p) => p._id === created._id)
+        )
+          incoming.unshift(created);
+        lastCreated.current = null;
+        setPosts((old) =>
+          page === 1
+            ? incoming
+            : Array.from(
+                new Map(
+                  [...old, ...incoming].map((post) => [post._id, post]),
+                ).values(),
+              ),
+        );
+        setTotalPages(
+          typeof data.totalPages === "number" ? data.totalPages : 0,
+        );
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setError(
+            communityError(
+              error,
+              "Chưa tải được bài viết. Kiểm tra kết nối và thử lại nhé.",
+            ),
+          );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [tab, page, revision, ready, token]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    apiClient
+      .get<CommunityCreator[]>("/community/creators", {
+        signal: controller.signal,
+      })
+      .then((data) => {
+        if (!controller.signal.aborted)
+          setCreators(
+            Array.isArray(data)
+              ? data
+                  .filter((c) => typeof c.userId === "string")
+                  .map((c) => ({ ...c, fullName: normalizeUser(c).fullName }))
+              : [],
+          );
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCreatorsError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCreatorsLoading(false);
+      });
+    return () => controller.abort();
+  }, [revision]);
+
   useEffect(() => {
     if (!token) return;
-    void apiClient.get<{ userIds: string[] }>("/community/following", { token })
-      .then(({ userIds }) => setFollowingIds(new Set(userIds)))
-      .catch(() => setFollowingIds(new Set()));
-  }, [token]);
+    const controller = new AbortController();
+    apiClient
+      .get<{ userIds: string[] }>("/community/following", {
+        token,
+        signal: controller.signal,
+      })
+      .then((data) => {
+        if (!controller.signal.aborted)
+          setFollowing(
+            new Set(Array.isArray(data.userIds) ? data.userIds : []),
+          );
+      })
+      .catch(() => {
+        /* Feed authors also include their following state. */
+      });
+    return () => controller.abort();
+  }, [token, revision]);
 
-  async function react(post: CommunityPost, type: ReactionType) {
-    if (!token) return setError("Bạn cần đăng nhập để bày tỏ cảm xúc.");
-    if (pendingReactions.has(post._id)) return;
-
-    const previous = post;
-    setPendingReactions((set) => {
-      const next = new Set(set);
-      next.add(post._id);
-      return next;
-    });
-
-    // Optimistic update
-    const prevMy = post.myReaction ?? null;
-    const nextMy: ReactionType | null = prevMy === type ? null : type;
-    const counts = { ...(post.reactionCounts ?? {}) } as Partial<Record<ReactionType, number>>;
-    if (prevMy) {
-      counts[prevMy] = Math.max(0, (counts[prevMy] ?? 1) - 1);
-      if (counts[prevMy] === 0) delete counts[prevMy];
+  function refresh() {
+    if (locks.current.size) return;
+    setError("");
+    setCreatorsLoading(true);
+    setCreatorsError(false);
+    setLoading(tab === "for-you" || !!token);
+    setPage(1);
+    setRevision((value) => value + 1);
+  }
+  function retryPage() {
+    if (locks.current.size) return;
+    setError("");
+    setLoading(true);
+    setRevision((value) => value + 1);
+  }
+  function switchTab(next: string) {
+    if (locks.current.size || next === tab) return;
+    setPosts([]);
+    setTotalPages(0);
+    setError("");
+    setLoading(next === "for-you" || !!token);
+    setPage(1);
+    setTab(next);
+    setNotice("");
+  }
+  function openPublish() {
+    if (!token) {
+      setError("Đăng nhập để chia sẻ câu chuyện của bạn.");
+      return;
     }
-    if (nextMy) {
-      counts[nextMy] = (counts[nextMy] ?? 0) + 1;
+    setPublish(true);
+  }
+  function updatePost(
+    id: string,
+    update: (post: CommunityPost) => CommunityPost,
+  ) {
+    setPosts((old) =>
+      old.map((post) => (post._id === id ? update(post) : post)),
+    );
+  }
+  async function action(
+    key: string,
+    run: (accessToken: string) => Promise<void>,
+  ) {
+    if (!token) {
+      setError("Vui lòng đăng nhập để tương tác với cộng đồng.");
+      return;
     }
-    const nextTotal = Object.values(counts).reduce((sum, v) => sum + (v ?? 0), 0);
-    setFeed((old) => old ? {
-      ...old,
-      items: old.items.map((item) => item._id === post._id ? {
-        ...item,
-        myReaction: nextMy,
-        reactionCounts: counts,
-        reactionTotal: nextTotal,
-        liked: nextMy === "like",
-        likeCount: counts.like ?? item.likeCount,
-      } : item),
-    } : old);
-
+    if (locks.current.has(key) || loading) return;
+    locks.current.add(key);
+    setPending(new Set(locks.current));
+    setError("");
     try {
-      const result = await apiClient.post<{
-        active: boolean;
-        myType: ReactionType | null;
-        counts: Partial<Record<ReactionType, number>>;
-        total: number;
-      }>(`/community/posts/${post._id}/react`, { type }, { token });
-      setFeed((old) => old ? {
-        ...old,
-        items: old.items.map((item) => item._id === post._id ? {
-          ...item,
-          myReaction: result.myType,
-          reactionCounts: result.counts,
-          reactionTotal: result.total,
-          liked: result.myType === "like",
-          likeCount: result.counts.like ?? item.likeCount,
-        } : item),
-      } : old);
-      setError("");
-    } catch (value) {
-      // Rollback
-      setFeed((old) => old ? {
-        ...old,
-        items: old.items.map((item) => item._id === post._id ? previous : item),
-      } : old);
-      console.error("react failed", {
-        postId: post._id,
-        type,
-        error: value instanceof Error
-          ? { name: value.name, message: value.message, status: (value as { status?: number }).status }
-          : value,
-      });
-      const msg = value instanceof ApiError
-        ? `${value.status} - ${value.message}`
-        : value instanceof Error
-          ? value.message
-          : "Không thể cập nhật cảm xúc. Vui lòng thử lại.";
-      setError(`Lỗi cảm xúc: ${msg}`);
+      await run(token);
+    } catch (error) {
+      setError(
+        communityError(error, "Thao tác chưa thành công. Bạn thử lại nhé."),
+      );
     } finally {
-      setPendingReactions((set) => {
-        const next = new Set(set);
-        next.delete(post._id);
-        return next;
-      });
+      locks.current.delete(key);
+      setPending(new Set(locks.current));
     }
   }
-
-  async function toggleSave(post: CommunityPost) {
-    if (!token) return setError("Bạn cần đăng nhập để thực hiện thao tác này.");
-    try {
+  function react(post: CommunityPost, type: ReactionType) {
+    void action(`reaction:${post._id}`, async (accessToken) => {
+      const result = await apiClient.post<{
+        myType: ReactionType | null;
+        counts: Partial<Record<ReactionType, number>>;
+      }>(
+        `/community/posts/${post._id}/react`,
+        { type },
+        { token: accessToken },
+      );
+      updatePost(post._id, (current) =>
+        normalizePost({
+          ...current,
+          myReaction: result.myType,
+          reactionCounts: result.counts,
+        }),
+      );
+    });
+  }
+  function save(post: CommunityPost) {
+    void action(`save:${post._id}`, async (accessToken) => {
       const result = await apiClient.post<{ active: boolean }>(
         `/community/posts/${post._id}/save`,
         undefined,
-        { token },
+        { token: accessToken },
       );
-      setFeed((old) => old ? {
-        ...old,
-        items: old.items.map((item) => item._id === post._id ? { ...item, saved: result.active } : item),
-      } : old);
-      setError("");
-    } catch (value) {
-      console.error("save failed", { postId: post._id, err: value });
-      const msg = value instanceof ApiError
-        ? `${value.status} - ${value.message}`
-        : "Không thể lưu bài viết. Vui lòng thử lại.";
-      setError(`Lỗi lưu: ${msg}`);
-    }
+      if (tab === "saved" && !result.active)
+        setPosts((old) => old.filter((p) => p._id !== post._id));
+      else
+        updatePost(post._id, (current) => ({
+          ...current,
+          saved: result.active,
+        }));
+      setNotice(
+        result.active
+          ? "Đã lưu vào bộ sưu tập ý tưởng của bạn."
+          : "Đã bỏ lưu bài viết.",
+      );
+    });
   }
-
-  async function submitComment(event: FormEvent, post: CommunityPost) {
-    event.preventDefault();
-    const content = comments[post._id]?.trim();
-    if (!token) return setError("Bạn cần đăng nhập để bình luận.");
-    if (!content) return;
-    try {
-      const newComment = await apiClient.post<{
-        _id: string;
-        content: string;
-        createdAt: string;
-        userId: CommunityUser;
-      }>(`/community/posts/${post._id}/comments`, { content }, { token });
-      setComments((old) => ({ ...old, [post._id]: "" }));
-      setError("");
-      setFeed((old) => old ? {
-        ...old,
-        items: old.items.map((item) => item._id === post._id ? {
-          ...item,
-          commentCount: item.commentCount + 1,
-          comments: [...(item.comments ?? []), newComment],
-        } : item),
-      } : old);
-      setCommentModalPost((current) => current && current._id === post._id ? {
-        ...current,
-        commentCount: current.commentCount + 1,
-        comments: [...(current.comments ?? []), newComment],
-      } : current);
-    } catch (value) {
-      console.error("submitComment failed", {
-        postId: post._id,
-        content,
-        error: value instanceof Error
-          ? { name: value.name, message: value.message, status: (value as { status?: number }).status }
-          : value,
-      });
-      const msg = value instanceof ApiError
-        ? `${value.status} - ${value.message}`
-        : value instanceof Error
-          ? value.message
-          : "Không thể gửi bình luận. Vui lòng thử lại.";
-      setError(`Lỗi bình luận: ${msg}`);
-    }
-  }
-
-  async function follow(id: string) {
-    if (!token) return setError("Bạn cần đăng nhập để theo dõi nhà sáng tạo.");
-    try {
-      // #region agent log
-      fetch('http://127.0.0.1:7585/ingest/62ddf151-99e7-43e4-94fd-6eea656c826d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1552f3'},body:JSON.stringify({sessionId:'1552f3',location:'CommunityView.tsx:314',message:'FE follow() request',data:{targetId:id,hasToken:!!token},runId:'run1',hypothesisId:'FE_follow',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      const result = await apiClient.post<{ following: boolean }>(`/community/users/${id}/follow`, undefined, { token });
-      // #region agent log
-      fetch('http://127.0.0.1:7585/ingest/62ddf151-99e7-43e4-94fd-6eea656c826d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1552f3'},body:JSON.stringify({sessionId:'1552f3',location:'CommunityView.tsx:320',message:'FE follow() response',data:{following:result?.following},runId:'run1',hypothesisId:'FE_follow',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      setFollowingIds((old) => {
+  function follow(id: string) {
+    if (!id || id === session?._id) return;
+    void action(`follow:${id}`, async (accessToken) => {
+      const result = await apiClient.post<{ following: boolean }>(
+        `/community/users/${id}/follow`,
+        undefined,
+        { token: accessToken },
+      );
+      setFollowing((old) => {
         const next = new Set(old);
         if (result.following) next.add(id);
         else next.delete(id);
         return next;
       });
-      setFeed((old) => old ? { ...old, items: old.items
-        .filter((post) => !(tab === "following" && post.userId._id === id && !result.following))
-        .map((post) => post.userId._id === id ? { ...post, userId: { ...post.userId, following: result.following } } : post) } : old);
-      setError("");
-    } catch (value) {
-      // #region agent log
-      fetch('http://127.0.0.1:7585/ingest/62ddf151-99e7-43e4-94fd-6eea656c826d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1552f3'},body:JSON.stringify({sessionId:'1552f3',location:'CommunityView.tsx:333',message:'FE follow() THROW',data:{err:value instanceof Error ? value.message : String(value)},runId:'run1',hypothesisId:'FE_follow',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      console.error("follow failed", { id, err: value });
-      const msg = value instanceof ApiError
-        ? `${value.status} - ${value.message}`
-        : "Không thể cập nhật theo dõi. Vui lòng thử lại.";
-      setError(`Lỗi theo dõi: ${msg}`);
+      setPosts((old) =>
+        old
+          .filter(
+            (post) =>
+              tab !== "following" || result.following || post.userId._id !== id,
+          )
+          .map((post) =>
+            post.userId._id === id
+              ? {
+                  ...post,
+                  userId: { ...post.userId, following: result.following },
+                }
+              : post,
+          ),
+      );
+    });
+  }
+  async function share(post: CommunityPost) {
+    const url = `${window.location.origin}/community/post/${post._id}`;
+    try {
+      if (navigator.share)
+        await navigator.share({
+          title: `Không gian của ${post.userId.fullName}`,
+          url,
+        });
+      else {
+        await navigator.clipboard.writeText(url);
+        setNotice("Đã sao chép liên kết bài viết.");
+      }
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError"))
+        setError("Chưa thể chia sẻ liên kết. Bạn thử lại nhé.");
     }
   }
-
-  return <main className="min-h-screen bg-[#faf7f2] text-[#2f6f5e]">
-    {error && (
-      <div className="sticky top-0 z-40 mx-auto flex max-w-7xl items-center justify-between gap-3 border-b border-[#efb6aa] bg-[#fff3ef] px-5 py-3 text-sm text-[#a33f31] sm:px-8">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4" />
-          <span className="font-bold">{error}</span>
-        </div>
-        <button aria-label="Đóng thông báo" className="rounded-full p-1 hover:bg-[#efb6aa]/50" onClick={() => setError("")}>
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    )}
-    <div className="mx-auto grid max-w-7xl gap-8 px-5 py-8 sm:px-8 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-8">
-        {/* Hero Section */}
-        <section className="grid gap-8 lg:grid-cols-2 lg:items-center">
-          <div className="relative">
-            <Sparkles className="absolute -left-3 -top-3 h-5 w-5 text-[#c8e976]" />
-            <h1 className="font-serif text-4xl font-bold leading-[1.05] sm:text-5xl">
-              Diễn đàn cảm hứng cho ngôi nhà bạn
-            </h1>
-            <p className="mt-5 text-base leading-7 text-[#646a61]">
-              Đặt câu hỏi, chia sẻ không gian sống, khoe thành quả decor và kết nối cùng nghệ nhân, nhà thiết kế cùng những người yêu cái đẹp trên khắp Việt Nam.
+  function commentAdded(id: string, total: number, comment: CommunityComment) {
+    updatePost(id, (post) => ({
+      ...post,
+      commentCount: Math.max(
+        post.commentCount +
+          (post.comments.some((c) => c._id === comment._id) ? 0 : 1),
+        total,
+      ),
+      comments: [
+        ...post.comments.filter((c) => c._id !== comment._id),
+        comment,
+      ],
+    }));
+  }
+  const privateTab = tab !== "for-you" && !token;
+  return (
+    <main className="min-h-screen bg-[#f6f5f0] pb-16 text-[#283e32]">
+      <section className="mx-auto max-w-[1320px] px-4 pb-8 pt-7 sm:px-8 sm:pt-10">
+        <div className="relative isolate overflow-hidden rounded-[28px] bg-[#254d3d] px-7 py-10 text-white sm:px-12 sm:py-12">
+          <div className="absolute inset-y-0 right-0 -z-10 hidden w-[46%] sm:block">
+            <Image
+              src="/images/product-space/organic-calm.png"
+              alt="Góc nhà ngập ánh sáng tự nhiên"
+              fill
+              sizes="600px"
+              priority
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#254d3d] via-[#254d3d]/30 to-transparent" />
+          </div>
+          <div className="max-w-xl">
+            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4dfbf]">
+              DECOHO COMMUNITY
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button className="rounded-full bg-[#2f6f5e] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#2f3431]" onClick={() => setModal(true)}>
-                Tạo bài viết
-              </button>
-              <Link className="rounded-full border-2 border-[#2f6f5e] bg-white px-6 py-3 text-sm font-bold transition hover:bg-[#f7f3ec]" href="#feed">
-                Khám phá Diễn đàn
-              </Link>
-            </div>
-            <div className="absolute -right-2 top-10 text-[#f2c749]">
-              <Star className="h-6 w-6 fill-current" />
-            </div>
+            <h1 className="font-serif text-4xl leading-[1.12] sm:text-5xl">
+              Nhà đẹp hơn.
+              <br />
+              <span className="text-[#d9e4bd]">Khi cùng chia sẻ.</span>
+            </h1>
+            <p className="mt-5 max-w-sm text-sm leading-7 text-white/75">
+              Góc nhỏ bạn yêu, ý tưởng bạn thử, câu chuyện bạn kể. Cùng nhau tạo
+              nên những không gian đáng sống.
+            </p>
+            <button
+              onClick={openPublish}
+              className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#e4edca] px-5 py-3 text-sm font-semibold text-[#284a35]"
+            >
+              <Plus size={17} /> Chia sẻ câu chuyện
+            </button>
           </div>
-          <div className="relative h-[420px]">
-            <div className="absolute left-4 top-2 h-72 w-56 rotate-[-8deg] overflow-hidden rounded-2xl border-[6px] border-white bg-white shadow-xl">
-              <Image alt="Không gian 1" className="object-cover" fill sizes="240px" src="/images/decoho-home-interior-v2.png" />
-            </div>
-            <div className="absolute right-2 top-12 h-56 w-44 rotate-[6deg] overflow-hidden rounded-2xl border-[6px] border-white bg-white shadow-xl">
-              <Image alt="Không gian 2" className="object-cover" fill sizes="200px" src="/images/product-space/urban-warmth.png" />
-            </div>
-            <div className="absolute left-0 bottom-4 w-56 rounded-xl border border-[#e8e1d4] bg-white p-3 shadow-lg">
-              <div className="flex items-start gap-2">
-                <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-[#f7f3ec]">
-                  <Image alt="avatar" className="object-cover" height={32} src="/images/product-space/organic-calm.png" width={32} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold">Minh Anh</p>
-                  <p className="truncate text-xs text-[#646a61]">Góc chờ chill cùng mọi người đọc lúc nào?</p>
-                </div>
-              </div>
-            </div>
-            <div className="absolute right-0 bottom-0 w-52 rounded-xl border border-[#e8e1d4] bg-white p-3 shadow-lg">
-              <div className="flex items-start gap-2">
-                <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-[#f7f3ec]">
-                  <Image alt="avatar" className="object-cover" height={32} src="/images/product-space/soft-evening.png" width={32} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold">Phong Trần</p>
-                  <p className="truncate text-xs text-[#646a61]">Mọi người đang tâm sự gì?</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Category Tabs */}
-        <section className="overflow-x-auto">
-          <div className="flex items-center gap-2 pb-2">
-            {tabs.map(([key, label]) => (
+        </div>
+      </section>
+      <div className="mx-auto grid max-w-[1320px] items-start gap-6 px-4 sm:px-8 lg:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-[190px_minmax(0,1fr)_270px]">
+        <aside className="lg:sticky lg:top-24">
+          <p className="mb-4 hidden px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#868d80] lg:block">
+            Góc cộng đồng
+          </p>
+          <nav
+            aria-label="Bộ lọc diễn đàn"
+            className="flex gap-2 overflow-x-auto pb-2 lg:flex-col"
+          >
+            {tabs.map(({ id, label, icon: Icon }) => (
               <button
-                className={`flex-shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition ${
-                  tab === key ? "border-[#2f6f5e] bg-[#2f6f5e] text-white" : "border-[#e8e1d4] bg-white text-[#2f6f5e] hover:border-[#2f6f5e]"
-                }`}
-                key={key}
-                onClick={() => { setLoading(true); setTab(key); }}
+                key={id}
+                onClick={() => switchTab(id)}
+                disabled={pending.size > 0}
+                aria-current={tab === id ? "page" : undefined}
+                className={`flex shrink-0 items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium ${tab === id ? "bg-[#e4ebdc] text-[#2c593e]" : "text-[#747c6f] hover:bg-white"}`}
               >
+                <Icon size={18} />
                 {label}
               </button>
             ))}
-            <button className="ml-auto flex flex-shrink-0 items-center gap-1 rounded-full border border-[#e8e1d4] bg-white px-4 py-2 text-sm font-medium hover:border-[#2f6f5e]">
-              Mới nhất <ChevronDown className="h-4 w-4" />
+          </nav>
+          <div className="mt-7 hidden border-t border-[#e1e3d9] px-3 pt-6 lg:block">
+            <p className="font-serif text-lg">
+              Một góc nhà.
+              <br />
+              Ngàn cảm hứng.
+            </p>
+            <p className="mt-3 text-xs leading-6 text-[#7d8477]">
+              Chia sẻ chân thành.
+              <br />
+              Góp ý tử tế.
+              <br />
+              Tôn trọng sự khác biệt.
+            </p>
+            <Link
+              href="/moodboards"
+              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[#3c7056]"
+            >
+              Khám phá moodboard <ArrowRight size={13} />
+            </Link>
+          </div>
+        </aside>
+        <section className="min-w-0" aria-label="Bảng tin diễn đàn">
+          <div className="mb-5 rounded-2xl border border-[#e5e6dd] bg-white p-5">
+            <div className="flex items-center gap-3">
+              <CommunityAvatar
+                user={{
+                  fullName: session?.name || "Bạn",
+                  avatar: session?.avatar,
+                }}
+              />
+              <button
+                onClick={openPublish}
+                className="min-w-0 flex-1 rounded-full bg-[#f6f6f1] px-4 py-3 text-left text-sm text-[#7b8275]"
+              >
+                Hôm nay, góc nhà bạn có gì mới?
+              </button>
+            </div>
+            <div className="mt-4 flex items-center justify-between border-t border-[#f0f0e9] pt-3">
+              <span className="flex items-center gap-2 text-xs text-[#7b8275]">
+                <ImagePlus size={16} /> Một bức ảnh, một câu chuyện
+              </span>
+              <button
+                onClick={openPublish}
+                className="rounded-full bg-[#2f6f5e] px-4 py-2 text-xs font-semibold text-white"
+              >
+                Tạo bài viết
+              </button>
+            </div>
+          </div>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-serif text-2xl">
+              {tabs.find((t) => t.id === tab)?.label}
+            </h2>
+            <button
+              onClick={refresh}
+              disabled={loading || pending.size > 0}
+              className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-[#737b6b] hover:bg-white disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              Làm mới
             </button>
           </div>
-        </section>
-
-        {/* Featured Article + Create CTA */}
-        <section className="rounded-2xl border border-[#e8e1d4] bg-[#f7f3ec] p-6 sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="h-12 w-12 overflow-hidden rounded-full bg-white">
-                <Image alt="avatar" className="object-cover" height={48} src="/images/product-space/organic-calm.png" width={48} />
+          {error && (
+            <div
+              role="alert"
+              className="mb-4 rounded-xl border border-[#e6c9bd] bg-[#fff4ec] p-4 text-sm text-[#904e36]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p>{error}</p>
+                <button
+                  aria-label="Đóng thông báo lỗi"
+                  onClick={() => setError("")}
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">DECOHO Editorial</span>
-                  <button className="rounded-full border border-[#2f6f5e] bg-white px-3 py-1 text-xs font-bold hover:bg-[#2f6f5e] hover:text-white">Theo dõi</button>
-                </div>
-                <p className="mt-1 text-xs text-[#646a61]">Cập nhật hôm qua</p>
-              </div>
+              {!token && (
+                <Link
+                  href="/login"
+                  className="mt-2 inline-block font-semibold underline"
+                >
+                  Đăng nhập
+                </Link>
+              )}
+              {!loading && (
+                <button
+                  onClick={retryPage}
+                  className="ml-3 mt-2 font-semibold underline"
+                >
+                  Thử tải lại
+                </button>
+              )}
             </div>
-            <div className="flex-1 lg:ml-4">
-              <h2 className="font-serif text-2xl font-bold leading-tight sm:text-3xl">
-                Tuần lễ Decor 2026: Hơn 50+ ý tưởng biến phòng trọ thành không gian sống đáng mơ ước
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-[#646a61]">
-                Tổng hợp những mẹo decor thông minh, tiết kiệm và đầy cảm hứng từ chính những thành viên tích cực nhất của diễn đàn DECOHO...
+          )}
+          {notice && (
+            <div
+              role="status"
+              className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-[#e7efdd] px-4 py-3 text-sm"
+            >
+              <span className="flex items-center gap-2">
+                <Check size={16} />
+                {notice}
+              </span>
+              <button aria-label="Đóng thông báo" onClick={() => setNotice("")}>
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {loading && posts.length === 0 && (
+            <div aria-label="Đang tải bài viết" className="space-y-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="animate-pulse rounded-2xl bg-white p-5">
+                  <div className="mb-5 h-10 w-44 rounded-xl bg-[#eceee5]" />
+                  <div className="aspect-[16/9] rounded-xl bg-[#eceee5]" />
+                  <div className="mt-5 h-4 w-2/3 rounded bg-[#eceee5]" />
+                </div>
+              ))}
+            </div>
+          )}
+          {!loading && !posts.length && !error && (
+            <div className="rounded-2xl border border-dashed border-[#ccd4c2] bg-white/70 px-6 py-14 text-center">
+              <MessageCircle size={32} className="mx-auto text-[#8da37a]" />
+              <h3 className="mt-5 font-serif text-2xl">
+                {privateTab ? "Góc riêng dành cho bạn" : empty[tab][0]}
+              </h3>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#7b8275]">
+                {privateTab
+                  ? "Đăng nhập để xem bài viết đã lưu và những người bạn theo dõi."
+                  : empty[tab][1]}
               </p>
-              <div className="mt-4 flex items-center gap-5 text-sm text-[#646a61]">
-                <span className="flex items-center gap-1.5"><Heart className="h-4 w-4" /> 1.2K</span>
-                <span className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> 234</span>
-                <span className="flex items-center gap-1.5"><Bookmark className="h-4 w-4" /> 89</span>
-              </div>
+              {privateTab ? (
+                <Link
+                  href="/login"
+                  className="mt-5 inline-block rounded-full bg-[#2f6f5e] px-5 py-2.5 text-sm text-white"
+                >
+                  Đăng nhập
+                </Link>
+              ) : (
+                tab === "for-you" && (
+                  <button
+                    onClick={openPublish}
+                    className="mt-5 rounded-full bg-[#2f6f5e] px-5 py-2.5 text-sm text-white"
+                  >
+                    Chia sẻ đầu tiên
+                  </button>
+                )
+              )}
             </div>
-            <button className="rounded-full bg-[#2f6f5e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#245a4a]" onClick={() => setModal(true)}>
-              Tạo bài viết mới
-            </button>
-          </div>
-        </section>
-
-        {/* Featured Topics */}
-        <section>
-          <div className="mb-5 flex items-end justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-[#c8e976]" />
-              <h2 className="font-serif text-2xl font-bold">Thảo luận nổi bật</h2>
-            </div>
-            <Link className="text-sm font-bold text-[#2f6f5e] hover:underline" href="#">Xem tất cả →</Link>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {featuredTopics.map((topic, idx) => (
-              <Link className="group overflow-hidden rounded-2xl border border-[#e8e1d4] bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md" href="#" key={idx}>
-                <div className="relative aspect-[4/3] overflow-hidden bg-[#f7f3ec]">
-                  <Image alt={topic.title} className="object-cover transition duration-500 group-hover:scale-105" fill sizes="(min-width:1024px) 25vw,50vw" src={topic.image} />
-                  <span className="absolute left-3 top-3 rounded-full bg-[#2f6f5e] px-2.5 py-1 text-[10px] font-bold text-white">{topic.tag}</span>
-                </div>
-                <div className="p-4">
-                  <h3 className="line-clamp-2 text-sm font-bold leading-snug">{topic.title}</h3>
-                  <div className="mt-3 flex items-center justify-between text-xs text-[#646a61]">
-                    <span>{topic.author}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{topic.likes}</span>
-                      <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{topic.comments}</span>
-                    </span>
+          )}
+          <div className="space-y-5">
+            {posts.map((post) => (
+              <article
+                key={post._id}
+                className="rounded-2xl border border-[#e5e6dd] bg-white shadow-[0_3px_12px_#283e3203]"
+              >
+                <div className="flex items-center gap-3 p-5">
+                  <CommunityAvatar user={post.userId} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {post.userId.fullName}
+                    </p>
+                    <p className="mt-1 text-[11px] text-[#899080]">
+                      {formatCommunityDate(post.createdAt)}
+                    </p>
                   </div>
+                  {post.userId._id && post.userId._id !== session?._id && (
+                    <button
+                      disabled={
+                        pending.has(`follow:${post.userId._id}`) || loading
+                      }
+                      onClick={() => follow(post.userId._id)}
+                      className="rounded-full border border-[#dce4d4] px-3 py-1.5 text-xs font-medium text-[#4f7859] disabled:opacity-40"
+                    >
+                      {following.has(post.userId._id) || post.userId.following
+                        ? "Đang theo dõi"
+                        : "+ Theo dõi"}
+                    </button>
+                  )}
                 </div>
-              </Link>
+                <div className="px-5 pb-4">
+                  <span className="rounded-md bg-[#f0f3e9] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#77815e]">
+                    {post.roomType}
+                  </span>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-[#4e574b]">
+                    {post.description}
+                  </p>
+                  {!!post.hashtags.length && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {post.hashtags.map((tag) => (
+                        <span key={tag} className="text-xs text-[#68875b]">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {!!post.media.length && <MediaGallery media={post.media} />}
+                <div className="px-4 py-3 sm:px-5">
+                  <div className="flex items-center justify-between border-b border-[#eeeee6] pb-3 text-xs text-[#858c7d]">
+                    <span>{post.reactionTotal || 0} lượt cảm xúc</span>
+                    <button
+                      onClick={() => setDiscussion(post)}
+                      className="hover:underline"
+                    >
+                      {post.commentCount} bình luận
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 pt-2">
+                    <ReactionPicker
+                      busy={loading || pending.has(`reaction:${post._id}`)}
+                      myReaction={post.myReaction ?? null}
+                      onPick={(type) => react(post, type)}
+                    >
+                      <span>
+                        {post.myReaction ? (
+                          REACTION_META[post.myReaction].emoji
+                        ) : (
+                          <Heart size={18} />
+                        )}
+                      </span>
+                      <span className="text-xs">
+                        {post.myReaction
+                          ? REACTION_META[post.myReaction].label
+                          : "Thích"}
+                      </span>
+                    </ReactionPicker>
+                    <button
+                      onClick={() => setDiscussion(post)}
+                      className="flex items-center gap-2 rounded-xl p-2 text-xs font-medium text-[#737c6c] hover:bg-[#f5f6ef]"
+                    >
+                      <MessageCircle size={18} />
+                      <span>Bình luận</span>
+                    </button>
+                    <button
+                      onClick={() => void share(post)}
+                      aria-label="Chia sẻ bài viết"
+                      className="ml-auto rounded-xl p-2 text-[#737c6c] hover:bg-[#f5f6ef]"
+                    >
+                      <Share2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => save(post)}
+                      disabled={loading || pending.has(`save:${post._id}`)}
+                      aria-label={
+                        post.saved ? "Bỏ lưu bài viết" : "Lưu bài viết"
+                      }
+                      aria-pressed={post.saved}
+                      className="rounded-xl p-2 text-[#527c55] hover:bg-[#f5f6ef] disabled:opacity-40"
+                    >
+                      <Bookmark
+                        size={18}
+                        fill={post.saved ? "currentColor" : "none"}
+                      />
+                    </button>
+                  </div>
+                  {post.comments
+                    .filter((c) => !c.parentId)
+                    .slice(-1)
+                    .map((comment) => (
+                      <div
+                        key={comment._id}
+                        className="mt-3 flex gap-2 border-t border-[#eeeee6] pt-3"
+                      >
+                        <CommunityAvatar size={28} user={comment.userId} />
+                        <p className="min-w-0 flex-1 break-words rounded-xl bg-[#f5f6f0] px-3 py-2 text-xs leading-5 text-[#6c7564]">
+                          <strong className="mr-1.5 text-[#44563c]">
+                            {comment.userId.fullName}
+                          </strong>
+                          {comment.content}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              </article>
             ))}
           </div>
+          {page < totalPages && (
+            <button
+              disabled={loading || pending.size > 0}
+              onClick={() => {
+                if (error) retryPage();
+                else {
+                  setLoading(true);
+                  setPage((p) => p + 1);
+                }
+              }}
+              className="mx-auto mt-6 flex items-center gap-2 rounded-full border border-[#d8dfce] bg-white px-6 py-3 text-sm disabled:opacity-50"
+            >
+              {loading ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <ArrowDown size={16} />
+              )}
+              {loading ? "Đang tải…" : error ? "Thử lại" : "Xem thêm bài viết"}
+            </button>
+          )}
         </section>
-
-        {/* Feed Section */}
-        <section id="feed">
-          <div className="mb-5 flex items-end justify-between border-b border-[#e8e1d4] pb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-[#2f6f5e]" />
-              <h2 className="font-serif text-2xl font-bold">Bài viết mới nhất</h2>
-            </div>
-            <Link className="text-sm font-bold text-[#2f6f5e] hover:underline" href="#">Xem thêm →</Link>
-          </div>
-
-          {error && <div className="mb-5 rounded-2xl border border-[#efb6aa] bg-[#fff3ef] p-4 text-[#a33f31]">{error}</div>}
-          {loading && <div className="rounded-3xl border border-[#e2d8c9] bg-white p-12 text-center text-[#777d74]">Đang tải câu chuyện thật từ diễn đàn...</div>}
-          {!loading && feed?.items.length === 0 && <div className="rounded-3xl border border-dashed border-[#cfc3b2] bg-white p-14 text-center"><Sparkles className="mx-auto text-[#78953b]" /><h2 className="mt-3 text-2xl">Chưa có bài viết trong mục này</h2><p className="mt-2 text-[#747970]">Hãy là người đầu tiên chia sẻ không gian của mình.</p></div>}
-
-          <div className="space-y-6">
-            {feed?.items.map((post) => <article className="overflow-hidden rounded-[26px] border border-[#e0d6c8] bg-white shadow-sm" key={post._id}>
-              <div className="flex items-center justify-between p-5">
-                <div className="flex items-center gap-3">
-                  <Avatar user={post.userId} />
-                  <div>
-                    <h2 className="font-sans text-base font-extrabold tracking-normal">{post.userId.fullName}</h2>
-                    <p className="text-xs text-[#7b8078]">{post.userId.businessAddress || post.roomType} · {new Date(post.createdAt).toLocaleDateString("vi-VN")}</p>
-                  </div>
-                </div>
-                <button
-                  className={`rounded-full border px-4 py-2 text-xs font-bold ${followingIds.has(post.userId._id) || post.userId.following ? "border-[#78953b] bg-[#eef5dc] text-[#526d21]" : session?._id === post.userId._id ? "cursor-not-allowed border-[#ccc] text-[#aaa]" : "border-[#cad6a8] text-[#66832d]"}`}
-                  disabled={session?._id === post.userId._id}
-                  onClick={() => session?._id !== post.userId._id && void follow(post.userId._id)}
-                >
-                  {session?._id === post.userId._id ? "Đây là bạn" : followingIds.has(post.userId._id) || post.userId.following ? "Đang theo dõi" : "+ Theo dõi"}
-                </button>
-              </div>
-
-              <MediaGallery media={post.media} />
-
-              <div className="p-5">
-                <p className="leading-7 text-[#424740]">{post.description}</p>
-                <div className="mt-2 flex flex-wrap gap-2">{post.hashtags.map((tag) => <span className="text-sm font-semibold text-[#739137]" key={tag}>#{tag}</span>)}</div>
-                <div className="mt-4 flex items-center gap-1 border-y border-[#eee7dc] py-2">
-                  <ReactionPicker
-                    myReaction={post.myReaction ?? null}
-                    busy={pendingReactions.has(post._id)}
-                    onPick={(type) => void react(post, type)}
-                  >
-                    <span className="flex items-center gap-2">
-                      {post.myReaction ? (
-                        <span className="text-lg leading-none">{REACTION_META[post.myReaction].emoji}</span>
-                      ) : (
-                        <Heart size={20} />
-                      )}
-                      {post.reactionTotal ?? post.likeCount}
-                    </span>
-                  </ReactionPicker>
-                  <span className="flex items-center gap-2 px-3 text-sm text-[#626960]"><MessageCircle size={20} />{post.commentCount}</span>
-                  <button aria-label="Chia sẻ" className="rounded-xl p-2 text-[#626960]"><Share2 size={20} /></button>
-                  <button aria-label="Lưu bài" className={`ml-auto rounded-xl p-2 ${post.saved ? "text-[#78953b]" : "text-[#626960]"}`} onClick={() => void toggleSave(post)}>
-                    <Bookmark fill={post.saved ? "currentColor" : "none"} size={20} />
+        <aside className="hidden space-y-5 xl:sticky xl:top-24 xl:block">
+          <section className="rounded-2xl border border-[#e5e6dd] bg-white p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8d9581]">
+              Kết nối & cảm hứng
+            </p>
+            <h2 className="mt-2 font-serif text-xl">Những người kể chuyện</h2>
+            <div className="mt-5 space-y-5">
+              {creatorsLoading ? (
+                <p className="text-xs text-[#7c8573]">Đang tìm thành viên…</p>
+              ) : creatorsError ? (
+                <p className="text-xs leading-6 text-[#7c8573]">
+                  Chưa tải được thành viên.{" "}
+                  <button onClick={refresh} className="underline">
+                    Thử lại
                   </button>
-                </div>
-                {post.reactionTotal && post.reactionTotal > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#626960]">
-                    <div className="flex -space-x-1.5">
-                      {REACTION_LIST.filter((t) => (post.reactionCounts?.[t] ?? 0) > 0)
-                        .slice(0, 6)
-                        .map((t) => (
-                          <span
-                            className="grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-white text-base"
-                            key={t}
-                          >
-                            {REACTION_META[t].emoji}
-                          </span>
-                        ))}
+                </p>
+              ) : !creators.length ? (
+                <p className="text-xs leading-6 text-[#7c8573]">
+                  Những thành viên chia sẻ tích cực sẽ xuất hiện ở đây.
+                </p>
+              ) : (
+                creators.slice(0, 5).map((creator) => (
+                  <div
+                    key={creator.userId}
+                    className="flex items-center gap-2.5"
+                  >
+                    <CommunityAvatar user={creator} size={34} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold">
+                        {creator.fullName}
+                      </p>
+                      <p className="mt-1 text-[10px] text-[#8b9380]">
+                        {creator.posts || 0} bài chia sẻ
+                      </p>
                     </div>
-                    <span>
-                      {post.reactionTotal} lượt cảm xúc
-                    </span>
+                    {creator.userId !== session?._id && (
+                      <button
+                        aria-label={`${following.has(creator.userId) ? "Bỏ theo dõi" : "Theo dõi"} ${creator.fullName}`}
+                        onClick={() => follow(creator.userId)}
+                        disabled={
+                          loading || pending.has(`follow:${creator.userId}`)
+                        }
+                        className="rounded-full bg-[#f0f3e9] p-1.5 text-[#527547] disabled:opacity-40"
+                      >
+                        {following.has(creator.userId) ? (
+                          <Check size={14} />
+                        ) : (
+                          <Plus size={14} />
+                        )}
+                      </button>
+                    )}
                   </div>
-                )}
-                {post.commentCount > post.comments.length ? (
-                  <button
-                    className="mt-3 text-xs font-semibold text-[#78953b] hover:underline"
-                    onClick={() => setCommentModalPost(post)}
-                    type="button"
-                  >
-                    Xem tất cả {post.commentCount} bình luận
-                  </button>
-                ) : null}
-                {post.comments.slice(-2).map((comment) => <div className="mt-3 flex gap-2 text-sm" key={comment._id}>
-                  <Avatar size={30} user={comment.userId} />
-                  <p className="rounded-2xl bg-[#f6f2eb] px-3 py-2"><strong>{comment.userId.fullName}</strong> {comment.content}</p>
-                </div>)}
-                <button
-                  className="mt-2 text-xs font-semibold text-[#78953b] hover:underline"
-                  onClick={() => setCommentModalPost(post)}
-                  type="button"
-                >
-                  {post.commentCount > post.comments.length
-                    ? `Mở hộp thoại bình luận`
-                    : "Mở hộp thoại bình luận"}
-                </button>
-                <form className="mt-4 flex gap-2" onSubmit={(event) => void submitComment(event, post)}>
-                  <input className="min-w-0 flex-1 rounded-full border border-[#ddd4c7] bg-[#fbf9f5] px-4 py-2.5 text-sm outline-none focus:border-[#78953b]" onChange={(e) => setComments((old) => ({ ...old, [post._id]: e.target.value }))} placeholder={session ? `Bình luận với tên ${session.name}...` : "Đăng nhập để bình luận..."} value={comments[post._id] ?? ""} />
-                  <button aria-label="Gửi bình luận" className="grid h-10 w-10 place-items-center rounded-full bg-[#78953b] text-white"><Send size={17} /></button>
-                </form>
-              </div>
-            </article>)}
-          </div>
-        </section>
-      </div>
-
-      {/* Sidebar */}
-      <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-        <section className="overflow-hidden rounded-2xl border border-[#e8e1d4] bg-gradient-to-br from-[#f7f3ec] to-[#f0e7d4] p-5">
-          <div className="text-3xl">🌿</div>
-          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-[#2f6f5e]">Thử thách tuần này</p>
-          <h3 className="mt-2 font-serif text-xl font-bold leading-tight">Show us your cozy corner</h3>
-          <p className="mt-2 text-sm text-[#646a61]">
-            Chia sẻ góc nhỏ yêu thích nhất trong nhà bạn, nhận ngay voucher 200K từ DECOHO.
+                ))
+              )}
+            </div>
+          </section>
+          <section className="rounded-2xl bg-[#e9edde] p-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#758361]">
+              Một gợi ý cho hôm nay
+            </p>
+            <h2 className="mt-3 font-serif text-2xl leading-tight">
+              Góc nhỏ,
+              <br />
+              niềm vui lớn.
+            </h2>
+            <p className="mt-3 text-xs leading-6 text-[#7d856f]">
+              Không cần một căn nhà hoàn hảo. Chỉ cần một góc khiến bạn muốn trở
+              về.
+            </p>
+            <button
+              onClick={openPublish}
+              className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[#436446]"
+            >
+              Kể câu chuyện của bạn <ArrowRight size={14} />
+            </button>
+          </section>
+          <p className="px-2 text-[10px] leading-5 text-[#929986]">
+            DECOHO · Decorate your home
+            <br />
+            Cảm hứng từ những ngôi nhà thật.
           </p>
-          <button className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#2f6f5e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#2f3431]" onClick={() => setModal(true)}>
-            Tạo bài viết mới
-          </button>
-        </section>
-
-        <section className="rounded-2xl border border-[#e8e1d4] bg-white p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-serif text-lg font-bold">Thành viên nổi bật</h3>
-            <Link className="text-xs font-bold text-[#2f6f5e] hover:underline" href="#">Xem tất cả</Link>
-          </div>
-          <div className="space-y-3">
-            {creators.length ? creators.slice(0, 4).map((creator) => <div className="flex items-center gap-3" key={creator.userId}>
-              <Avatar user={{ fullName: creator.fullName, avatar: creator.avatar }} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{creator.fullName}</p>
-                <p className="text-xs text-[#7b8078]">{creator.posts} bài · {creator.likes} lượt thích</p>
-              </div>
-              <button
-                className={`text-xs font-bold ${session?._id === creator.userId ? "text-[#aaa] cursor-not-allowed" : followingIds.has(creator.userId) ? "text-[#718d34]" : "text-[#2f6f5e]"}`}
-                disabled={session?._id === creator.userId}
-                onClick={() => session?._id !== creator.userId && void follow(creator.userId)}
-              >
-                {session?._id === creator.userId ? "Đây là bạn" : followingIds.has(creator.userId) ? "Đang theo dõi" : "Theo dõi"}
-              </button>
-            </div>) : <p className="text-sm text-[#7b8078]">Danh sách sẽ xuất hiện khi có bài đăng thật.</p>}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-[#e8e1d4] bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-serif text-lg font-bold">Câu hỏi được quan tâm</h3>
-            <Link className="text-xs font-bold text-[#2f6f5e] hover:underline" href="#">Xem tất cả</Link>
-          </div>
-          <ul className="space-y-3">
-            {trendingQuestions.map((q, idx) => <li key={idx}>
-              <Link className="group flex gap-3 rounded-lg p-2 transition hover:bg-[#f7f3ec]" href="#">
-                <Heart className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ef6e61]" />
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-bold leading-snug group-hover:text-[#2f6f5e]">{q.title}</p>
-                  <p className="mt-1 text-xs text-[#646a61]">{q.time} · {q.likes} lượt thích</p>
-                </div>
-              </Link>
-            </li>)}
-          </ul>
-        </section>
-
-        <section className="rounded-2xl border border-[#e8e1d4] bg-white p-5">
-          <h3 className="mb-3 font-serif text-lg font-bold">Quy tắc diễn đàn</h3>
-          <ul className="space-y-2 text-sm text-[#646a61]">
-            {communityRules.map((rule, idx) => <li className="flex gap-2" key={idx}>
-              <span className="text-[#2f6f5e]">•</span><span>{rule}</span>
-            </li>)}
-          </ul>
-          <Link className="mt-4 inline-block text-xs font-bold text-[#2f6f5e] hover:underline" href="#">Xem chi tiết →</Link>
-        </section>
-
-        <section className="rounded-2xl border border-[#e8e1d4] bg-white p-5">
-          <h3 className="mb-4 font-serif text-lg font-bold">Cảm hứng từ diễn đàn</h3>
-          <div className="grid grid-cols-3 gap-2">
-            {inspirationImages.map((img, idx) => <Link className="relative aspect-square overflow-hidden rounded-lg bg-[#f7f3ec] transition hover:opacity-90" href="#" key={idx}>
-              <Image alt={`Cảm hứng ${idx + 1}`} className="object-cover" fill sizes="100px" src={img} />
-            </Link>)}
-          </div>
-        </section>
-      </aside>
-    </div>
-
-    {modal && <PublishModal close={() => setModal(false)} onCreated={(newPost) => {
-      setFeed((old) => {
-        if (!old) return old;
-        const exists = old.items.some((item) => item._id === newPost._id);
-        if (exists) return old;
-        return { ...old, items: [newPost, ...old.items], total: old.total + 1 };
-      });
-    }} />}
-    {commentModalPost && (
-      <CommentModal
-        onClose={() => setCommentModalPost(null)}
-        onCommentAdded={(postId, newTotal) => {
-          setFeed((old) => old ? {
-            ...old,
-            items: old.items.map((item) => item._id === postId ? { ...item, commentCount: newTotal } : item),
-          } : old);
-          setCommentModalPost((current) => current && current._id === postId
-            ? { ...current, commentCount: newTotal }
-            : current);
-        }}
-        post={commentModalPost}
-      />
-    )}
-  </main>;
+        </aside>
+      </div>
+      {publish && (
+        <PublishModal
+          close={() => setPublish(false)}
+          onCreated={(post) => {
+            lastCreated.current = post;
+            setPosts([post]);
+            setLoading(true);
+            setError("");
+            setTab("for-you");
+            setPage(1);
+            setRevision((v) => v + 1);
+            setNotice("Bài viết của bạn đã được chia sẻ.");
+          }}
+        />
+      )}
+      {discussion && (
+        <CommentModal
+          key={discussion._id}
+          post={discussion}
+          onClose={() => setDiscussion(null)}
+          onCommentAdded={commentAdded}
+        />
+      )}
+    </main>
+  );
 }

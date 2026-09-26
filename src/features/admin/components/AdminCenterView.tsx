@@ -1,10 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AdminProductsPanel from "@/src/features/products/components/AdminProductsPanel";
 import AdminMoodboardsPanel from "@/src/features/product-space/components/AdminMoodboardsPanel";
-import { getAccessToken, getSessionUser } from "@/src/features/auth/services/session";
+import { getAccessToken, getSessionUser, subscribeSessionUser } from "@/src/features/auth/services/session";
+import type { AuthSessionUser } from "@/src/features/auth/types";
+
+// Use a stable primitive snapshot; getSessionUser returns a new object each time.
+function getUserSnapshot() {
+  return JSON.stringify(getSessionUser());
+}
+
+function getServerUserSnapshot() {
+  return "null";
+}
 
 type ModuleConfig = {
   id: string;
@@ -75,9 +85,16 @@ export default function AdminCenterView() {
   const [query, setQuery] = useState("");
 
   const current = modules.find((item) => item.id === active) ?? modules[0];
-  const user = getSessionUser();
+  const userSnapshot = useSyncExternalStore(
+    subscribeSessionUser,
+    getUserSnapshot,
+    getServerUserSnapshot,
+  );
+  const user = useMemo(() => JSON.parse(userSnapshot) as AuthSessionUser | null, [userSnapshot]);
+  const canAccessAdmin = !!user && ["admin", "super_admin", "staff"].includes(user.role ?? "");
 
   const load = useCallback(async () => {
+    if (!canAccessAdmin) return;
     if (!current.endpoint) {
       setData([]);
       setError("");
@@ -105,7 +122,7 @@ export default function AdminCenterView() {
     } finally {
       setLoading(false);
     }
-  }, [current.endpoint]);
+  }, [current.endpoint, canAccessAdmin]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -127,7 +144,7 @@ export default function AdminCenterView() {
 
   const groups = [...new Set(modules.map((item) => item.group))];
 
-  if (!user || !["admin", "super_admin", "staff"].includes(user.role ?? "")) {
+  if (!user || !canAccessAdmin) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f5f1ea] p-6">
         <div className="max-w-md rounded-2xl border bg-white p-8 text-center">

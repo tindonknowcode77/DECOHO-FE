@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const spaces = [
   { label: "Phòng khách", active: true },
@@ -23,7 +24,7 @@ export default function ShopBySpace() {
         <div className="flex flex-col justify-between">
           <div>
             <h2 className="font-serif text-3xl font-bold tracking-tight sm:text-4xl">
-              Mua theo không gian
+              <MagneticText strength={20}>Mua theo không gian</MagneticText>
             </h2>
             <p className="mt-4 max-w-md text-sm leading-7 text-[#646a61]">
               Chọn một không gian bạn yêu thích dưới 30m² và xem các sản phẩm
@@ -49,7 +50,7 @@ export default function ShopBySpace() {
 
           <div className="mt-8 hidden md:block">
             <h3 className="font-serif text-xl font-bold">
-              Bắt đầu với phòng nhỏ chưa tới 4m²?
+              <MagneticText strength={14}>Bắt đầu với phòng nhỏ chưa tới 4m²?</MagneticText>
             </h3>
             <Link
               className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#2f3431]"

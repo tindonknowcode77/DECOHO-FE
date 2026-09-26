@@ -1,4 +1,5 @@
 import { Apple, Smartphone } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const apps = [
   {
@@ -29,7 +30,7 @@ export default function ComingSoonApps() {
           Sắp ra mắt
         </p>
         <h2 className="mt-2 font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-          Ứng dụng DECOHO
+          <MagneticText strength={14}>Ứng dụng DECOHO</MagneticText>
         </h2>
       </div>
 
@@ -48,7 +49,7 @@ export default function ComingSoonApps() {
 
             <div className="mt-12 max-w-[60%]">
               <h3 className="font-serif text-xl font-bold text-[#2f6f5e] sm:text-2xl">
-                {app.title}
+                <MagneticText strength={12}>{app.title}</MagneticText>
               </h3>
               <p className="mt-3 text-xs leading-6 text-[#2f6f5e]/70 sm:text-sm">
                 {app.description}

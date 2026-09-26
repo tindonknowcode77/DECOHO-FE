@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Bookmark, ChevronDown, Sparkles } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const boards = [
   { title: "Retro Vinyl Lounge", author: "Mộc Trà", likes: 312, image: "/images/product-space/urban-warmth.png", saved: false },
@@ -22,7 +23,7 @@ export default function FeaturedMoodboards() {
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#d89b47]" strokeWidth={2.5} />
           <h2 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-            Moodboard nổi bật
+            <MagneticText strength={12}>Moodboard nổi bật</MagneticText>
           </h2>
         </div>
         <button

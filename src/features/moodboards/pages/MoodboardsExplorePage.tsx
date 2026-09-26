@@ -9,6 +9,7 @@ import {
   BookOpen,
   Bookmark,
   ChevronDown,
+  Eye,
   Grid3X3,
   Heart,
   LayoutGrid,
@@ -19,7 +20,8 @@ import {
   Tag,
   Utensils,
 } from "lucide-react";
-import type { ProductSpace } from "@/src/features/product-space/types";
+import type { Moodboard } from "../types";
+import { fetchMoodboards } from "../services/moodboardsService";
 import {
   getSavedMoodboardIds,
   saveMoodboardMeta,
@@ -34,26 +36,29 @@ const ROOM_TABS = [
   { id: "bedroom", label: "Phòng ngủ" },
   { id: "kitchen", label: "Bếp" },
   { id: "bathroom", label: "Phòng tắm" },
-  { id: "study", label: "Phòng làm việc" },
-  { id: "dining", label: "Phòng ăn" },
+  { id: "office", label: "Phòng làm việc" },
+  { id: "dining_room", label: "Phòng ăn" },
   { id: "outdoor", label: "Ngoài trời" },
+  { id: "other", label: "Khác" },
 ];
 
-// Map icon đại diện cho mỗi loại phòng
 const ROOM_ICONS: Record<string, typeof Bed> = {
   living_room: Sofa,
   bedroom: Bed,
   kitchen: Utensils,
   bathroom: Bath,
   study: BookOpen,
+  office: BookOpen,
+  dining_room: Utensils,
   dining: Utensils,
   outdoor: Sun,
+  other: LayoutGrid,
 };
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mới nhất" },
   { value: "popular", label: "Nhiều ♥ nhất" },
-  { value: "oldest", label: "Cũ nhất" },
+  { value: "most_viewed", label: "Nhiều lượt xem" },
 ];
 
 export default function MoodboardsExplorePage() {
@@ -62,27 +67,15 @@ export default function MoodboardsExplorePage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  // Khởi tạo rỗng — không còn demo hardcode. Dữ liệu lấy 100% từ API.
-  const [moodboards, setMoodboards] = useState<ProductSpace[]>([]);
+  const [moodboards, setMoodboards] = useState<Moodboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  // Load from API (no fallback hardcode)
   const loadMoodboards = useCallback(async () => {
     setLoading(true);
     setLoadError("");
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "/backend-api";
-      const response = await fetch(`${base}/product-spaces`, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`Máy chủ trả về ${response.status}`);
-      }
-      const body = await response.json().catch(() => null);
-      const items = Array.isArray(body)
-        ? body
-        : Array.isArray(body?.items)
-          ? body.items
-          : [];
+      const items = await fetchMoodboards();
       setMoodboards(items);
     } catch (err) {
       setLoadError(
@@ -100,43 +93,44 @@ export default function MoodboardsExplorePage() {
     void loadMoodboards();
   }, [loadMoodboards]);
 
+  useEffect(() => {
+    setSavedIds(new Set(getSavedMoodboardIds()));
+    return subscribeSavedMoodboards((ids) => setSavedIds(new Set(ids)));
+  }, []);
+
   const filtered = useMemo(() => {
     let result = moodboards;
 
-    // Filter by room type
     if (activeTab !== "all") {
       result = result.filter((m) => m.roomType === activeTab);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (m) =>
           m.title?.toLowerCase().includes(query) ||
-          (typeof m.author === "string" && m.author.toLowerCase().includes(query)) ||
-          m.tags?.some((t) => t.toLowerCase().includes(query))
+          m.authorName?.toLowerCase().includes(query) ||
+          m.tags?.some((t) => t.toLowerCase().includes(query)),
       );
     }
 
-    // Sort
-    result = [...result].sort((a, b) => {
+    return [...result].sort((a, b) => {
       switch (sortBy) {
         case "popular":
           return (b.likes ?? 0) - (a.likes ?? 0);
+        case "most_viewed":
+          return (b.views ?? 0) - (a.views ?? 0);
         case "oldest":
           return new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
         default: // newest
           return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
       }
     });
-
-    return result;
   }, [moodboards, activeTab, sortBy, searchQuery]);
 
-  // Group theo tags (chủ đề) - lấy top 6 tag phổ biến nhất
   const themesByTag = useMemo(() => {
-    const map = new Map<string, ProductSpace[]>();
+    const map = new Map<string, Moodboard[]>();
     moodboards.forEach((m) => {
       m.tags?.forEach((tag) => {
         const list = map.get(tag) ?? [];
@@ -155,7 +149,6 @@ export default function MoodboardsExplorePage() {
       .slice(0, 6);
   }, [moodboards]);
 
-  // Group theo roomType - dùng label tiếng Việt từ ROOM_TABS
   const roomsByType = useMemo(() => {
     return ROOM_TABS.filter((tab) => tab.id !== "all")
       .map((tab) => {
@@ -165,19 +158,16 @@ export default function MoodboardsExplorePage() {
       .filter((group) => group.count > 0);
   }, [moodboards]);
 
-  function toggleSave(board: ProductSpace) {
-    const id = String(board._id ?? board.id ?? "");
+  function toggleSave(board: Moodboard) {
+    const id = String(board.moodboardId ?? board._id ?? board.id ?? "");
     if (!id) return;
     const nowSaved = toggleSavedMoodboard(id);
     if (nowSaved) {
       const meta: SavedMoodboard = {
-        author:
-          typeof board.author === "string"
-            ? board.author
-            : board.author?.name ?? "Ẩn danh",
+        author: board.authorName ?? "Ẩn danh",
         id,
         image: board.imageUrl ?? "",
-        productCount: board.productPoints?.length ?? 0,
+        productCount: board.productsCount ?? board.productPoints?.length ?? 0,
         roomType: board.roomType,
         savedAt: Date.now(),
         title: board.title ?? "Moodboard không tên",
@@ -185,11 +175,6 @@ export default function MoodboardsExplorePage() {
       saveMoodboardMeta(meta);
     }
   }
-
-  useEffect(() => {
-    setSavedIds(new Set(getSavedMoodboardIds()));
-    return subscribeSavedMoodboards((ids) => setSavedIds(new Set(ids)));
-  }, []);
 
   return (
     <main className="min-h-screen bg-[#faf6ee]">
@@ -221,7 +206,6 @@ export default function MoodboardsExplorePage() {
       {/* Filter Bar */}
       <div className="sticky top-[var(--header-height,64px)] z-30 border-y border-[#e8e1d4] bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
-          {/* Room Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {ROOM_TABS.map((tab) => (
               <button
@@ -239,9 +223,7 @@ export default function MoodboardsExplorePage() {
             ))}
           </div>
 
-          {/* Sort & View */}
           <div className="flex items-center gap-2">
-            {/* Sort Dropdown */}
             <div className="relative">
               <select
                 className="appearance-none rounded-full border border-[#e8e1d4] bg-white px-4 py-2 pr-8 text-xs font-bold text-[#2f6f5e] focus:border-[#2f6f5e] focus:outline-none"
@@ -260,7 +242,6 @@ export default function MoodboardsExplorePage() {
               />
             </div>
 
-            {/* View Toggle */}
             <div className="flex rounded-full border border-[#e8e1d4]">
               <button
                 className={`grid h-9 w-9 place-items-center rounded-l-full transition ${
@@ -282,7 +263,6 @@ export default function MoodboardsExplorePage() {
               </button>
             </div>
 
-            {/* Advanced Filter */}
             <button
               className="hidden items-center gap-1.5 rounded-full border border-[#e8e1d4] bg-white px-4 py-2 text-xs font-bold text-[#2f6f5e] transition hover:border-[#2f6f5e] sm:flex"
               type="button"
@@ -345,14 +325,14 @@ export default function MoodboardsExplorePage() {
         ) : viewMode === "grid" ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((board) => {
-              const id = String(board._id ?? board.id ?? "");
+              const id = String(board.moodboardId ?? board._id ?? board.id ?? "");
               const isSaved = savedIds.has(id);
               return (
                 <article
                   className="group overflow-hidden rounded-2xl bg-white transition hover:-translate-y-1 hover:shadow-xl"
                   key={id}
                 >
-                  <Link href={`/product-space/${id}`}>
+                  <Link href={`/moodboards/${id}`}>
                     <div className="relative aspect-[4/3] overflow-hidden bg-[#f7f3ec]">
                       {board.imageUrl ? (
                         <Image
@@ -369,7 +349,6 @@ export default function MoodboardsExplorePage() {
                         </div>
                       )}
 
-                      {/* Bookmark */}
                       <button
                         aria-label={isSaved ? "Bỏ lưu" : "Lưu moodboard"}
                         className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 backdrop-blur transition hover:bg-white"
@@ -386,26 +365,29 @@ export default function MoodboardsExplorePage() {
                         />
                       </button>
 
-                      {/* Likes */}
                       <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1.5 text-xs font-bold backdrop-blur">
                         <Heart className="h-3.5 w-3.5 text-[#ef6e61]" fill="currentColor" />
                         {board.likes ?? 0}
+                      </div>
+
+                      <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1.5 text-xs font-bold backdrop-blur">
+                        <Eye className="h-3.5 w-3.5 text-[#2f6f5e]" />
+                        {board.views ?? 0}
                       </div>
                     </div>
                   </Link>
 
                   <div className="p-4">
-                    <Link href={`/product-space/${id}`}>
+                    <Link href={`/moodboards/${id}`}>
                       <h3 className="font-bold text-[#2f6f5e] transition hover:text-[#7e9a3f]">
                         {board.title ?? "Moodboard không tên"}
                       </h3>
                     </Link>
                     <p className="mt-1.5 text-xs text-[#646a61]">
-                      By {typeof board.author === "string" ? board.author : board.author?.name} ·{" "}
-                      {board.productPoints?.length ?? 0} sản phẩm
+                      By {board.authorName ?? "Ẩn danh"} ·{" "}
+                      {board.productsCount ?? board.productPoints?.length ?? 0} sản phẩm
                     </p>
 
-                    {/* Tags */}
                     {board.tags && board.tags.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {board.tags.slice(0, 3).map((tag) => (
@@ -424,17 +406,16 @@ export default function MoodboardsExplorePage() {
             })}
           </div>
         ) : (
-          /* List View */
           <div className="space-y-4">
             {filtered.map((board) => {
-              const id = String(board._id ?? board.id ?? "");
+              const id = String(board.moodboardId ?? board._id ?? board.id ?? "");
               const isSaved = savedIds.has(id);
               return (
                 <article
                   className="flex gap-4 overflow-hidden rounded-2xl bg-white p-4 transition hover:shadow-lg"
                   key={id}
                 >
-                  <Link className="shrink-0" href={`/product-space/${id}`}>
+                  <Link className="shrink-0" href={`/moodboards/${id}`}>
                     <div className="relative h-24 w-32 overflow-hidden rounded-xl bg-[#f7f3ec] sm:h-32 sm:w-44">
                       {board.imageUrl && (
                         <Image
@@ -452,7 +433,7 @@ export default function MoodboardsExplorePage() {
                   <div className="flex flex-1 flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <Link href={`/product-space/${id}`}>
+                        <Link href={`/moodboards/${id}`}>
                           <h3 className="font-bold text-[#2f6f5e] transition hover:text-[#7e9a3f]">
                             {board.title ?? "Moodboard không tên"}
                           </h3>
@@ -470,7 +451,7 @@ export default function MoodboardsExplorePage() {
                         </button>
                       </div>
                       <p className="mt-1 text-xs text-[#646a61]">
-                        By {typeof board.author === "string" ? board.author : board.author?.name}
+                        By {board.authorName ?? "Ẩn danh"}
                       </p>
                       {board.tags && board.tags.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -492,7 +473,7 @@ export default function MoodboardsExplorePage() {
                         {board.likes ?? 0}
                       </span>
                       <span className="text-xs text-[#646a61]">
-                        {board.productPoints?.length ?? 0} sản phẩm
+                        {board.productsCount ?? board.productPoints?.length ?? 0} sản phẩm
                       </span>
                     </div>
                   </div>
@@ -502,7 +483,6 @@ export default function MoodboardsExplorePage() {
           </div>
         )}
 
-        {/* Load More */}
         {filtered.length > 0 && (
           <div className="mt-8 text-center">
             <button
@@ -515,7 +495,7 @@ export default function MoodboardsExplorePage() {
         )}
       </div>
 
-      {/* Bộ sưu tập theo chủ đề */}
+      {/* Themes by tag */}
       {themesByTag.length > 0 && (
         <section className="mx-auto mt-12 max-w-7xl px-5 pb-12 sm:px-8">
           <div className="mb-6 flex items-end justify-between gap-3">
@@ -527,19 +507,16 @@ export default function MoodboardsExplorePage() {
               <h2 className="mt-3 font-serif text-2xl font-bold tracking-tight text-[#2f6f5e] sm:text-3xl">
                 Bộ sưu tập theo chủ đề
               </h2>
-              <p className="mt-1 text-sm text-[#646a61]">
-                Khám phá moodboards theo phong cách bạn yêu thích
-              </p>
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {themesByTag.map((theme) => {
-              const firstId = String(theme.boards[0]?._id ?? theme.boards[0]?.id ?? "");
+              const firstId = String(theme.boards[0]?.moodboardId ?? theme.boards[0]?._id ?? theme.boards[0]?.id ?? "");
               return (
                 <Link
                   className="group relative overflow-hidden rounded-2xl border border-[#e8e1d4] bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-                  href={`/product-space/${firstId}`}
+                  href={`/moodboards/${firstId}`}
                   key={theme.tag}
                 >
                   <div className="relative aspect-[16/9] overflow-hidden bg-[#f7f3ec]">
@@ -581,7 +558,7 @@ export default function MoodboardsExplorePage() {
         </section>
       )}
 
-      {/* Khám phá theo phòng */}
+      {/* Explore by room */}
       {roomsByType.length > 0 && (
         <section className="mx-auto mt-4 max-w-7xl px-5 pb-16 sm:px-8">
           <div className="mb-6 flex items-end justify-between gap-3">
@@ -593,9 +570,6 @@ export default function MoodboardsExplorePage() {
               <h2 className="mt-3 font-serif text-2xl font-bold tracking-tight text-[#2f6f5e] sm:text-3xl">
                 Khám phá theo phòng
               </h2>
-              <p className="mt-1 text-sm text-[#646a61]">
-                Tìm cảm hứng cho từng không gian trong ngôi nhà của bạn
-              </p>
             </div>
           </div>
 
@@ -605,7 +579,7 @@ export default function MoodboardsExplorePage() {
               return (
                 <Link
                   className="group flex flex-col items-center rounded-2xl border border-[#e8e1d4] bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-                  href={`/product-space?room=${room.id}`}
+                  href={`/moodboards?room=${room.id}`}
                   key={room.id}
                 >
                   <div className="grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-[#eaf3e9] to-[#f5efe3] text-[#2f6f5e] ring-4 ring-white shadow-md transition group-hover:scale-110">

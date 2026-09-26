@@ -110,3 +110,20 @@ img {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Tôn trọng prefers-reduced-motion: tắt mọi animation/transition mặc định */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Giữ nguyên vị trí cuộn khi chuyển trang (PageTransition chủ động cuộn về đầu). */
+html, body {
+  scroll-behavior: auto;
+}

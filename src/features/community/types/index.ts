@@ -11,6 +11,11 @@ export type CommunityComment = {
   userId: CommunityUser;
   content: string;
   createdAt: string;
+  parentId?: string | null;
+  replyCount?: number;
+  myReaction?: ReactionType | null;
+  reactionCounts?: Partial<Record<ReactionType, number>>;
+  reactionTotal?: number;
 };
 
 export type CommunityMedia = {

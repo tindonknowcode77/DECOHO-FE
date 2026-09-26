@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ProductQuickView from "@/src/features/products/components/ProductQuickView";
+import { getProductById } from "@/src/features/products/services/productService";
 import { getProductSpace } from "../services/productSpaceService";
 import {
   ROOM_TYPE_LABELS,
@@ -11,11 +12,33 @@ import {
   type ProductSpace,
   type ProductSpaceProduct,
 } from "../types";
+import { findDemoMoodboard, isLikelyMongoId, DEMO_PRODUCT_MAP } from "../data/demoSpaces";
 
-function getProduct(point: ProductPoint): ProductSpaceProduct | undefined {
+/**
+ * BE có thể populate `productPoints[].productId` thành object ProductSpaceProduct,
+ * hoặc chỉ trả về string id. Hàm này ưu tiên object (nếu có) hoặc fallback
+ * đọc từ cache client (được fill bằng `getProductById`).
+ */
+function readProduct(
+  point: ProductPoint,
+  cache: Map<string, ProductSpaceProduct>,
+): ProductSpaceProduct | undefined {
   if (point.product && typeof point.product === "object") return point.product;
   if (point.productId && typeof point.productId === "object") return point.productId;
-  return undefined;
+  const id =
+    typeof point.productId === "string"
+      ? point.productId
+      : point._id ?? point.id ?? "";
+  if (!id) return undefined;
+  return cache.get(String(id));
+}
+
+function getProductId(point: ProductPoint): string {
+  if (typeof point.productId === "string") return point.productId;
+  if (point.productId && typeof point.productId === "object") {
+    return String(point.productId._id ?? point.productId.id ?? "");
+  }
+  return "";
 }
 
 function formatPrice(value: number | undefined): string {
@@ -51,6 +74,12 @@ export default function ProductSpaceDetailPage({
   const [error, setError] = useState("");
   const [id, setId] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<ProductSpaceProduct | null>(null);
+  const [productCache, setProductCache] = useState<Map<string, ProductSpaceProduct>>(
+    new Map(),
+  );
+  const [pendingProductId, setPendingProductId] = useState<string>("");
+  const cacheRef = useRef(productCache);
+  cacheRef.current = productCache;
 
   useEffect(() => {
     params.then(({ id: resolvedId }) => setId(resolvedId));
@@ -60,11 +89,41 @@ export default function ProductSpaceDetailPage({
     if (!id) return;
     setLoading(true);
     setError("");
+
+    // 1) Demo id (vd: "demo-2") -> dùng dữ liệu mock, không gọi API.
+    if (!isLikelyMongoId(id)) {
+      const demo = findDemoMoodboard(id);
+      if (demo) {
+        setSpace(demo);
+        setLoading(false);
+        return;
+      }
+      setError("Moodboard không tồn tại");
+      setSpace(null);
+      setLoading(false);
+      return;
+    }
+
+    // 2) MongoId -> gọi API thật
     try {
       const data = await getProductSpace(id);
       setSpace(data);
+      // Cache luôn các product đã được BE populate (object) để render nhanh
+      if (data?.productPoints?.length) {
+        setProductCache((prev) => {
+          const next = new Map(prev);
+          for (const point of data.productPoints ?? []) {
+            const idStr = getProductId(point);
+            if (!idStr) continue;
+            const embedded = readProduct(point, new Map());
+            if (embedded) next.set(idStr, embedded);
+          }
+          return next;
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tải Moodboard");
+      setSpace(null);
     } finally {
       setLoading(false);
     }
@@ -74,11 +133,78 @@ export default function ProductSpaceDetailPage({
     loadSpace();
   }, [loadSpace]);
 
+  const openProduct = useCallback(
+    async (point: ProductPoint) => {
+      const embedded = readProduct(point, cacheRef.current);
+      if (embedded) {
+        setSelectedProduct(embedded);
+        return;
+      }
+      const idStr = getProductId(point);
+      if (!idStr) return;
+
+      // Id demo (không phải MongoId) -> dùng map mock, không gọi API
+      if (!isLikelyMongoId(idStr)) {
+        const demoProduct = DEMO_PRODUCT_MAP[idStr];
+        if (demoProduct) {
+          cacheRef.current = new Map(cacheRef.current).set(idStr, demoProduct);
+          setProductCache(new Map(cacheRef.current));
+          setSelectedProduct(demoProduct);
+          return;
+        }
+        // Không có demo -> vẫn mở QuickView với skeleton
+        setSelectedProduct({ _id: idStr, id: idStr, name: "Sản phẩm demo" });
+        return;
+      }
+
+      // Lazy fetch khi BE chỉ trả về string id (MongoId 24-hex)
+      try {
+        setPendingProductId(idStr);
+        const product = await getProductById(idStr);
+        if (!product) return;
+        const normalized: ProductSpaceProduct = {
+          _id: product.id ?? product.sku ?? idStr,
+          id: product.id ?? idStr,
+          name: product.name,
+          price: product.priceVND,
+          images:
+            product.images?.length
+              ? product.images
+              : product.image
+              ? [product.image]
+              : [],
+          image: product.image,
+          brand: product.brand,
+        };
+        cacheRef.current = new Map(cacheRef.current).set(idStr, normalized);
+        setProductCache(new Map(cacheRef.current));
+        setSelectedProduct(normalized);
+      } catch {
+        // vẫn mở QuickView với skeleton (chỉ có id) để user thấy đang tải
+        setSelectedProduct({ _id: idStr, id: idStr, name: "Đang tải sản phẩm…" });
+      } finally {
+        setPendingProductId("");
+      }
+    },
+    [],
+  );
+
   const points = space?.productPoints ?? [];
   const roomLabel = space?.roomType
     ? (ROOM_TYPE_LABELS[space.roomType] ?? "Không gian")
     : "Không gian";
   const spaceId = space?._id ?? space?.id ?? space?.roomId ?? id;
+
+  // Memo để render không bị re-create Map mỗi lần
+  const pointsWithCachedProduct = useMemo(
+    () =>
+      points.map((point) => ({
+        point,
+        product: readProduct(point, productCache),
+        id: getProductId(point),
+      })),
+    [points, productCache],
+  );
 
   if (loading) {
     return (
@@ -148,23 +274,42 @@ export default function ProductSpaceDetailPage({
                     Chưa có ảnh cover
                   </div>
                 )}
-                {points.map((point, index) => (
-                  <button
-                    className="absolute grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[#ef6e61] text-xs font-black text-white shadow transition hover:bg-[#e0554a] hover:scale-110"
-                    key={point._id ?? point.id ?? index}
-                    style={{ left: `${point.x ?? 0}%`, top: `${point.y ?? 0}%` }}
-                    onClick={() => {
-                      const product = getProduct(point);
-                      if (product) setSelectedProduct(product);
-                    }}
-                    aria-label={`Xem sản phẩm ${index + 1}`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
+                {points.map((point, index) => {
+                  const productId = getProductId(point);
+                  const pending = pendingProductId === productId;
+                  const isSelected =
+                    String(selectedProduct?._id ?? selectedProduct?.id ?? "") ===
+                    String(productId);
+                  return (
+                    <button
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow transition disabled:opacity-60
+                        h-3 w-3
+                        ${isSelected ? "scale-125 bg-[#79943b] ring-2 ring-white/80" : "bg-[#ef6e61]"}
+                        hover:scale-125 hover:bg-[#79943b] focus-visible:scale-125 focus-visible:bg-[#79943b]`}
+                      key={point._id ?? point.id ?? index}
+                      style={{
+                        left: `${point.x ?? 0}%`,
+                        top: `${point.y ?? 0}%`,
+                      }}
+                      onClick={() => {
+                        void openProduct(point);
+                      }}
+                      disabled={pending}
+                      aria-label={`Xem sản phẩm ${index + 1}`}
+                      title={`Sản phẩm ${index + 1}`}
+                    >
+                      {pending ? (
+                        <span className="block h-full w-full animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
+              <p className="mt-3 px-2 pb-1 text-xs font-bold text-[#78913f]">
+                Bấm vào chấm tròn trên ảnh để xem chi tiết sản phẩm
+              </p>
               {space.description ? (
-                <p className="mt-4 px-2 pb-1 text-sm leading-6 text-[#5e645b]">
+                <p className="mt-1 px-2 pb-1 text-sm leading-6 text-[#5e645b]">
                   {space.description}
                 </p>
               ) : null}
@@ -254,15 +399,16 @@ export default function ProductSpaceDetailPage({
               </p>
             ) : (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {points.map((point, index) => {
-                  const product = getProduct(point);
+                {pointsWithCachedProduct.map(({ point, product, id: productId }, index) => {
+                  const pending = pendingProductId === productId;
                   return (
                     <button
-                      className="group overflow-hidden rounded-2xl border border-[#ece4d8] bg-white p-2 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                      className="group overflow-hidden rounded-2xl border border-[#ece4d8] bg-white p-2 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md disabled:opacity-60"
                       key={point._id ?? point.id ?? index}
                       onClick={() => {
-                        if (product) setSelectedProduct(product);
+                        void openProduct(point);
                       }}
+                      disabled={pending}
                     >
                       <div className="relative aspect-square overflow-hidden rounded-xl bg-[#f2eee7]">
                         {product?.images?.[0] ? (
@@ -274,6 +420,10 @@ export default function ProductSpaceDetailPage({
                             src={product.images[0]}
                             unoptimized
                           />
+                        ) : pending ? (
+                          <div className="grid h-full place-items-center">
+                            <span className="h-8 w-8 animate-spin rounded-full border-4 border-[#79943b] border-t-transparent" />
+                          </div>
                         ) : (
                           <div className="grid h-full place-items-center text-3xl">
                             🪑
@@ -282,7 +432,7 @@ export default function ProductSpaceDetailPage({
                         <span className="absolute left-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-[#ef6e61] text-xs font-black text-white shadow">
                           {index + 1}
                         </span>
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition hover:bg-black/30 hover:opacity-100">
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
                           <span className="rounded-full bg-white px-3 py-2 text-sm font-bold text-[#2f6f5e] shadow-lg">
                             Xem nhanh
                           </span>
@@ -290,10 +440,10 @@ export default function ProductSpaceDetailPage({
                       </div>
                       <div className="px-1 pb-1 pt-3">
                         <p className="truncate text-sm font-black">
-                          {product?.name ?? "Sản phẩm chưa đồng bộ"}
+                          {product?.name ?? (pending ? "Đang tải…" : "Sản phẩm chưa đồng bộ")}
                         </p>
                         <p className="mt-1 text-xs text-[#78913f]">
-                          {formatPrice(product?.price)}
+                          {product?.price ? formatPrice(product.price) : pending ? "" : "—"}
                         </p>
                         {product?.brand ? (
                           <p className="mt-1 text-[11px] text-[#898d86]">

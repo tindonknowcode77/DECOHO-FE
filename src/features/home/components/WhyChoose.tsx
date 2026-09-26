@@ -1,4 +1,5 @@
 import { Home, Sparkles, Tag, Leaf, Truck } from "lucide-react";
+import MagneticText from "@/src/components/common/MagneticText";
 
 const features = [
   {
@@ -34,7 +35,7 @@ export default function WhyChoose() {
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <div className="mb-8 text-center">
           <h2 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl">
-            Vì sao chọn DECOHO?
+            <MagneticText strength={14}>Vì sao chọn DECOHO?</MagneticText>
           </h2>
         </div>
 

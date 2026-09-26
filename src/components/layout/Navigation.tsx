@@ -150,7 +150,7 @@ export default function Navigation() {
     router.push("/login");
   }
 
-  if (mounted && authPaths.includes(pathname)) {
+  if (pathname === "/admin" || pathname.startsWith("/admin/") || (mounted && authPaths.includes(pathname))) {
     return null;
   }
 

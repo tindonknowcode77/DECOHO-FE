@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  REACTION_LIST,
-  REACTION_META,
-  type ReactionType,
-} from "../types";
+import { REACTION_LIST, REACTION_META, type ReactionType } from "../types";
 
 type ReactionPickerProps = {
   myReaction: ReactionType | null;
@@ -22,25 +18,13 @@ export default function ReactionPicker({
 }: ReactionPickerProps) {
   const [open, setOpen] = useState(false);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const closeTimer = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  function handleEnter() {
-    if (closeTimer.current) {
-      window.clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-    setOpen(true);
-  }
-
-  function handleLeave() {
-    closeTimer.current = window.setTimeout(() => setOpen(false), 200);
-  }
+  const pointerType = useRef("mouse");
+  const hoverTimer = useRef<{ id?: ReturnType<typeof setTimeout> }>({});
 
   useEffect(() => {
-    return () => {
-      if (closeTimer.current) window.clearTimeout(closeTimer.current);
-    };
+    const timer = hoverTimer.current;
+    return () => clearTimeout(timer.id);
   }, []);
 
   useEffect(() => {
@@ -57,13 +41,18 @@ export default function ReactionPicker({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  function handleClickTrigger() {
+  function handleClickTrigger(event: React.MouseEvent<HTMLButtonElement>) {
     if (busy) return;
+    if (event.detail === 0 || pointerType.current !== "mouse") {
+      setOpen((value) => !value);
+      return;
+    }
     const fallback: ReactionType = myReaction ?? "like";
     onPick(fallback);
   }
 
   function handlePick(type: ReactionType) {
+    if (busy) return;
     setOpen(false);
     onPick(type);
   }
@@ -75,18 +64,45 @@ export default function ReactionPicker({
   return (
     <div
       className="relative inline-flex"
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
+      onPointerEnter={() => clearTimeout(hoverTimer.current.id)}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "mouse") return;
+        clearTimeout(hoverTimer.current.id);
+        hoverTimer.current.id = setTimeout(() => {
+          setOpen(false);
+          setHoverIdx(null);
+        }, 200);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setOpen(false);
+      }}
       ref={containerRef}
     >
       <button
         aria-label="Bày tỏ cảm xúc"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${
-          myReaction
-            ? "bg-[#fef2f2]"
-            : "text-[#626960] hover:bg-[#f6f2eb]"
+          myReaction ? "bg-[#fef2f2]" : "text-[#626960] hover:bg-[#f6f2eb]"
         }`}
         disabled={busy}
+        onPointerDown={(event) => { pointerType.current = event.pointerType; }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" && !busy) {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse" && !busy) {
+            clearTimeout(hoverTimer.current.id);
+            setOpen(true);
+          }
+        }}
         onClick={handleClickTrigger}
         style={triggerStyle}
         type="button"
@@ -105,12 +121,17 @@ export default function ReactionPicker({
             return (
               <button
                 aria-label={meta.label}
+                role="menuitem"
+                disabled={busy}
                 className="flex flex-col items-center"
                 key={type}
                 onClick={() => handlePick(type)}
                 onMouseEnter={() => setHoverIdx(idx)}
                 onMouseLeave={() => setHoverIdx(null)}
-                style={{ transform: `translateY(${hoverIdx === idx ? -8 : 0}px) scale(${scale})`, transition: "transform 120ms ease" }}
+                style={{
+                  transform: `translateY(${hoverIdx === idx ? -8 : 0}px) scale(${scale})`,
+                  transition: "transform 120ms ease",
+                }}
                 type="button"
               >
                 <span className="text-2xl leading-none">{meta.emoji}</span>

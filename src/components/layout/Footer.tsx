@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import BrandLogo from "@/src/components/common/BrandLogo";
 
 const footerLinks = {
@@ -33,6 +34,9 @@ const footerLinks = {
 };
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return null;
+
   return (
     <footer className="border-t border-[#ded6c9] bg-white">
       {/* Main Footer */}

@@ -2,169 +2,113 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Play, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight } from "lucide-react";
 import type { CommunityMedia } from "../types";
+import CommunityDialog from "./CommunityDialog";
 
 export default function MediaGallery({ media }: { media: CommunityMedia[] }) {
-  const [active, setActive] = useState(0);
-  const [lightbox, setLightbox] = useState<number | null>(null);
-
-  if (!media?.length) {
-    return <div className="grid aspect-[16/10] place-items-center bg-[#f6f2eb] text-sm text-[#7b8078]">Chưa có ảnh/video</div>;
-  }
-
-  const current = media[active];
-  const count = media.length;
-
-  function openLightbox(index: number) {
-    setLightbox(index);
-  }
-
-  function closeLightbox() {
-    setLightbox(null);
-  }
-
-  function nextLightbox() {
-    if (lightbox === null) return;
-    setLightbox((lightbox + 1) % count);
-  }
-
-  function prevLightbox() {
-    if (lightbox === null) return;
-    setLightbox((lightbox - 1 + count) % count);
-  }
-
-  const layout = (() => {
-    if (count === 1) return "single";
-    if (count === 2) return "double";
-    if (count === 3) return "triple";
-    return "grid";
-  })();
-
+  const [active, setActive] = useState<number | null>(null);
+  if (!media?.length) return null;
+  const selected = active === null ? null : media[active % media.length];
   return (
     <>
-      <div className="relative bg-[#2f6f5e]">
-        {layout === "single" && (
-          <button className="block w-full" onClick={() => openLightbox(0)}>
-            <MediaItem media={current} className="aspect-[16/10]" priority />
-          </button>
-        )}
-
-        {layout === "double" && (
-          <div className="grid grid-cols-2 gap-0.5">
-            {media.map((item, idx) => (
-              <button key={idx} className="relative block aspect-square overflow-hidden" onClick={() => openLightbox(idx)}>
-                <MediaItem media={item} className="aspect-square" />
-              </button>
-            ))}
-          </div>
-        )}
-
-        {layout === "triple" && (
-          <div className="grid grid-cols-2 gap-0.5">
-            <button className="relative row-span-2 block aspect-square overflow-hidden" onClick={() => openLightbox(0)}>
-              <MediaItem media={media[0]} className="aspect-square h-full" />
-            </button>
-            <button className="relative block aspect-square overflow-hidden" onClick={() => openLightbox(1)}>
-              <MediaItem media={media[1]} className="aspect-square" />
-            </button>
-            <button className="relative block aspect-square overflow-hidden" onClick={() => openLightbox(2)}>
-              <MediaItem media={media[2]} className="aspect-square" />
-            </button>
-          </div>
-        )}
-
-        {layout === "grid" && (
-          <div className="grid grid-cols-2 gap-0.5">
-            {media.slice(0, 4).map((item, idx) => (
-              <button key={idx} className="relative block aspect-square overflow-hidden" onClick={() => openLightbox(idx)}>
-                <MediaItem media={item} className="aspect-square" />
-                {idx === 3 && count > 4 && (
-                  <span className="absolute inset-0 grid place-items-center bg-black/55 text-2xl font-bold text-white">
-                    +{count - 4}
+      <div
+        className={`grid gap-1 bg-[#eff1e9] ${media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+      >
+        {media.slice(0, 4).map((item, index) => (
+          <button
+            type="button"
+            key={`${item.url}-${index}`}
+            aria-label={`Xem ${item.type === "video" ? "video" : "ảnh"} ${index + 1}`}
+            onClick={() => setActive(index)}
+            className={`relative block overflow-hidden ${media.length === 1 ? "aspect-[4/3] max-h-[540px]" : "aspect-square"}`}
+          >
+            {item.type === "video" ? (
+              <>
+                <video
+                  src={item.url}
+                  poster={item.thumbnailUrl}
+                  preload="metadata"
+                  muted
+                  playsInline
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute inset-0 grid place-items-center">
+                  <span className="rounded-full bg-white/90 p-3 text-[#31523e]">
+                    <Play size={24} />
                   </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {count > 1 && layout !== "double" && layout !== "triple" && layout !== "grid" && (
-        <div className="flex justify-center gap-1.5 bg-[#2f6f5e] pb-3">
-          {media.map((_, idx) => (
-            <button
-              aria-label={`Xem ảnh ${idx + 1}`}
-              className={`h-1.5 rounded-full transition ${idx === active ? "w-6 bg-white" : "w-1.5 bg-white/40"}`}
-              key={idx}
-              onClick={() => setActive(idx)}
-            />
-          ))}
-        </div>
-      )}
-
-      {lightbox !== null && (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/90 p-4" onClick={closeLightbox}>
-          <button className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); closeLightbox(); }}>
-            <X size={20} />
+                </span>
+              </>
+            ) : (
+              <Image
+                src={item.url}
+                alt={`Không gian được chia sẻ, ảnh ${index + 1}`}
+                fill
+                unoptimized
+                sizes="(max-width: 768px) 100vw, 600px"
+                className="object-cover transition duration-500 hover:scale-[1.03]"
+              />
+            )}
+            {index === 3 && media.length > 4 && (
+              <span className="absolute inset-0 grid place-items-center bg-black/50 text-3xl font-semibold text-white">
+                +{media.length - 4}
+              </span>
+            )}
           </button>
-          {count > 1 && (
-            <>
-              <button className="absolute left-4 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevLightbox(); }}>
-                <ChevronLeft size={24} />
-              </button>
-              <button className="absolute right-4 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextLightbox(); }}>
-                <ChevronRight size={24} />
-              </button>
-            </>
-          )}
-          <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-            <MediaItem media={media[lightbox]} className="max-h-[90vh] max-w-[90vw] rounded" unoptimizedLarge />
+        ))}
+      </div>
+      {selected && active !== null && (
+        <CommunityDialog
+          title={`Ảnh & video · ${active + 1}/${media.length}`}
+          onClose={() => setActive(null)}
+        >
+          <div className="relative min-h-0 flex-1 bg-[#17271e]">
+            {selected.type === "video" ? (
+              <video
+                key={selected.url}
+                src={selected.url}
+                controls
+                playsInline
+                autoPlay
+                className="h-[65dvh] w-full object-contain"
+              />
+            ) : (
+              <div className="relative h-[65dvh] w-full">
+                <Image
+                  src={selected.url}
+                  alt={`Ảnh ${active + 1}`}
+                  fill
+                  unoptimized
+                  sizes="90vw"
+                  className="object-contain"
+                />
+              </div>
+            )}
+            {media.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Ảnh trước"
+                  onClick={() =>
+                    setActive((active - 1 + media.length) % media.length)
+                  }
+                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-[#284b38]"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Ảnh tiếp theo"
+                  onClick={() => setActive((active + 1) % media.length)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-[#284b38]"
+                >
+                  <ChevronRight size={24} />
+                </button>
+              </>
+            )}
           </div>
-          {count > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm text-white">
-              {lightbox + 1} / {count}
-            </div>
-          )}
-        </div>
+        </CommunityDialog>
       )}
     </>
-  );
-}
-
-function MediaItem({ media, className = "", priority, unoptimizedLarge }: { media: CommunityMedia; className?: string; priority?: boolean; unoptimizedLarge?: boolean }) {
-  if (media.type === "video") {
-    return (
-      <div className={`relative bg-black ${className}`}>
-        <video
-          className="h-full w-full object-cover"
-          controls={unoptimizedLarge}
-          playsInline
-          poster={media.thumbnailUrl}
-          preload={unoptimizedLarge ? "metadata" : "none"}
-        >
-          <source src={media.url} />
-        </video>
-        {!unoptimizedLarge && (
-          <span className="pointer-events-none absolute left-1/2 top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-[#2f6f5e] shadow-lg">
-            <Play size={20} fill="currentColor" />
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className={`relative ${className}`}>
-      <Image
-        alt="Ảnh bài viết"
-        className="object-cover"
-        fill
-        priority={priority}
-        sizes={unoptimizedLarge ? "(max-width: 90vw) 100vw" : "(max-width: 1024px) 100vw, 680px"}
-        src={media.url}
-        unoptimized
-      />
-    </div>
   );
 }

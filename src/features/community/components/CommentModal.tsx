@@ -1,254 +1,414 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { X, Send, Loader2, Trash2, MessageCircle } from "lucide-react";
-import { ApiError, apiClient } from "@/src/services/axios";
+import Link from "next/link";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Heart, LoaderCircle, MessageCircle, Send, X } from "lucide-react";
+import { apiClient } from "@/src/services/axios";
 import { getAccessToken } from "@/src/features/auth/services/session";
-import type { CommunityComment, CommunityPost, CommunityUser } from "../types";
+import {
+  REACTION_META,
+  type CommunityComment,
+  type CommunityPost,
+  type ReactionType,
+} from "../types";
+import {
+  communityError,
+  formatCommunityDate,
+  normalizeComment,
+} from "../services/community-data";
+import CommunityDialog from "./CommunityDialog";
+import CommunityAvatar from "./CommunityAvatar";
+import ReactionPicker from "./ReactionPicker";
 
-type CommentsPage = {
-  items: CommunityComment[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-};
-
-type Props = {
+export default function CommentModal({
+  post,
+  onClose,
+  onCommentAdded,
+}: {
   post: CommunityPost;
   onClose: () => void;
-  onCommentAdded: (postId: string, newTotal: number) => void;
-};
-
-export default function CommentModal({ post, onClose, onCommentAdded }: Props) {
-  const [page, setPage] = useState<CommentsPage | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  onCommentAdded: (
+    id: string,
+    total: number,
+    comment: CommunityComment,
+  ) => void;
+}) {
+  const token = getAccessToken();
+  const [comments, setComments] = useState<CommunityComment[]>(
+    post.comments.filter((c) => !c.parentId),
+  );
+  const [total, setTotal] = useState(post.commentCount);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(!!token);
+  const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const token = typeof window === "undefined" ? null : getAccessToken();
-
-  async function load(targetPage: number) {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await apiClient.get<CommentsPage>(
-        `/community/posts/${post._id}/comments?page=${targetPage}&limit=20`,
-        token ? { token } : undefined,
-      );
-      setPage(result);
-      setCurrentPage(result.page);
-    } catch (value) {
-      const msg =
-        value instanceof ApiError
-          ? value.message
-          : value instanceof Error
-            ? value.message
-            : "Không thể tải bình luận.";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
+  const [replies, setReplies] = useState<Record<string, CommunityComment[]>>(
+    {},
+  );
+  const [replyPages, setReplyPages] = useState<Record<string, number>>({});
+  const [replyHasMore, setReplyHasMore] = useState<Record<string, boolean>>({});
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const locks = useRef(new Set<string>());
+  const textarea = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    void load(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post._id]);
+    if (!token) return;
+    const controller = new AbortController();
+    apiClient
+      .get<{ items: unknown[]; total: number; totalPages: number }>(
+        `/community/posts/${post._id}/comments?page=${page}&limit=20`,
+        { token, signal: controller.signal },
+      )
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        const incoming = (Array.isArray(data.items) ? data.items : [])
+          .map(normalizeComment)
+          .filter((c) => c._id);
+        setComments((old) =>
+          page === 1
+            ? incoming
+            : Array.from(
+                new Map([...old, ...incoming].map((c) => [c._id, c])).values(),
+              ),
+        );
+        setTotal(data.total);
+        setPages(data.totalPages);
+        setError("");
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setError(
+            communityError(error, "Chưa tải được bình luận. Hãy thử lại."),
+          );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [post._id, token, page, revision]);
 
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token) {
-      setError("Bạn cần đăng nhập để bình luận.");
-      return;
-    }
     const content = draft.trim();
-    if (!content) return;
-    setSubmitting(true);
+    if (!token || !content || locks.current.has("send") || loading) return;
+    locks.current.add("send");
+    setBusy(true);
     setError("");
     try {
-      await apiClient.post(`/community/posts/${post._id}/comments`, { content }, { token });
+      const result = normalizeComment(
+        await apiClient.post(
+          `/community/posts/${post._id}/comments`,
+          { content, ...(replyTo ? { parentId: replyTo._id } : {}) },
+          { token },
+        ),
+      );
+      if (!result._id) throw new Error("Invalid comment response");
+      if (replyTo) {
+        setReplies((old) => ({
+          ...old,
+          [replyTo._id]: [...(old[replyTo._id] ?? []), result],
+        }));
+        setComments((old) =>
+          old.map((c) =>
+            c._id === replyTo._id
+              ? { ...c, replyCount: (c.replyCount ?? 0) + 1 }
+              : c,
+          ),
+        );
+      } else {
+        setComments((old) => [result, ...old]);
+        setTotal((old) => old + 1);
+      }
+      onCommentAdded(post._id, total + 1, result);
       setDraft("");
-      await load(1);
-      const newTotal = (page?.total ?? post.commentCount) + 1;
-      onCommentAdded(post._id, newTotal);
-    } catch (value) {
-      const msg =
-        value instanceof ApiError
-          ? value.message
-          : value instanceof Error
-            ? value.message
-            : "Không thể gửi bình luận.";
-      setError(msg);
+      setReplyTo(null);
+    } catch (error) {
+      setError(
+        communityError(
+          error,
+          "Chưa gửi được bình luận. Nội dung vẫn được giữ lại để bạn thử lại.",
+        ),
+      );
     } finally {
-      setSubmitting(false);
+      locks.current.delete("send");
+      setBusy(false);
     }
   }
 
-  const totalLabel = useMemo(() => {
-    const total = page?.total ?? post.commentCount;
-    return `${total} bình luận`;
-  }, [page?.total, post.commentCount]);
+  async function react(comment: CommunityComment, type: ReactionType) {
+    if (!token || loading || locks.current.has(comment._id)) return;
+    locks.current.add(comment._id);
+    setPending(new Set(locks.current));
+    try {
+      const result = await apiClient.post<{
+        myType: ReactionType | null;
+        counts: Partial<Record<ReactionType, number>>;
+        total: number;
+      }>(
+        `/community/posts/${post._id}/comments/${comment._id}/react`,
+        { type },
+        { token },
+      );
+      const update = (c: CommunityComment) =>
+        c._id === comment._id
+          ? {
+              ...c,
+              myReaction: result.myType,
+              reactionCounts: result.counts,
+              reactionTotal: result.total,
+            }
+          : c;
+      setComments((old) => old.map(update));
+      setReplies((old) =>
+        Object.fromEntries(
+          Object.entries(old).map(([id, list]) => [id, list.map(update)]),
+        ),
+      );
+    } catch (error) {
+      setError(
+        communityError(error, "Chưa cập nhật được cảm xúc. Hãy thử lại."),
+      );
+    } finally {
+      locks.current.delete(comment._id);
+      setPending(new Set(locks.current));
+    }
+  }
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="flex h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:h-[80vh] sm:rounded-2xl">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <MessageCircle size={18} className="text-slate-600" />
-            <h2 className="text-base font-semibold text-slate-900">{totalLabel}</h2>
+  async function loadReplies(comment: CommunityComment) {
+    const key = `replies:${comment._id}`;
+    if (!token || locks.current.has(key)) return;
+    locks.current.add(key);
+    setPending(new Set(locks.current));
+    const nextPage = (replyPages[comment._id] ?? 0) + 1;
+    try {
+      const data = await apiClient.get<{
+        items: unknown[];
+        totalPages: number;
+      }>(
+        `/community/posts/${post._id}/comments?parentId=${comment._id}&page=${nextPage}&limit=20`,
+        { token },
+      );
+      const incoming = (Array.isArray(data.items) ? data.items : []).map(
+        normalizeComment,
+      );
+      setReplies((old) => ({
+        ...old,
+        [comment._id]: Array.from(
+          new Map(
+            [...(old[comment._id] ?? []), ...incoming].map((c) => [c._id, c]),
+          ).values(),
+        ),
+      }));
+      setReplyPages((old) => ({ ...old, [comment._id]: nextPage }));
+      setReplyHasMore((old) => ({
+        ...old,
+        [comment._id]: nextPage < data.totalPages,
+      }));
+    } catch (error) {
+      setError(
+        communityError(error, "Chưa tải được câu trả lời. Hãy thử lại."),
+      );
+    } finally {
+      locks.current.delete(key);
+      setPending(new Set(locks.current));
+    }
+  }
+
+  function renderComment(comment: CommunityComment, nested = false) {
+    return (
+      <div key={comment._id} className="flex min-w-0 gap-3">
+        <CommunityAvatar user={comment.userId} size={nested ? 28 : 34} />
+        <div className="min-w-0 flex-1">
+          <div className="rounded-2xl bg-[#f0f2e9] px-4 py-3">
+            <p className="text-xs font-semibold">{comment.userId.fullName}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[#65705c]">
+              {comment.content}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100"
-            aria-label="Đóng"
-          >
-            <X size={18} />
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {loading && !page ? (
-            <div className="flex items-center justify-center py-10 text-slate-500">
-              <Loader2 className="mr-2 animate-spin" size={18} />
-              Đang tải bình luận...
-            </div>
-          ) : page && page.items.length > 0 ? (
-            <ul className="space-y-4">
-              {page.items.map((comment) => (
-                <CommentItem key={comment._id} comment={comment} />
-              ))}
-            </ul>
-          ) : (
-            <div className="py-10 text-center text-sm text-slate-500">
-              Chưa có bình luận nào. Hãy là người đầu tiên!
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {error}
-            </div>
-          )}
-
-          {page && page.totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                disabled={currentPage <= 1 || loading}
-                onClick={() => void load(currentPage - 1)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#8a917f]">
+            <span>{formatCommunityDate(comment.createdAt)}</span>
+            {token && (
+              <ReactionPicker
+                busy={loading || pending.has(comment._id)}
+                myReaction={comment.myReaction ?? null}
+                onPick={(type) => void react(comment, type)}
               >
-                Trước
-              </button>
-              <span className="text-xs text-slate-500">
-                Trang {currentPage}/{page.totalPages}
-              </span>
+                <span>
+                  {comment.myReaction ? (
+                    REACTION_META[comment.myReaction].emoji
+                  ) : (
+                    <Heart size={13} />
+                  )}
+                </span>
+                <span className="text-xs">
+                  {comment.reactionTotal || "Thích"}
+                </span>
+              </ReactionPicker>
+            )}
+            {token && !nested && (
               <button
-                type="button"
-                disabled={currentPage >= page.totalPages || loading}
-                onClick={() => void load(currentPage + 1)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={busy}
+                onClick={() => {
+                  setReplyTo(comment);
+                  textarea.current?.focus();
+                }}
+                className="text-xs font-medium"
               >
-                Sau
+                Trả lời
               </button>
+            )}
+          </div>
+          {!nested &&
+            (comment.replyCount ?? 0) > 0 &&
+            (!replyPages[comment._id] || replyHasMore[comment._id]) && (
+              <button
+                disabled={pending.has(`replies:${comment._id}`)}
+                onClick={() => void loadReplies(comment)}
+                className="my-2 text-xs font-semibold text-[#477452]"
+              >
+                {pending.has(`replies:${comment._id}`)
+                  ? "Đang tải…"
+                  : replyPages[comment._id]
+                    ? "Xem thêm trả lời"
+                    : `Xem ${comment.replyCount} câu trả lời`}
+              </button>
+            )}
+          {!nested && (
+            <div className="mt-2 space-y-3">
+              {(replies[comment._id] ?? []).map((reply) =>
+                renderComment(reply, true),
+              )}
             </div>
           )}
         </div>
+      </div>
+    );
+  }
 
-        <form
-          onSubmit={submit}
-          className="shrink-0 border-t border-slate-200 bg-white px-5 py-3"
-        >
-          <div className="flex items-end gap-2">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={token ? "Viết bình luận..." : "Đăng nhập để bình luận"}
-              disabled={!token || submitting}
-              rows={2}
-              maxLength={1000}
-              className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void submit(e as unknown as FormEvent);
-                }
-              }}
-            />
+  return (
+    <CommunityDialog title="Cùng trò chuyện" onClose={onClose} busy={busy}>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="mb-5 border-b border-[#e5e8dc] pb-5">
+          <div className="flex items-center gap-3">
+            <CommunityAvatar user={post.userId} />
+            <div>
+              <p className="text-sm font-semibold">{post.userId.fullName}</p>
+              <p className="mt-1 text-xs text-[#8b9380]">{post.roomType}</p>
+            </div>
+          </div>
+          <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#73806a]">
+            {post.description}
+          </p>
+        </div>
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800"
+          >
+            {error}
             <button
-              type="submit"
-              disabled={!token || submitting || !draft.trim()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300"
-              aria-label="Gửi bình luận"
+              disabled={busy || pending.size > 0 || loading}
+              onClick={() => {
+                setLoading(true);
+                setRevision((v) => v + 1);
+              }}
+              className="ml-2 underline"
             >
-              {submitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+              Tải lại
             </button>
           </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function CommentItem({ comment }: { comment: CommunityComment }) {
-  const author: CommunityUser | undefined = comment.userId;
-  const avatarUrl = typeof author?.avatar === "string" ? author.avatar : author?.avatar?.secureUrl;
-  const initials = (author?.fullName ?? "U").trim().slice(0, 1).toUpperCase();
-  return (
-    <li className="flex gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt={author?.fullName ?? "Người dùng"} className="h-full w-full object-cover" />
-        ) : (
-          initials
+        )}
+        {loading && (
+          <p role="status" className="mb-4 text-xs text-[#7c8573]">
+            Đang tải bình luận…
+          </p>
+        )}
+        {!loading && !comments.length && (
+          <div className="py-9 text-center">
+            <MessageCircle size={30} className="mx-auto text-[#8fa379]" />
+            <p className="mt-3 text-sm text-[#7c8573]">
+              Hãy bắt đầu cuộc trò chuyện bằng một lời chia sẻ.
+            </p>
+          </div>
+        )}
+        <div className="space-y-4">
+          {comments.map((comment) => renderComment(comment))}
+        </div>
+        {token && page < pages && (
+          <button
+            disabled={loading || busy || pending.size > 0}
+            onClick={() => {
+              setLoading(true);
+              setPage((p) => p + 1);
+            }}
+            className="mt-5 w-full text-sm font-semibold text-[#527b54]"
+          >
+            Xem thêm bình luận
+          </button>
         )}
       </div>
-      <div className="flex-1">
-        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-          <div className="text-sm font-semibold text-slate-900">
-            {author?.fullName ?? "Người dùng"}
+      {token ? (
+        <form
+          onSubmit={submit}
+          className="shrink-0 border-t border-[#e5e8dc] bg-white p-4 sm:px-6"
+        >
+          {replyTo && (
+            <div className="mb-2 flex items-center justify-between text-xs text-[#6b7c5d]">
+              Đang trả lời {replyTo.userId.fullName}
+              <button
+                type="button"
+                aria-label="Hủy trả lời"
+                disabled={busy}
+                onClick={() => setReplyTo(null)}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={textarea}
+              aria-label="Nhập bình luận"
+              placeholder="Chia sẻ suy nghĩ của bạn…"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              disabled={busy}
+              maxLength={1000}
+              rows={2}
+              className="min-w-0 flex-1 resize-none rounded-xl border border-[#dce2d3] bg-[#f8f9f4] p-3 text-sm outline-none focus:border-[#6c946a]"
+            />
+            <button
+              aria-label="Gửi bình luận"
+              type="submit"
+              disabled={busy || loading || !draft.trim()}
+              className="rounded-full bg-[#2f6f5e] p-3 text-white disabled:opacity-40"
+            >
+              {busy ? (
+                <LoaderCircle size={18} className="animate-spin" />
+              ) : (
+                <Send size={18} />
+              )}
+            </button>
           </div>
-          <p className="whitespace-pre-wrap break-words text-sm text-slate-700">{comment.content}</p>
-        </div>
-        <div className="mt-1 flex items-center gap-3 px-2 text-xs text-slate-500">
-          <time dateTime={comment.createdAt}>
-            {new Date(comment.createdAt).toLocaleString("vi-VN")}
-          </time>
-          <button
-            type="button"
-            className="rounded-full px-1 text-slate-500 transition hover:text-sky-600"
-            aria-label="Thích bình luận"
+          <p className="mt-2 text-right text-[10px] text-[#8a937f]">
+            {draft.length}/1000
+          </p>
+        </form>
+      ) : (
+        <div className="border-t border-[#e5e8dc] p-5 text-center text-sm">
+          <Link
+            href="/login"
+            className="font-semibold text-[#3b7756] underline"
           >
-            Thích
-          </button>
-          <button
-            type="button"
-            className="rounded-full px-1 text-slate-500 transition hover:text-red-600"
-            aria-label="Xóa bình luận"
-          >
-            <Trash2 size={12} />
-          </button>
+            Đăng nhập
+          </Link>{" "}
+          để xem đầy đủ và tham gia trò chuyện.
         </div>
-      </div>
-    </li>
+      )}
+    </CommunityDialog>
   );
 }
