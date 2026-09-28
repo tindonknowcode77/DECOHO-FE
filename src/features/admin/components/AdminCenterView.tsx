@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AdminProductsPanel from "@/src/features/products/components/AdminProductsPanel";
 import AdminMoodboardsPanel from "@/src/features/product-space/components/AdminMoodboardsPanel";
+import AdminCommunityPanel from "./AdminCommunityPanel";
 import { getAccessToken, getSessionUser, subscribeSessionUser } from "@/src/features/auth/services/session";
 import type { AuthSessionUser } from "@/src/features/auth/types";
 
@@ -39,6 +40,7 @@ const modules: ModuleConfig[] = [
   { id: "scanner", label: "AI Product Scanner", endpoint: "/ai-scanner/admin/history", group: "Không gian và AI" },
   { id: "reviews", label: "Đánh giá", endpoint: "/reviews/admin/all", group: "Chăm sóc" },
   { id: "complaints", label: "Khiếu nại", endpoint: "/support-tickets/admin/all", group: "Chăm sóc" },
+  { id: "community", label: "Diễn đàn", custom: true, group: "Nội dung" },
   { id: "content", label: "Nội dung website", endpoint: "/website-content/admin/all", group: "Nội dung" },
   { id: "notifications", label: "Thông báo", group: "Nội dung" },
   { id: "reports", label: "Báo cáo thống kê", group: "Hệ thống" },
@@ -164,6 +166,7 @@ export default function AdminCenterView() {
   }
 
   const renderContent = () => {
+    if (active === "community") return <AdminCommunityPanel />;
     if (active === "products") {
       return <AdminProductsPanel accessToken={getAccessToken() ?? undefined} />;
     }

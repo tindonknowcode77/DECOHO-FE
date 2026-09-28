@@ -85,38 +85,6 @@
   color: #eeeee0;
   margin-top: 22px;
 }
-.note {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: fit-content;
-  margin-top: 30px;
-  padding: 16px 20px;
-  background: #ffffff12;
-  border: 1px solid #ffffff35;
-  border-radius: 18px;
-  backdrop-filter: blur(12px);
-}
-.noteIcon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #e6eadc;
-  color: #2e6c59;
-}
-.note strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-}
-.note div > span {
-  display: block;
-  font-size: 11px;
-  color: #d9dfd4;
-  margin-top: 5px;
-}
 .visualFooter {
   display: flex;
   justify-content: space-between;
@@ -157,9 +125,6 @@
 .animated .photo {
   animation: settle 2200ms ease-out both;
 }
-.animated .note {
-  animation: float 5s ease-in-out 2;
-}
 @keyframes enter {
   from {
     opacity: 0;
@@ -176,15 +141,6 @@
   }
   to {
     transform: scale(1);
-  }
-}
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
   }
 }
 @media (max-width: 1023px) {
@@ -219,8 +175,7 @@
 @media (prefers-reduced-motion: reduce) {
   .animated .formContent,
   .animated .story,
-  .animated .photo,
-  .animated .note {
+  .animated .photo {
     animation: none;
   }
 }
