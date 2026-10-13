@@ -15,10 +15,15 @@ const nextConfig: NextConfig = {
       );
     }
 
+    const backendApiUrl = new URL(backendUrl);
+    if (backendApiUrl.pathname === "/") {
+      backendApiUrl.pathname = "/api";
+    }
+
     return [
       {
         source: "/backend-api/:path*",
-        destination: `${backendUrl.replace(/\/$/, "")}/:path*`,
+        destination: `${backendApiUrl.toString().replace(/\/$/, "")}/:path*`,
       },
     ];
   },
