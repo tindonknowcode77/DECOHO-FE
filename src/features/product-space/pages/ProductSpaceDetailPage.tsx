@@ -353,19 +353,6 @@ export default function ProductSpaceDetailPage({
                 ))}
               </div>
 
-              <Link
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#79943b] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#6a8430]"
-                href={`/product-space?highlight=${encodeURIComponent(spaceId)}`}
-              >
-                <span aria-hidden="true">＋</span>
-                Thêm sản phẩm vào Moodboard
-              </Link>
-              <Link
-                className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-[#ded6c9] bg-[#fcfaf6] px-5 py-3 text-sm font-bold text-[#51564f] transition hover:border-[#79943b] hover:text-[#667c38]"
-                href="/showroom"
-              >
-                Xem trong Showroom 3D
-              </Link>
             </aside>
           </div>
 

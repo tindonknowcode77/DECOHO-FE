@@ -25,6 +25,8 @@ export type Product = {
   rating: number;
   reviewsCount: number;
   status?: ProductStatus;
+  productLink?: string;
+  ecommercePlatform?: string;
   specifications: Record<string, string>;
   __raw?: Record<string, unknown>;
 };

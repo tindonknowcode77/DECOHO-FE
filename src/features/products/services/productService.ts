@@ -164,6 +164,8 @@ function normalizeProduct(product: ApiProduct): Product {
       "Trạng thái": product.status ?? "Đang cập nhật",
     },
     __raw: product,
+    productLink: product.productLink,
+    ecommercePlatform: product.ecommercePlatform,
   } as Product;
 }
 

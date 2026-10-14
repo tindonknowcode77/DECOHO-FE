@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
+import { ShoppingBag, ExternalLink } from "lucide-react";
 import type { ProductSpaceProduct } from "../../product-space/types";
 import { getProductById } from "@/src/features/products/services/productService";
 import type { Product } from "../types";
@@ -25,6 +26,23 @@ function isMongoId(value: string): boolean {
   return /^[a-f\d]{24}$/i.test(value);
 }
 
+function getPurchaseLink(product: Product | null) {
+  if (!product?.productLink) return null;
+  try {
+    const url = new URL(product.productLink.trim());
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    const isShopee = /(^|\.)shopee\.vn$/.test(url.hostname) || url.hostname === "shope.ee";
+    return {
+      href: url.href,
+      label: isShopee || product.ecommercePlatform?.toLowerCase() === "shopee"
+        ? "Mua trên Shopee"
+        : "Xem nơi bán",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function ProductQuickView({
   product,
   onClose,
@@ -34,6 +52,7 @@ export default function ProductQuickView({
   const [error, setError] = useState("");
 
   const productId = product?._id ?? product?.id;
+  const purchaseLink = getPurchaseLink(fullProduct);
 
   const loadProduct = useCallback(async () => {
     const normalizedId = String(productId ?? "");
@@ -221,6 +240,18 @@ export default function ProductQuickView({
               </div>
 
               <div className="mt-auto flex flex-col gap-3 pt-6">
+                {purchaseLink && (
+                  <a
+                    href={purchaseLink.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#ee4d2d] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#d73f20] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ee4d2d]"
+                  >
+                    <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+                    {purchaseLink.label}
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  </a>
+                )}
                 {fullProduct && (
                   <AddToCartButton
                     item={{
