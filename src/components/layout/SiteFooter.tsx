@@ -38,7 +38,9 @@ export default function SiteFooter() {
               <Link
                 aria-label="Facebook"
                 className="grid h-9 w-9 place-items-center rounded-full border border-[#e8e1d4] bg-white text-[#2f6f5e] transition hover:bg-[#2f6f5e] hover:text-white"
-                href="#"
+                href="https://www.facebook.com/profile.php?id=61590553962441"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 <span className="font-black text-xs">f</span>
               </Link>

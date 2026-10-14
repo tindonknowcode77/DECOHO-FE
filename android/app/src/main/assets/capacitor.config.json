@@ -1,0 +1,19 @@
+{
+	"appId": "com.decoho.app",
+	"appName": "DECOHO Dev",
+	"webDir": "mobile-shell",
+	"backgroundColor": "#f7f3ec",
+	"server": {
+		"url": "http://10.0.2.2:3000/",
+		"cleartext": true,
+		"errorPath": "offline.html"
+	},
+	"android": {
+		"backgroundColor": "#f7f3ec"
+	},
+	"plugins": {
+		"SystemBars": {
+			"insetsHandling": "native"
+		}
+	}
+}
