@@ -1,4 +1,5 @@
 "use client";
+import { confirmDelete } from "@/src/components/common/confirmDelete";
 
 import { useCallback, useMemo, useState } from "react";
 import MoodboardImageEditor from "./MoodboardImageEditor";
@@ -136,7 +137,7 @@ export default function MoodboardEditor({
     async (point: ProductPoint) => {
       const pointId = point._id ?? point.id ?? "";
       if (!pointId) return;
-      const confirmed = window.confirm("Xoá điểm này?");
+      const confirmed = await confirmDelete("Xóa điểm ghim này khỏi moodboard? Sản phẩm trong danh mục vẫn được giữ.");
       if (!confirmed) return;
       setError("");
       try {
@@ -222,7 +223,9 @@ export default function MoodboardEditor({
           {onDeleteSpace ? (
             <button
               className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
-              onClick={onDeleteSpace}
+              onClick={async () => {
+                if (await confirmDelete("Xóa moodboard này và các điểm ghim? Thao tác không thể hoàn tác.")) onDeleteSpace();
+              }}
               type="button"
             >
               Xoá Moodboard

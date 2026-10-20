@@ -1,4 +1,5 @@
 "use client";
+import { confirmDelete } from "@/src/components/common/confirmDelete";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -6,6 +7,7 @@ import { getProducts } from "@/src/features/products/services/productService";
 import type { ProductLite } from "@/src/features/products/types";
 import {
   listAllProductSpacesForAdmin,
+  deleteProductSpacesForAdmin,
 } from "../services/productSpaceService";
 import {
   ROOM_TYPE_LABELS,
@@ -27,6 +29,27 @@ export default function AdminMoodboardsPanel() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState<ProductLite[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function removeSelected(ids: string[]) {
+    if (!ids.length || deleting) return;
+    if (ids.length > 100) { setDeleteError("Chỉ được xóa tối đa 100 moodboard mỗi lần."); return; }
+    if (!await confirmDelete(`Xóa ${ids.length} moodboard đã chọn? Các điểm ghim sẽ bị xóa cùng moodboard. Sản phẩm trong danh mục vẫn được giữ. Không thể hoàn tác.`)) return;
+    setDeleting(true);
+    setDeleteError("");
+    setNotice("");
+    try {
+      const result = await deleteProductSpacesForAdmin(ids);
+      setSelected([]);
+      setNotice(`Đã xóa ${result.deletedCount} moodboard.`);
+      await load();
+    } catch (value) {
+      setDeleteError(value instanceof Error ? value.message : "Không thể xóa moodboard.");
+    } finally { setDeleting(false); }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +60,7 @@ export default function AdminMoodboardsPanel() {
         getProducts().catch(() => []),
       ]);
       setSpaces(list);
+      setSelected((prev) => prev.filter(id => list.some(space => String(space._id ?? space.id) === id)));
       setProducts(
         productList.map((p) => ({
           id: String(p.id ?? p.sku ?? ""),
@@ -125,6 +149,7 @@ export default function AdminMoodboardsPanel() {
         <button
           className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[#2f6f5e] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#265a4c] sm:self-auto"
           onClick={() => setView({ mode: "create" })}
+          disabled={deleting}
           type="button"
         >
           + Tạo Moodboard
@@ -141,12 +166,30 @@ export default function AdminMoodboardsPanel() {
         <button
           className="h-11 rounded-lg border border-[#dcd5c3] px-5 text-sm font-bold hover:bg-[#faf6ec]"
           onClick={() => void load()}
+          disabled={deleting || loading}
           type="button"
         >
           Tải lại
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-white p-3 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" disabled={loading || deleting || !filtered.length}
+            checked={filtered.length > 0 && filtered.every(s => selected.includes(String(s._id ?? s.id)))}
+            onChange={(event) => {
+              const ids = filtered.map(s => String(s._id ?? s.id));
+              setSelected(prev => event.target.checked ? [...new Set([...prev, ...ids])] : prev.filter(id => !ids.includes(id)));
+            }} /> Chọn tất cả kết quả lọc
+        </label>
+        <span>Đã chọn {selected.length}</span>
+        <button type="button" disabled={deleting || loading || !selected.length}
+          className="rounded-lg bg-red-700 px-4 py-2 font-bold text-white disabled:opacity-50"
+          onClick={() => void removeSelected(selected)}>{deleting ? "Đang xóa…" : "Xóa đã chọn"}</button>
+        <button type="button" disabled={deleting} onClick={() => setSelected([])}>Bỏ chọn</button>
+      </div>
+      {deleteError && <p role="alert" className="text-sm text-red-700">{deleteError}</p>}
+      {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
       {error ? (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
@@ -173,13 +216,18 @@ export default function AdminMoodboardsPanel() {
               ? ROOM_TYPE_LABELS[space.roomType as RoomType]
               : "Không gian";
             return (
-              <button
+              <article
                 className="group flex flex-col overflow-hidden rounded-2xl border border-[#e5dfd2] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 key={id}
-                onClick={() => setView({ mode: "edit", space })}
-                type="button"
               >
-                <div className="relative aspect-[4/3] bg-[#faf6ec]">
+                <div className="flex items-center justify-between gap-2 p-3 text-sm">
+                  <label className="flex items-center gap-2"><input type="checkbox" disabled={deleting}
+                    checked={selected.includes(id)} aria-label={`Chọn ${space.title || id}`}
+                    onChange={(event) => setSelected(prev => event.target.checked ? [...prev, id] : prev.filter(value => value !== id))} /> Chọn</label>
+                  <button type="button" disabled={deleting} className="font-bold text-red-700" onClick={() => void removeSelected([id])}>Xóa</button>
+                </div>
+                <button type="button" disabled={deleting} className="flex w-full flex-1 flex-col text-left" onClick={() => setView({ mode: "edit", space })}>
+                <div className="relative aspect-[4/3] w-full bg-[#faf6ec]">
                   {space.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -222,7 +270,8 @@ export default function AdminMoodboardsPanel() {
                     </p>
                   ) : null}
                 </div>
-              </button>
+                </button>
+              </article>
             );
           })}
         </div>

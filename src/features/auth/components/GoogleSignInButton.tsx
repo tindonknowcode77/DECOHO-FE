@@ -98,8 +98,15 @@ export default function GoogleSignInButton({
           },
           method: "POST",
         });
-        const profile =
-          (await verificationResponse.json()) as GoogleProfileResponse;
+        const profile = (await verificationResponse
+          .json()
+          .catch(() => null)) as GoogleProfileResponse | null;
+
+        if (verificationResponse.status >= 500 || !profile) {
+          throw new Error(
+            "Máy chủ đăng nhập tạm thời không khả dụng. Vui lòng đợi một lát rồi thử lại.",
+          );
+        }
 
         if (
           !verificationResponse.ok ||

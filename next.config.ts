@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Allow hosted backends time to wake up before the rewrite proxy disconnects.
+    proxyTimeout: 120_000,
+  },
   async rewrites() {
     const configuredBackendUrl = process.env.BACKEND_INTERNAL_URL?.trim();
     const backendUrl =

@@ -92,6 +92,13 @@ export function listAllProductSpacesForAdmin(): Promise<ProductSpace[]> {
   });
 }
 
+export function deleteProductSpacesForAdmin(ids: string[]): Promise<{ deletedCount: number }> {
+  return request<{ deletedCount: number }>("/product-spaces/admin/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 /**
  * Lấy chi tiết một Product Space công khai.
  */

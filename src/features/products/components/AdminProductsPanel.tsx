@@ -1,18 +1,16 @@
 "use client";
+import { confirmDelete } from "@/src/components/common/confirmDelete";
 
 import { useCallback, useEffect, useState } from "react";
 import {
   deleteProduct,
-  getProducts,
+  getAdminProducts,
 } from "../services/productService";
 import type { Product } from "../types";
 import ProductForm from "./ProductForm";
 
 type Props = { accessToken?: string };
 
-function apiBase() {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
-}
 
 type View = { mode: "list" } | { mode: "create" } | { mode: "edit"; product: Product };
 
@@ -23,50 +21,48 @@ export default function AdminProductsPanel({ accessToken }: Props) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>({ mode: "list" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
 
-  const fetchAuth = useCallback(
-    (path: string, init: RequestInit = {}) => {
-      const headers = new Headers(init.headers ?? {});
-      headers.set("Accept", "application/json");
-      if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-      return fetch(`${apiBase()}${path}`, { ...init, headers });
-    },
-    [accessToken],
-  );
+  async function removeProducts(products: Product[]) {
+    if (deletingId || !products.length) return;
+    if (!await confirmDelete(`Xóa ${products.length} sản phẩm${products.length === 1 ? ` "${products[0].name}"` : " đã chọn"}? Thao tác không thể hoàn tác.`)) return;
+    setDeletingId(products[0].id);
+    setError("");
+    setNotice("");
+    const deleted = new Set<string>();
+    const failures: string[] = [];
+    try {
+      for (const product of products) {
+        setDeletingId(product.id);
+        try { await deleteProduct(product.id); deleted.add(product.id); }
+        catch (value) { failures.push(`${product.name}: ${value instanceof Error ? value.message : "Xóa thất bại"}`); }
+      }
+      setItems(prev => prev.filter(item => !deleted.has(item.id)));
+      setSelected(prev => prev.filter(id => !deleted.has(id)));
+      setNotice(`Đã xóa ${deleted.size}/${products.length} sản phẩm.`);
+      if (failures.length) setError(failures.join("; "));
+    } finally { setDeletingId(null); }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const list = await getProducts();
+      const list = await getAdminProducts(accessToken);
       setItems(list);
+      setSelected(prev => prev.filter(id => list.some(item => item.id === id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được danh sách.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
-
-  const onDelete = useCallback(
-    async (product: Product) => {
-      const confirmed = window.confirm(`Xoá sản phẩm "${product.name}"?`);
-      if (!confirmed) return;
-      setDeletingId(product.id);
-      try {
-        await deleteProduct(product.id);
-        setItems((prev) => prev.filter((item) => item.id !== product.id));
-      } catch (e) {
-        window.alert(e instanceof Error ? e.message : "Xoá thất bại.");
-      } finally {
-        setDeletingId(null);
-      }
-    },
-    [],
-  );
 
   const filtered = items.filter((item) =>
     [item.name, item.sku, item.category, item.brand]
@@ -113,6 +109,7 @@ export default function AdminProductsPanel({ accessToken }: Props) {
         <button
           type="button"
           onClick={() => setView({ mode: "create" })}
+          disabled={deletingId !== null}
           className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[#2f6f5e] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#265a4c] sm:self-auto"
         >
           + Đăng sản phẩm mới
@@ -129,12 +126,30 @@ export default function AdminProductsPanel({ accessToken }: Props) {
         <button
           type="button"
           onClick={() => void load()}
+          disabled={loading || deletingId !== null}
           className="h-11 rounded-lg border border-[#dcd5c3] px-5 text-sm font-bold text-[#17211b] hover:bg-[#faf6ec]"
         >
           Tải lại
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-white p-3 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox"
+          disabled={loading || deletingId !== null || !filtered.length}
+          checked={filtered.length > 0 && filtered.every(item => selected.includes(item.id))}
+          onChange={event => setSelected(prev => event.target.checked
+            ? [...new Set([...prev, ...filtered.map(item => item.id)])]
+            : prev.filter(id => !filtered.some(item => item.id === id)))} /> Chọn tất cả kết quả lọc</label>
+        <button type="button" disabled={loading || deletingId !== null || !items.length}
+          onClick={() => setSelected(items.map(item => item.id))}>Chọn toàn bộ {items.length} sản phẩm</button>
+        <span>Đã chọn {selected.length}</span>
+        <button type="button" disabled={loading || deletingId !== null || !selected.length}
+          className="rounded-lg bg-red-700 px-4 py-2 font-bold text-white disabled:opacity-50"
+          onClick={() => void removeProducts(items.filter(item => selected.includes(item.id)))}>
+          {deletingId ? "Đang xóa…" : "Xóa đã chọn"}</button>
+        <button type="button" disabled={deletingId !== null} onClick={() => setSelected([])}>Bỏ chọn</button>
+      </div>
+      {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
@@ -159,6 +174,10 @@ export default function AdminProductsPanel({ accessToken }: Props) {
               key={product.id}
               className="flex flex-col overflow-hidden rounded-2xl border border-[#e5dfd2] bg-white shadow-sm"
             >
+              <label className="flex items-center gap-2 p-3 text-sm"><input type="checkbox"
+                disabled={deletingId !== null} checked={selected.includes(product.id)}
+                aria-label={`Chọn ${product.name}`}
+                onChange={event => setSelected(prev => event.target.checked ? [...prev, product.id] : prev.filter(id => id !== product.id))} /> Chọn sản phẩm</label>
               <div className="relative h-44 bg-[#faf6ec]">
                 {product.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -201,14 +220,15 @@ export default function AdminProductsPanel({ accessToken }: Props) {
                   <button
                     type="button"
                     onClick={() => setView({ mode: "edit", product })}
+                    disabled={deletingId !== null}
                     className="flex-1 rounded-lg border border-[#dcd5c3] px-3 py-2 text-xs font-bold text-[#17211b] hover:bg-[#faf6ec]"
                   >
                     Sửa
                   </button>
                   <button
                     type="button"
-                    disabled={deletingId === product.id}
-                    onClick={() => void onDelete(product)}
+                    disabled={deletingId !== null}
+                    onClick={() => void removeProducts([product])}
                     className="flex-1 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {deletingId === product.id ? "Đang xoá..." : "Xoá"}

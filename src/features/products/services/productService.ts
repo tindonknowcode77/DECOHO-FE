@@ -191,6 +191,19 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
   return data.map(normalizeProduct);
 }
 
+export async function getAdminProducts(accessToken?: string): Promise<Product[]> {
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
+  const response = await fetch(`${base}/products/admin/all`, {
+    cache: "no-store", headers: accessToken
+      ? { Accept: "application/json", Authorization: `Bearer ${accessToken}` }
+      : authHeaders({ Accept: "application/json" }),
+  });
+  if (!response.ok) throw new Error(`Không thể tải sản phẩm quản trị (${response.status}).`);
+  const data = await response.json();
+  if (!Array.isArray(data)) throw new Error("Danh sách sản phẩm không hợp lệ.");
+  return data.map(normalizeProduct);
+}
+
 export async function getProductById(id: string): Promise<Product | null> {
   const response = await fetch(
     `${getApiUrl()}/${encodeURIComponent(id)}`,
