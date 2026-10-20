@@ -13,6 +13,7 @@ import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
 type ProductQuickViewProps = {
   product: ProductSpaceProduct | undefined;
   onClose: () => void;
+  inline?: boolean;
 };
 
 function formatPrice(value: number): string {
@@ -46,6 +47,7 @@ function getPurchaseLink(product: Product | null) {
 export default function ProductQuickView({
   product,
   onClose,
+  inline = false,
 }: ProductQuickViewProps) {
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,6 +83,7 @@ export default function ProductQuickView({
   }, [loadProduct]);
 
   useEffect(() => {
+    if (inline) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -90,7 +93,7 @@ export default function ProductQuickView({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, [onClose, inline]);
 
   if (!product) return null;
 
@@ -124,15 +127,15 @@ export default function ProductQuickView({
 
   const overlay = (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className={inline ? "min-w-0" : "fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!inline && e.target === e.currentTarget) onClose();
       }}
-      role="dialog"
-      aria-modal="true"
+      role={inline ? "region" : "dialog"}
+      aria-modal={inline ? undefined : true}
       aria-labelledby="quickview-title"
     >
-      <div className="relative my-auto max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+      <div className={inline ? "relative w-full overflow-hidden rounded-2xl border border-[#ddd2c2] bg-white shadow-[0_12px_36px_rgba(57,45,29,.09)]" : "relative my-auto max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl"}>
         <button
           className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-lg font-bold text-[#646a61] shadow-lg transition hover:bg-white hover:text-[#bc3d2b]"
           onClick={onClose}
@@ -157,14 +160,14 @@ export default function ProductQuickView({
             </button>
           </div>
         ) : (
-          <div className="grid gap-0 lg:grid-cols-[1fr_1fr]">
-            <div className="relative min-h-[300px] bg-[#f5f1ea] lg:min-h-[500px]">
+          <div className={inline ? "grid gap-0" : "grid gap-0 lg:grid-cols-[1fr_1fr]"}>
+            <div className={inline ? "relative h-48 bg-[#f5f1ea] sm:h-56" : "relative min-h-[300px] bg-[#f5f1ea] lg:min-h-[500px]"}>
               {displayProduct.images?.[0] ? (
                 <Image
                   alt={displayProduct.name}
-                  className="object-cover"
+                  className={inline ? "object-contain" : "object-cover"}
                   fill
-                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  sizes={inline ? "(min-width: 1024px) 480px, 100vw" : "(min-width: 1024px) 50vw, 100vw"}
                   src={displayProduct.images[0]}
                   unoptimized
                 />
@@ -284,5 +287,5 @@ export default function ProductQuickView({
   );
 
   // Render vào document.body để né stacking context từ PageTransition (transform/scale)
-  return body ? createPortal(overlay, body) : overlay;
+  return inline ? overlay : body ? createPortal(overlay, body) : overlay;
 }

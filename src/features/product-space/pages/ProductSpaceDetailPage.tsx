@@ -289,6 +289,8 @@ export default function ProductSpaceDetailPage({
                         void openProduct(point);
                       }}
                       disabled={pending}
+                      aria-pressed={isSelected}
+                      aria-controls="room-product-details"
                       aria-label={`Xem sản phẩm ${index + 1}`}
                       title={`Sản phẩm ${index + 1}`}
                     >
@@ -309,6 +311,15 @@ export default function ProductSpaceDetailPage({
               ) : null}
             </div>
 
+            <div id="room-product-details" className="min-w-0">
+            {selectedProduct ? (
+              <ProductQuickView
+                key={String(selectedProduct._id ?? selectedProduct.id)}
+                product={selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+                inline
+              />
+            ) : (
             <aside className="rounded-2xl border border-[#ddd2c2] bg-white p-5 shadow-[0_12px_36px_rgba(57,45,29,.09)] sm:p-7">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-[#eef4df] px-3 py-1 text-[11px] font-bold text-[#667c38]">
@@ -354,6 +365,8 @@ export default function ProductSpaceDetailPage({
               </div>
 
             </aside>
+            )}
+            </div>
           </div>
 
           <section className="mt-8 rounded-2xl border border-[#eadfce] bg-white p-5 shadow-[0_10px_30px_rgba(57,45,29,.07)] sm:p-7">
@@ -441,12 +454,6 @@ export default function ProductSpaceDetailPage({
         </section>
       </main>
 
-      {selectedProduct && (
-        <ProductQuickView
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-        />
-      )}
     </>
   );
 }
