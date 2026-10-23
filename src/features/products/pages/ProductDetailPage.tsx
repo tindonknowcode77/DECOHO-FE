@@ -101,16 +101,6 @@ export default async function ProductDetailPage({
             <p className="mt-2 text-sm text-[#646a61]">
               {product.brand}
             </p>
-            <div className="mt-4 flex items-center gap-2">
-              <span className="text-lg font-bold text-[#b46f2c]">
-                {product.rating}
-              </span>
-              <span className="text-sm font-semibold text-[#b46f2c]">sao</span>
-              <span className="h-1 w-1 rounded-full bg-[#c9c0b3]" />
-              <span className="text-sm text-[#646a61]">
-                {product.reviewsCount} đánh giá
-              </span>
-            </div>
 
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-[#eee7dc] pt-5">
               <p className="text-3xl font-bold">
@@ -139,22 +129,24 @@ export default async function ProductDetailPage({
               ))}
             </div>
 
-            <div className="mt-7 grid gap-3 sm:grid-cols-2">
-              <AddToCartButton
-                item={{
-                  id: `catalog-${product.id}`,
-                  category: product.category,
-                  dimensions: product.dimensions,
-                  image: product.image,
-                  material: product.material,
-                  name: product.name,
-                  priceVND: product.priceVND,
-                  productHref: `/products/${product.id}`,
-                  source: "catalog",
-                  stock: product.stock,
-                  style: product.styleName,
-                }}
-              />
+            <div className={`mt-7 grid gap-3 ${product.stock > 0 && purchaseLink ? "sm:grid-cols-2" : ""}`}>
+              {product.stock > 0 && (
+                <AddToCartButton
+                  item={{
+                    id: `catalog-${product.id}`,
+                    category: product.category,
+                    dimensions: product.dimensions,
+                    image: product.image,
+                    material: product.material,
+                    name: product.name,
+                    priceVND: product.priceVND,
+                    productHref: `/products/${product.id}`,
+                    source: "catalog",
+                    stock: product.stock,
+                    style: product.styleName,
+                  }}
+                />
+              )}
               {purchaseLink && (
                 <a
                   className="rounded-md bg-[#2f6f5e] px-5 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#285f51]"
@@ -166,12 +158,7 @@ export default async function ProductDetailPage({
                 </a>
               )}
             </div>
-            <Link
-              className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-[#ded6c9] bg-[#fcfaf6] px-5 py-3 text-sm font-bold text-[#51564f] transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
-              href="/cart"
-            >
-              Xem giỏ hàng hiện tại
-            </Link>
+
           </div>
         </div>
 
@@ -258,9 +245,6 @@ export default async function ProductDetailPage({
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <p className="font-bold">
                       {formatPrice(recommendedProduct.priceVND)}
-                    </p>
-                    <p className="text-xs font-bold text-[#b46f2c]">
-                      {recommendedProduct.rating} sao
                     </p>
                   </div>
                 </div>
