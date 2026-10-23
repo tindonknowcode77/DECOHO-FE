@@ -186,17 +186,6 @@ export default function ProductQuickView({
                 {displayProduct.brand}
               </p>
 
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-lg font-bold text-[#b46f2c]">
-                  {displayProduct.rating}
-                </span>
-                <span className="text-sm font-semibold text-[#b46f2c]">★</span>
-                <span className="h-1 w-1 rounded-full bg-[#c9c0b3]" />
-                <span className="text-sm text-[#646a61]">
-                  {displayProduct.reviewsCount} đánh giá
-                </span>
-              </div>
-
               <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-[#eee7dc] pt-5">
                 <p className="text-3xl font-bold text-[#bc3d2b]">
                   {formatPrice(displayProduct.priceVND)}
@@ -237,7 +226,7 @@ export default function ProductQuickView({
                     <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   </a>
                 )}
-                {fullProduct && (
+                {fullProduct && fullProduct.stock > 0 && (
                   <AddToCartButton
                     item={{
                       id: `quickview-${fullProduct.id}`,
