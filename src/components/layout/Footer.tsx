@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import BrandLogo from "@/src/components/common/BrandLogo";
 
@@ -58,6 +59,23 @@ export default function Footer() {
                 </svg>
               </a>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="border-t border-[#eee7dc]">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-5 py-4 sm:px-8 md:flex-row">
+          <p className="text-xs text-[#646a61]">
+            © 2026 DECOHO. Mọi quyền được bảo lưu.
+          </p>
+          <div className="flex gap-5 text-xs text-[#646a61]">
+            <Link className="transition hover:text-[#2f6f5e]" href="/privacy">
+              Chính sách bảo mật
+            </Link>
+            <Link className="transition hover:text-[#2f6f5e]" href="/terms">
+              Điều khoản sử dụng
+            </Link>
           </div>
         </div>
       </div>

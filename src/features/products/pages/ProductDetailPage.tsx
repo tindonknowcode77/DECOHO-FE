@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
 import ProductImage from "../components/ProductImage";
+import { getPurchaseLink } from "../utils/purchaseLink";
 import {
   getProductById,
   getProducts,
@@ -34,6 +35,7 @@ export default async function ProductDetailPage({
     notFound();
   }
 
+  const purchaseLink = getPurchaseLink(product);
   const recommendedProducts = getRecommendedProducts(product, products);
 
   return (
@@ -48,7 +50,7 @@ export default async function ProductDetailPage({
             Quay lại catalog
           </Link>
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#7b7f78]">
-            {product.category} · {product.sku}
+            {product.category}
           </p>
         </div>
 
@@ -97,7 +99,7 @@ export default async function ProductDetailPage({
               {product.name}
             </h1>
             <p className="mt-2 text-sm text-[#646a61]">
-              {product.brand} · SKU {product.sku}
+              {product.brand}
             </p>
             <div className="mt-4 flex items-center gap-2">
               <span className="text-lg font-bold text-[#b46f2c]">
@@ -128,9 +130,7 @@ export default async function ProductDetailPage({
             <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[#e8dfd2] bg-[#e8dfd2] text-sm">
               {[
                 ["Kích thước", product.dimensions],
-                ["Vật liệu", product.material],
                 ["Màu sắc", product.color],
-                ["Tồn kho", `${product.stock} sản phẩm`],
               ].map(([label, value]) => (
                 <div className="min-w-0 bg-[#fcfaf6] p-3" key={label}>
                   <p className="text-xs font-bold text-[#51564f]">{label}</p>
@@ -155,14 +155,16 @@ export default async function ProductDetailPage({
                   style: product.styleName,
                 }}
               />
-              <a
-                className="rounded-md bg-[#2f6f5e] px-5 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#285f51]"
-                href={`https://shopee.vn/search?keyword=${encodeURIComponent(product.name)}`}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                Tìm trên Shopee
-              </a>
+              {purchaseLink && (
+                <a
+                  className="rounded-md bg-[#2f6f5e] px-5 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#285f51]"
+                  href={purchaseLink.href}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {purchaseLink.label}
+                </a>
+              )}
             </div>
             <Link
               className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-[#ded6c9] bg-[#fcfaf6] px-5 py-3 text-sm font-bold text-[#51564f] transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"

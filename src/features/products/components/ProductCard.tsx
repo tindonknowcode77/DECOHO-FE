@@ -117,11 +117,6 @@ export default function ProductCard({
           </p>
         )}
         <div className="mt-auto flex items-center justify-between gap-1 border-t border-[#eff0e8] pt-3">
-          <span
-            className={`text-[10px] ${product.stock > 0 ? "text-[#81906b]" : "text-[#aa8d7d]"}`}
-          >
-            {product.stock > 0 ? "Có sẵn" : "Tạm hết hàng"}
-          </span>
           {onQuickView ? (
             <button
               type="button"

@@ -8,6 +8,7 @@ import { ShoppingBag, ExternalLink } from "lucide-react";
 import type { ProductSpaceProduct } from "../../product-space/types";
 import { getProductById } from "@/src/features/products/services/productService";
 import type { Product } from "../types";
+import { getPurchaseLink } from "../utils/purchaseLink";
 import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
 
 type ProductQuickViewProps = {
@@ -25,23 +26,6 @@ function formatPrice(value: number): string {
 
 function isMongoId(value: string): boolean {
   return /^[a-f\d]{24}$/i.test(value);
-}
-
-function getPurchaseLink(product: Product | null) {
-  if (!product?.productLink) return null;
-  try {
-    const url = new URL(product.productLink.trim());
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    const isShopee = /(^|\.)shopee\.vn$/.test(url.hostname) || url.hostname === "shope.ee";
-    return {
-      href: url.href,
-      label: isShopee || product.ecommercePlatform?.toLowerCase() === "shopee"
-        ? "Mua trên Shopee"
-        : "Xem nơi bán",
-    };
-  } catch {
-    return null;
-  }
 }
 
 export default function ProductQuickView({
@@ -199,7 +183,7 @@ export default function ProductQuickView({
               </h2>
 
               <p className="mt-2 text-sm text-[#646a61]">
-                {displayProduct.brand} · SKU {displayProduct.sku}
+                {displayProduct.brand}
               </p>
 
               <div className="mt-3 flex items-center gap-2">
@@ -231,9 +215,7 @@ export default function ProductQuickView({
               <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl border border-[#e8dfd2] bg-[#fcfaf6] p-4 text-sm">
                 {[
                   ["Kích thước", displayProduct.dimensions],
-                  ["Vật liệu", displayProduct.material],
                   ["Màu sắc", displayProduct.color],
-                  ["Tồn kho", `${displayProduct.stock} sản phẩm`],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <p className="text-xs font-bold text-[#51564f]">{label}</p>
