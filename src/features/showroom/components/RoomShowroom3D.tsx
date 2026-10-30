@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Info,
   Plus,
+  Minus,
   Trash2,
   RotateCw,
   Move,
@@ -61,6 +62,7 @@ export type PlacedFurniture = {
   modelUrl: string;
   position: [number, number, number];
   rotationY: number;
+  scale: number;
 };
 
 const fallbackShowrooms: Showroom[] = [
@@ -479,6 +481,10 @@ export default function RoomShowroom3D() {
         const model = gltf.scene;
         const instanceId = `placed-${Date.now()}`;
 
+        // Đặt tỉ lệ mặc định vừa vặn (0.45 để nằm gọn trong phòng)
+        const initialScale = 0.45;
+        model.scale.set(initialScale, initialScale, initialScale);
+
         // Căn chỉnh đáy chạm sàn y = 0
         const bbox = new THREE.Box3().setFromObject(model);
         const minY = bbox.min.y;
@@ -489,6 +495,7 @@ export default function RoomShowroom3D() {
           instanceId,
           productId: product.id,
           name: product.name,
+          scale: initialScale,
         };
 
         furnitureGroup.add(model);
@@ -500,6 +507,7 @@ export default function RoomShowroom3D() {
           modelUrl: product.modelUrl,
           position: [0, -minY, 0],
           rotationY: 0,
+          scale: initialScale,
         };
 
         setPlacedList((prev) => [...prev, newPlaced]);
@@ -534,6 +542,45 @@ export default function RoomShowroom3D() {
       prev.map((item) =>
         item.instanceId === selectedInstanceId
           ? { ...item, rotationY: targetObj.rotation.y }
+          : item,
+      ),
+    );
+  };
+
+  // HÀM: Chỉnh kích thước (Scale) riêng từng sản phẩm
+  const handleScaleSelected = (factor: number) => {
+    if (!selectedInstanceId) return;
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!furnitureGroup) return;
+
+    const targetObj = furnitureGroup.children.find(
+      (c) => c.userData?.instanceId === selectedInstanceId,
+    );
+    if (!targetObj) return;
+
+    const currentScale = targetObj.scale.x;
+    // Giới hạn scale từ 0.15 đến 1.5
+    const newScale = Math.min(1.5, Math.max(0.15, currentScale * factor));
+    targetObj.scale.set(newScale, newScale, newScale);
+    targetObj.userData.scale = newScale;
+
+    // Giữ đáy chân đồ vật luôn chạm đúng mặt sàn y = 0
+    const bbox = new THREE.Box3().setFromObject(targetObj);
+    const deltaY = bbox.min.y;
+    targetObj.position.y -= deltaY;
+
+    // Cập nhật vòng tròn chọn
+    const ring = selectionRingRef.current;
+    if (ring) {
+      const size = bbox.getSize(new THREE.Vector3());
+      const radius = Math.max(size.x, size.z) * 0.55;
+      ring.scale.set(radius, radius, 1);
+    }
+
+    setPlacedList((prev) =>
+      prev.map((item) =>
+        item.instanceId === selectedInstanceId
+          ? { ...item, scale: newScale, position: [targetObj.position.x, targetObj.position.y, targetObj.position.z] }
           : item,
       ),
     );
@@ -658,16 +705,31 @@ export default function RoomShowroom3D() {
                     <span>Xoay 45°</span>
                   </button>
 
-                  {/* Nút xoay 90° */}
+                  <div className="h-4 w-px bg-[#ded6c9]" />
+
+                  {/* Nút Thu nhỏ món đồ (-15%) */}
                   <button
                     type="button"
-                    onClick={() => handleRotateSelected(90)}
-                    title="Xoay 90 độ"
+                    onClick={() => handleScaleSelected(0.85)}
+                    title="Thu nhỏ món đồ này (-15%)"
                     className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
                   >
-                    <RotateCw size={13} />
-                    <span>90°</span>
+                    <Minus size={13} />
+                    <span>Thu nhỏ</span>
                   </button>
+
+                  {/* Nút Phóng to món đồ (+15%) */}
+                  <button
+                    type="button"
+                    onClick={() => handleScaleSelected(1.15)}
+                    title="Phóng to món đồ này (+15%)"
+                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
+                  >
+                    <Plus size={13} />
+                    <span>Phóng to</span>
+                  </button>
+
+                  <div className="h-4 w-px bg-[#ded6c9]" />
 
                   {/* Nút Xóa */}
                   <button
