@@ -5,7 +5,6 @@ import Image from "next/image";
 import {
   Box,
   ChevronRight,
-  Expand,
   LoaderCircle,
   Maximize2,
   Minimize2,
@@ -17,6 +16,11 @@ import {
   ShoppingBag,
   ArrowRight,
   Info,
+  Plus,
+  Trash2,
+  RotateCw,
+  Move,
+  CheckCircle2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -25,12 +29,46 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import type { Showroom } from "../types";
 
+// Danh mục sản phẩm 3D có thể kéo thả vào phòng
+export type AvailableProduct = {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  modelUrl: string;
+  thumbnailUrl: string;
+  dimensions: string;
+  material: string;
+};
+
+const AVAILABLE_FURNITURE: AvailableProduct[] = [
+  {
+    id: "bed-wooden-platform",
+    name: "Giường ngủ gỗ Platform",
+    category: "Phòng ngủ",
+    price: 18500000,
+    modelUrl: "https://res.cloudinary.com/djzzwjznn/raw/upload/v1793328129/decoho/furniture/wooden-bed-1793328126661.glb",
+    thumbnailUrl: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=600&q=80",
+    dimensions: "200 x 180 x 85 cm",
+    material: "Gỗ sồi tự nhiên, đầu giường bọc nệm",
+  },
+];
+
+export type PlacedFurniture = {
+  instanceId: string;
+  productId: string;
+  name: string;
+  modelUrl: string;
+  position: [number, number, number];
+  rotationY: number;
+};
+
 const fallbackShowrooms: Showroom[] = [
   {
     _id: "6ae3671bda91875ce3b84a0d",
     title: "Phòng mẫu nội thất 3D (Tripo3D AI)",
     description:
-      "Không gian nội thất hiện đại được tạo tự động bởi Tripo3D AI. Trải nghiệm xoay 360°, chạm để khám phá từng góc phòng.",
+      "Không gian nội thất hiện đại được tạo tự động bởi Tripo3D AI. Trải nghiệm xoay 360°, bấm chọn và kéo thả giường ngủ hoặc các món đồ vào phòng.",
     thumbnailUrl:
       "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80",
     environmentModelUrl:
@@ -44,24 +82,47 @@ export default function RoomShowroom3D() {
   const [showrooms, setShowrooms] = useState<Showroom[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
 
   // 3D Canvas states
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const [modelLoading, setModelLoading] = useState<boolean>(true);
   const [modelError, setModelError] = useState<string>("");
   const [loadProgress, setLoadProgress] = useState<number>(0);
-  const [autoRotate, setAutoRotate] = useState<boolean>(true);
+  const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  // References for Three.js cleanup and controls
+  // Danh sách đồ đã đặt trong phòng & món đồ đang chọn
+  const [placedList, setPlacedList] = useState<PlacedFurniture[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [isAddingModel, setIsAddingModel] = useState<boolean>(false);
+  const [userNotification, setUserNotification] = useState<string>("");
+
+  // Three.js instances ref
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const furnitureGroupRef = useRef<THREE.Group | null>(null);
+  const selectionRingRef = useRef<THREE.Mesh | null>(null);
   const resetCameraRef = useRef<(() => void) | null>(null);
+
+  // Tương tác kéo thả trên sàn (Drag)
+  const isDraggingRef = useRef<boolean>(false);
+  const draggedObjectRef = useRef<THREE.Object3D | null>(null);
+  const dragOffsetRef = useRef<THREE.Vector3>(new THREE.Vector3());
+  const floorPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
+  const mouseCoordsRef = useRef<THREE.Vector2>(new THREE.Vector2());
+
+  // Thông báo tạm thời
+  const showToast = (msg: string) => {
+    setUserNotification(msg);
+    setTimeout(() => setUserNotification(""), 3500);
+  };
 
   // Fetch showrooms from API
   const fetchShowrooms = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
       const res = await fetch(`${baseUrl}/showrooms`, { credentials: "omit" });
@@ -76,7 +137,6 @@ export default function RoomShowroom3D() {
         setSelectedId(fallbackShowrooms[0]._id);
       }
     } catch {
-      // Fallback
       setShowrooms(fallbackShowrooms);
       setSelectedId(fallbackShowrooms[0]._id);
     } finally {
@@ -90,7 +150,7 @@ export default function RoomShowroom3D() {
 
   const activeShowroom = showrooms.find((s) => s._id === selectedId) || showrooms[0];
 
-  // Initialize and Render Three.js Scene
+  // Khởi tạo Three.js Scene và Room
   useEffect(() => {
     const container = canvasContainerRef.current;
     if (!container || !activeShowroom?.environmentModelUrl) return;
@@ -103,12 +163,14 @@ export default function RoomShowroom3D() {
     // Scene setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#f7f3ec");
+    sceneRef.current = scene;
 
     const width = container.clientWidth;
     const height = container.clientHeight;
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.05, 1000);
     camera.position.set(6, 4.5, 8);
+    cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -116,25 +178,45 @@ export default function RoomShowroom3D() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
+    rendererRef.current = renderer;
 
-    // Clear previous canvas
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
-    // Lighting
+    // Lights
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b8a6, 2.6);
     scene.add(hemiLight);
 
     const ambLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambLight);
 
-    const sunLight1 = new THREE.DirectionalLight(0xffffff, 2.4);
-    sunLight1.position.set(6, 12, 7);
-    scene.add(sunLight1);
+    const sun1 = new THREE.DirectionalLight(0xffffff, 2.4);
+    sun1.position.set(6, 12, 7);
+    scene.add(sun1);
 
-    const sunLight2 = new THREE.DirectionalLight(0xfff7ea, 1.6);
-    sunLight2.position.set(-7, 8, -6);
-    scene.add(sunLight2);
+    const sun2 = new THREE.DirectionalLight(0xfff7ea, 1.6);
+    sun2.position.set(-7, 8, -6);
+    scene.add(sun2);
+
+    // Group chứa đồ nội thất kéo thả
+    const furnitureGroup = new THREE.Group();
+    scene.add(furnitureGroup);
+    furnitureGroupRef.current = furnitureGroup;
+
+    // Vòng tròn báo hiệu món đồ đang chọn (Selection Ring)
+    const ringGeo = new THREE.RingGeometry(1.2, 1.35, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x2e6f5e,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const selectionRing = new THREE.Mesh(ringGeo, ringMat);
+    selectionRing.position.set(0, 0.02, 0);
+    selectionRing.visible = false;
+    scene.add(selectionRing);
+    selectionRingRef.current = selectionRing;
 
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -147,30 +229,28 @@ export default function RoomShowroom3D() {
     controls.autoRotateSpeed = 0.8;
     controlsRef.current = controls;
 
-    // Load Model with DRACOLoader
+    // DRACO Loader
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
 
     const loader = new GLTFLoader();
     loader.setDRACOLoader(dracoLoader);
 
-    const modelGroup = new THREE.Group();
-    scene.add(modelGroup);
+    // Tải mô hình căn phòng trống (Room Environment)
+    const roomModelGroup = new THREE.Group();
+    scene.add(roomModelGroup);
 
     let defaultCamPos = new THREE.Vector3(6, 4.5, 8);
     let defaultCamTarget = new THREE.Vector3(0, 0, 0);
 
-    const modelUrl = activeShowroom.environmentModelUrl;
-
     loader.load(
-      modelUrl,
+      activeShowroom.environmentModelUrl,
       (gltf) => {
         if (isDisposed) return;
-        const model = gltf.scene;
-        modelGroup.add(model);
+        const roomModel = gltf.scene;
+        roomModelGroup.add(roomModel);
 
-        // Center and fit camera
-        const bbox = new THREE.Box3().setFromObject(modelGroup);
+        const bbox = new THREE.Box3().setFromObject(roomModelGroup);
         if (!bbox.isEmpty()) {
           const center = bbox.getCenter(new THREE.Vector3());
           const size = bbox.getSize(new THREE.Vector3());
@@ -195,8 +275,8 @@ export default function RoomShowroom3D() {
       },
       (err) => {
         if (isDisposed) return;
-        console.error("Three.js Load error:", err);
-        setModelError("Không thể tải mô hình 3D. Vui lòng kiểm tra kết nối mạng.");
+        console.error("Lỗi tải room 3D:", err);
+        setModelError("Không thể tải mô hình căn phòng. Vui lòng thử lại.");
         setModelLoading(false);
       },
     );
@@ -206,6 +286,111 @@ export default function RoomShowroom3D() {
       controls.target.copy(defaultCamTarget);
       controls.update();
     };
+
+    // --- SỰ KIỆN KÉO THẢ MÔ HÌNH NỘI THẤT TRÊN SÀN (POINTER EVENTS) ---
+    const domElem = renderer.domElement;
+
+    function getPointerPos(e: PointerEvent) {
+      const rect = domElem.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      return { x, y };
+    }
+
+    function onPointerDown(e: PointerEvent) {
+      if (e.button !== 0) return; // Chỉ xử lý chuột trái
+      const { x, y } = getPointerPos(e);
+      mouseCoordsRef.current.set(x, y);
+      raycasterRef.current.setFromCamera(mouseCoordsRef.current, camera);
+
+      // Kiểm tra có bấm trúng món đồ nội thất nào không
+      if (furnitureGroup.children.length > 0) {
+        const intersects = raycasterRef.current.intersectObjects(furnitureGroup.children, true);
+        if (intersects.length > 0) {
+          // Tìm root Object3D của item trong furnitureGroup
+          let rootObj: THREE.Object3D | null = intersects[0].object;
+          while (rootObj && rootObj.parent !== furnitureGroup) {
+            rootObj = rootObj.parent;
+          }
+
+          if (rootObj && rootObj.userData?.instanceId) {
+            isDraggingRef.current = true;
+            draggedObjectRef.current = rootObj;
+            setSelectedInstanceId(rootObj.userData.instanceId);
+
+            // Tắt OrbitControls để không xoay phòng khi kéo đồ
+            controls.enabled = false;
+
+            // Tính điểm offset trên sàn
+            const planeIntersect = new THREE.Vector3();
+            raycasterRef.current.ray.intersectPlane(floorPlaneRef.current, planeIntersect);
+            if (planeIntersect) {
+              dragOffsetRef.current.set(
+                planeIntersect.x - rootObj.position.x,
+                0,
+                planeIntersect.z - rootObj.position.z,
+              );
+            }
+            return;
+          }
+        }
+      }
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      const { x, y } = getPointerPos(e);
+      mouseCoordsRef.current.set(x, y);
+
+      if (isDraggingRef.current && draggedObjectRef.current) {
+        raycasterRef.current.setFromCamera(mouseCoordsRef.current, camera);
+        const planeIntersect = new THREE.Vector3();
+        if (raycasterRef.current.ray.intersectPlane(floorPlaneRef.current, planeIntersect)) {
+          const newX = planeIntersect.x - dragOffsetRef.current.x;
+          const newZ = planeIntersect.z - dragOffsetRef.current.z;
+
+          draggedObjectRef.current.position.x = newX;
+          draggedObjectRef.current.position.z = newZ;
+
+          // Cập nhật vòng tròn chọn
+          if (selectionRing) {
+            selectionRing.position.x = newX;
+            selectionRing.position.z = newZ;
+          }
+
+          // Cập nhật state
+          const instId = draggedObjectRef.current.userData.instanceId;
+          setPlacedList((prev) =>
+            prev.map((item) =>
+              item.instanceId === instId
+                ? { ...item, position: [newX, item.position[1], newZ] }
+                : item,
+            ),
+          );
+        }
+      } else {
+        // Thay đổi con trỏ chuột thành pointer khi rê vào đồ vật
+        raycasterRef.current.setFromCamera(mouseCoordsRef.current, camera);
+        if (furnitureGroup.children.length > 0) {
+          const hits = raycasterRef.current.intersectObjects(furnitureGroup.children, true);
+          domElem.style.cursor = hits.length > 0 ? "grab" : "default";
+        } else {
+          domElem.style.cursor = "default";
+        }
+      }
+    }
+
+    function onPointerUp() {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        draggedObjectRef.current = null;
+        controls.enabled = true; // Bật lại xoay phòng
+        domElem.style.cursor = "default";
+      }
+    }
+
+    domElem.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
 
     // Animation Loop
     let animationFrameId: number;
@@ -231,6 +416,9 @@ export default function RoomShowroom3D() {
     return () => {
       isDisposed = true;
       cancelAnimationFrame(animationFrameId);
+      domElem.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("resize", handleResize);
       controls.dispose();
       dracoLoader.dispose();
@@ -238,6 +426,143 @@ export default function RoomShowroom3D() {
       if (container) container.innerHTML = "";
     };
   }, [activeShowroom?.environmentModelUrl, autoRotate]);
+
+  // Cập nhật vòng tròn chỉ điểm khi thay đổi selectedInstanceId
+  useEffect(() => {
+    const ring = selectionRingRef.current;
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!ring || !furnitureGroup) return;
+
+    if (!selectedInstanceId) {
+      ring.visible = false;
+      return;
+    }
+
+    const targetObj = furnitureGroup.children.find(
+      (c) => c.userData?.instanceId === selectedInstanceId,
+    );
+
+    if (targetObj) {
+      ring.visible = true;
+      ring.position.x = targetObj.position.x;
+      ring.position.z = targetObj.position.z;
+
+      // Đo kích thước để chỉnh bán kính vòng tròn
+      const bbox = new THREE.Box3().setFromObject(targetObj);
+      if (!bbox.isEmpty()) {
+        const size = bbox.getSize(new THREE.Vector3());
+        const radius = Math.max(size.x, size.z) * 0.55;
+        ring.scale.set(radius, radius, 1);
+      }
+    } else {
+      ring.visible = false;
+    }
+  }, [selectedInstanceId]);
+
+  // HÀM: Thêm sản phẩm vào căn phòng 3D
+  const handleAddFurnitureToRoom = async (product: AvailableProduct) => {
+    const scene = sceneRef.current;
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!scene || !furnitureGroup) return;
+
+    setIsAddingModel(true);
+    showToast(`Đang nạp 3D ${product.name} vào phòng...`);
+
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
+
+    loader.load(
+      product.modelUrl,
+      (gltf) => {
+        const model = gltf.scene;
+        const instanceId = `placed-${Date.now()}`;
+
+        // Căn chỉnh đáy chạm sàn y = 0
+        const bbox = new THREE.Box3().setFromObject(model);
+        const minY = bbox.min.y;
+        model.position.set(0, -minY, 0);
+
+        // Lưu metadata
+        model.userData = {
+          instanceId,
+          productId: product.id,
+          name: product.name,
+        };
+
+        furnitureGroup.add(model);
+
+        const newPlaced: PlacedFurniture = {
+          instanceId,
+          productId: product.id,
+          name: product.name,
+          modelUrl: product.modelUrl,
+          position: [0, -minY, 0],
+          rotationY: 0,
+        };
+
+        setPlacedList((prev) => [...prev, newPlaced]);
+        setSelectedInstanceId(instanceId);
+        setIsAddingModel(false);
+        showToast(`Đã thêm ${product.name}! Nhấp giữ chuột để kéo di chuyển.`);
+      },
+      undefined,
+      (err) => {
+        console.error("Lỗi load model sản phẩm:", err);
+        setIsAddingModel(false);
+        showToast("Không thể tải mô hình 3D này. Vui lòng thử lại.");
+      },
+    );
+  };
+
+  // HÀM: Xoay món đồ đang chọn
+  const handleRotateSelected = (angleDeg: number) => {
+    if (!selectedInstanceId) return;
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!furnitureGroup) return;
+
+    const targetObj = furnitureGroup.children.find(
+      (c) => c.userData?.instanceId === selectedInstanceId,
+    );
+    if (!targetObj) return;
+
+    const rad = (angleDeg * Math.PI) / 180;
+    targetObj.rotation.y += rad;
+
+    setPlacedList((prev) =>
+      prev.map((item) =>
+        item.instanceId === selectedInstanceId
+          ? { ...item, rotationY: targetObj.rotation.y }
+          : item,
+      ),
+    );
+  };
+
+  // HÀM: Xóa món đồ khỏi phòng
+  const handleRemoveSelected = () => {
+    if (!selectedInstanceId) return;
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!furnitureGroup) return;
+
+    const targetObj = furnitureGroup.children.find(
+      (c) => c.userData?.instanceId === selectedInstanceId,
+    );
+    if (targetObj) {
+      furnitureGroup.remove(targetObj);
+      targetObj.traverse((o: any) => {
+        o.geometry?.dispose();
+        if (o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach((m: any) => m.dispose());
+        }
+      });
+    }
+
+    setPlacedList((prev) => prev.filter((item) => item.instanceId !== selectedInstanceId));
+    setSelectedInstanceId(null);
+    showToast("Đã bỏ món đồ khỏi phòng.");
+  };
 
   // Toggle auto rotate
   const handleToggleAutoRotate = () => {
@@ -260,6 +585,8 @@ export default function RoomShowroom3D() {
     }
   };
 
+  const selectedItemData = placedList.find((i) => i.instanceId === selectedInstanceId);
+
   return (
     <main className="min-h-screen bg-[#f7f3ec] pb-16">
       {/* Top Banner & Header */}
@@ -270,65 +597,94 @@ export default function RoomShowroom3D() {
               Trang chủ
             </Link>
             <ChevronRight size={14} className="text-[#a4ab9f]" />
-            <span className="text-[#2e6f5e]">Phòng mẫu 3D</span>
+            <span className="text-[#2e6f5e]">Showroom 3D Tương Tác</span>
           </nav>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#ded6c9] bg-[#f2efe6] px-3 py-1 text-xs font-bold text-[#2e6f5e]">
                 <Sparkles size={14} className="text-[#2e6f5e]" />
-                TRIPO3D AI SHOWROOM
+                TRIPO3D INTERACTIVE ROOM PLANNER
               </div>
               <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#254f43] sm:text-4xl lg:text-5xl">
-                Không gian nội thất 3D
+                Bố trí nội thất 3D vào căn phòng
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#646a61] sm:text-base">
-                Trải nghiệm xoay 360 độ, thu phóng chi tiết từng món đồ nội thất sống động được kết nối trực tiếp từ hệ thống API DECOHO.
+                Nhấp vào món đồ nội thất bất kỳ để đưa vào phòng ➔ Bấm giữ chuột để kéo di chuyển và xoay hướng tùy thích trên sàn nhà.
               </p>
             </div>
-
-            {/* Room Selector if multiple */}
-            {showrooms.length > 1 && (
-              <div className="flex flex-wrap gap-2">
-                {showrooms.map((room) => {
-                  const active = room._id === selectedId;
-                  return (
-                    <button
-                      key={room._id}
-                      type="button"
-                      onClick={() => setSelectedId(room._id)}
-                      className={`rounded-xl px-4 py-2 text-xs font-bold transition sm:text-sm ${
-                        active
-                          ? "bg-[#2e6f5e] text-white shadow-sm"
-                          : "border border-[#ded6c9] bg-white text-[#646a61] hover:border-[#2e6f5e] hover:text-[#2e6f5e]"
-                      }`}
-                    >
-                      {room.title}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       </section>
 
-      {/* Main 3D Experience Section */}
+      {/* Main Experience */}
       <section className="mx-auto max-w-[1440px] px-4 pt-6 sm:px-8 lg:px-12">
-        <div className="grid gap-8 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_380px]">
+        <div className="grid gap-8 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px]">
           {/* Left: 3D Canvas Box */}
           <div className="flex flex-col gap-4">
             <div className="relative overflow-hidden rounded-3xl border border-[#ded6c9] bg-[#f7f3ec] shadow-[0_12px_40px_rgba(37,60,46,0.06)]">
-              {/* 3D Canvas Container */}
+              {/* 3D Canvas */}
               <div
                 ref={canvasContainerRef}
-                className="relative h-[480px] w-full touch-none sm:h-[600px] lg:h-[680px]"
+                className="relative h-[500px] w-full touch-none sm:h-[620px] lg:h-[700px]"
               />
 
-              {/* Floating Controls Bar */}
+              {/* Toast Thông báo */}
+              {userNotification && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-2xl bg-[#254f43] px-4 py-2.5 text-xs font-bold text-white shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-top-3">
+                  <CheckCircle2 size={16} className="text-[#dfe8d3]" />
+                  <span>{userNotification}</span>
+                </div>
+              )}
+
+              {/* Bảng điều khiển món đồ đang được chọn (Floating Active Object HUD) */}
+              {selectedItemData && (
+                <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-[#ded6c9] bg-white/95 p-2 shadow-lg backdrop-blur-md">
+                  <div className="flex items-center gap-2 px-2 text-xs font-bold text-[#254f43]">
+                    <Move size={15} className="text-[#2e6f5e]" />
+                    <span className="max-w-[140px] truncate">{selectedItemData.name}</span>
+                  </div>
+
+                  <div className="h-4 w-px bg-[#ded6c9]" />
+
+                  {/* Nút xoay 45° */}
+                  <button
+                    type="button"
+                    onClick={() => handleRotateSelected(45)}
+                    title="Xoay 45 độ"
+                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
+                  >
+                    <RotateCw size={13} />
+                    <span>Xoay 45°</span>
+                  </button>
+
+                  {/* Nút xoay 90° */}
+                  <button
+                    type="button"
+                    onClick={() => handleRotateSelected(90)}
+                    title="Xoay 90 độ"
+                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
+                  >
+                    <RotateCw size={13} />
+                    <span>90°</span>
+                  </button>
+
+                  {/* Nút Xóa */}
+                  <button
+                    type="button"
+                    onClick={handleRemoveSelected}
+                    title="Xóa món đồ này khỏi phòng"
+                    className="grid h-8 w-8 place-items-center rounded-xl bg-[#fdf2f0] text-[#a34131] transition hover:bg-[#fae1dd]"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Floating Controls Bar ở góc dưới */}
               <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
                 <div className="rounded-xl border border-[#ded6c9]/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-[#254f43] shadow-sm backdrop-blur-md">
-                  Kéo để xoay 360° · Cuộn chuột hoặc chụm 2 ngón để thu phóng
+                  💡 Nhấp giữ chuột vào món đồ để kéo trượt trên sàn · Kéo khoảng trống để xoay phòng
                 </div>
 
                 <div className="flex items-center gap-1.5 pointer-events-auto">
@@ -373,10 +729,10 @@ export default function RoomShowroom3D() {
                     <LoaderCircle size={28} className="animate-spin" />
                   </div>
                   <h3 className="mt-4 text-base font-bold text-[#254f43]">
-                    Đang tải mô hình không gian 3D…
+                    Đang tải căn phòng 3D…
                   </h3>
                   <p className="mt-1 text-xs text-[#646a61]">
-                    {loadProgress > 0 ? `Tiến trình: ${loadProgress}%` : "Giải nén mô hình Tripo3D Draco"}
+                    {loadProgress > 0 ? `Tiến trình: ${loadProgress}%` : "Giải nén mô hình không gian"}
                   </p>
                 </div>
               )}
@@ -394,100 +750,158 @@ export default function RoomShowroom3D() {
                     className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#2e6f5e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#245747]"
                   >
                     <RefreshCw size={14} />
-                    Tải lại không gian
+                    Tải lại phòng
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right: Showroom Details & Linked Products */}
+          {/* Right: Furniture Catalog (Chọn sản phẩm để đưa vào phòng) */}
           <aside className="flex flex-col gap-6">
-            {/* Info Card */}
+            {/* Catalog Box */}
             <div className="rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#708164]">
-                THÔNG TIN PHÒNG MẪU
-              </span>
-              <h2 className="mt-2 text-xl font-bold text-[#254f43]">
-                {activeShowroom?.title ?? "Phòng mẫu 3D"}
-              </h2>
-              <p className="mt-3 text-sm leading-relaxed text-[#646a61]">
-                {activeShowroom?.description ?? "Không gian nội thất trải nghiệm đa chiều."}
-              </p>
-
-              <div className="mt-5 border-t border-[#f0ece4] pt-4 flex flex-col gap-2.5 text-xs text-[#646a61]">
-                <div className="flex justify-between">
-                  <span>Trạng thái kết nối</span>
-                  <span className="font-bold text-[#2e6f5e]">Trực tiếp qua API Render</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Công nghệ dựng hình</span>
-                  <span className="font-medium text-[#254f43]">Three.js WebGL & Tripo3D</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Định dạng mô hình</span>
-                  <span className="font-medium text-[#254f43]">GLB (Draco Compressed)</span>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#708164]">
+                  DANH SÁCH NỘI THẤT 3D
+                </span>
+                <span className="rounded-full bg-[#f0ede4] px-2 py-0.5 text-[10px] font-bold text-[#2e6f5e]">
+                  {AVAILABLE_FURNITURE.length} mẫu có sẵn
+                </span>
               </div>
 
-              <div className="mt-6 flex flex-col gap-2">
-                <Link
-                  href="/products"
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2e6f5e] text-sm font-bold text-white shadow-sm transition hover:bg-[#245747]"
-                >
-                  <ShoppingBag size={16} />
-                  Khám phá toàn bộ sản phẩm
-                </Link>
-                <Link
-                  href="/product-space"
-                  className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-[#ded6c9] bg-[#fbf9f4] text-xs font-bold text-[#2e6f5e] transition hover:bg-[#f2efe6]"
-                >
-                  Xem bộ sưu tập Moodboard
-                  <ArrowRight size={14} />
-                </Link>
+              <h2 className="mt-2 text-xl font-bold text-[#254f43]">
+                Thêm đồ vào phòng
+              </h2>
+              <p className="mt-1 text-xs text-[#646a61]">
+                Bấm nút bên dưới để đặt món đồ vào căn phòng 3D của bạn:
+              </p>
+
+              {/* Danh sách các sản phẩm nội thất */}
+              <div className="mt-5 flex flex-col gap-3">
+                {AVAILABLE_FURNITURE.map((prod) => {
+                  const isPlaced = placedList.some((p) => p.productId === prod.id);
+                  return (
+                    <div
+                      key={prod.id}
+                      className="flex flex-col gap-3 rounded-2xl border border-[#ded6c9] bg-[#fbf9f4] p-3.5 transition hover:border-[#2e6f5e]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#ded6c9] bg-white">
+                          <Image
+                            src={prod.thumbnailUrl}
+                            alt={prod.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] font-semibold uppercase text-[#708164]">
+                            {prod.category}
+                          </span>
+                          <h3 className="truncate text-sm font-bold text-[#254f43]">
+                            {prod.name}
+                          </h3>
+                          <p className="text-xs font-bold text-[#2e6f5e]">
+                            {prod.price.toLocaleString("vi-VN")} ₫
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isAddingModel}
+                        onClick={() => handleAddFurnitureToRoom(prod)}
+                        className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-bold transition shadow-sm ${
+                          isPlaced
+                            ? "bg-[#e8f1ec] text-[#2e6f5e] border border-[#2e6f5e]/30 hover:bg-[#d8e7e0]"
+                            : "bg-[#2e6f5e] text-white hover:bg-[#245747]"
+                        }`}
+                      >
+                        {isAddingModel ? (
+                          <LoaderCircle size={14} className="animate-spin" />
+                        ) : (
+                          <Plus size={14} />
+                        )}
+                        <span>{isPlaced ? "Thêm thêm 1 chiếc nữa" : "Thêm vào phòng 3D"}</span>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Linked items inside showroom if any */}
-            {activeShowroom?.items && activeShowroom.items.length > 0 && (
-              <div className="rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-sm">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#708164]">
-                  SẢN PHẨM TRONG KHÔNG GIAN ({activeShowroom.items.length})
-                </span>
-                <div className="mt-4 flex flex-col gap-3">
-                  {activeShowroom.items.map((item) => {
-                    const prod = typeof item.productId === "object" ? item.productId : null;
-                    const prodId = typeof item.productId === "string" ? item.productId : item.productId._id;
+            {/* Danh sách các món đang có trong phòng */}
+            {placedList.length > 0 && (
+              <div className="rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-sm animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#708164]">
+                    ĐANG TRONG PHÒNG ({placedList.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      furnitureGroupRef.current?.clear();
+                      setPlacedList([]);
+                      setSelectedInstanceId(null);
+                      showToast("Đã dọn sạch phòng!");
+                    }}
+                    className="text-[11px] font-bold text-[#a34131] hover:underline"
+                  >
+                    Dọn tất cả
+                  </button>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2">
+                  {placedList.map((item, idx) => {
+                    const isSelected = item.instanceId === selectedInstanceId;
                     return (
-                      <Link
-                        key={item._id}
-                        href={`/products/${prodId}`}
-                        className="group flex items-center justify-between gap-3 rounded-2xl border border-[#ded6c9] p-3 transition hover:border-[#2e6f5e] hover:bg-[#fbf9f4]"
+                      <div
+                        key={item.instanceId}
+                        onClick={() => setSelectedInstanceId(item.instanceId)}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border p-2.5 transition ${
+                          isSelected
+                            ? "border-[#2e6f5e] bg-[#f0f6f3]"
+                            : "border-[#ded6c9] bg-[#fbf9f4] hover:bg-white"
+                        }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {prod?.image && (
-                            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[#ded6c9] bg-[#f7f3ec]">
-                              <Image
-                                src={prod.image}
-                                alt={prod.name ?? "Sản phẩm"}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <h4 className="truncate text-xs font-bold text-[#254f43] group-hover:text-[#2e6f5e]">
-                              {prod?.name ?? "Sản phẩm nội thất"}
-                            </h4>
-                            {prod?.price && (
-                              <p className="mt-0.5 text-xs font-semibold text-[#2e6f5e]">
-                                {prod.price.toLocaleString("vi-VN")} ₫
-                              </p>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <span className="grid h-6 w-6 place-items-center rounded-full bg-[#dfe8d3] text-[10px] font-bold text-[#2e6f5e]">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-[#254f43]">
+                            {item.name}
+                          </span>
                         </div>
-                        <ChevronRight size={16} className="text-[#a4ab9f] group-hover:text-[#2e6f5e] shrink-0" />
-                      </Link>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInstanceId(item.instanceId);
+                              handleRotateSelected(45);
+                            }}
+                            title="Xoay 45°"
+                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#ded6c9] bg-white text-[#254f43] hover:bg-[#f0ece4]"
+                          >
+                            <RotateCw size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInstanceId(item.instanceId);
+                              handleRemoveSelected();
+                            }}
+                            title="Xóa"
+                            className="grid h-7 w-7 place-items-center rounded-lg bg-[#fdf2f0] text-[#a34131] hover:bg-[#f8d7d4]"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
