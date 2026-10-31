@@ -206,7 +206,7 @@ export default function RoomShowroom3D() {
     furnitureGroupRef.current = furnitureGroup;
 
     // Vòng tròn báo hiệu món đồ đang chọn (Selection Ring)
-    const ringGeo = new THREE.RingGeometry(1.2, 1.35, 32);
+    const ringGeo = new THREE.RingGeometry(0.35, 0.4, 32);
     ringGeo.rotateX(-Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x2e6f5e,
@@ -449,12 +449,14 @@ export default function RoomShowroom3D() {
       ring.position.x = targetObj.position.x;
       ring.position.z = targetObj.position.z;
 
-      // Đo kích thước để chỉnh bán kính vòng tròn
+      // Đo kích thước để chỉnh bán kính vòng tròn ôm sát đáy món đồ
       const bbox = new THREE.Box3().setFromObject(targetObj);
       if (!bbox.isEmpty()) {
         const size = bbox.getSize(new THREE.Vector3());
         const radius = Math.max(size.x, size.z) * 0.55;
-        ring.scale.set(radius, radius, 1);
+        // ringGeo có bán kính gốc là 0.35, tỉ lệ scale = radius / 0.35
+        const ringScale = radius / 0.35;
+        ring.scale.set(ringScale, ringScale, 1);
       }
     } else {
       ring.visible = false;
@@ -481,8 +483,8 @@ export default function RoomShowroom3D() {
         const model = gltf.scene;
         const instanceId = `placed-${Date.now()}`;
 
-        // Đặt tỉ lệ mặc định vừa vặn (0.45 để nằm gọn trong phòng)
-        const initialScale = 0.45;
+        // Đặt tỉ lệ mặc định vừa vặn (0.22 để cân đối tỉ lệ trong phòng)
+        const initialScale = 0.22;
         model.scale.set(initialScale, initialScale, initialScale);
 
         // Căn chỉnh đáy chạm sàn y = 0
@@ -574,7 +576,8 @@ export default function RoomShowroom3D() {
     if (ring) {
       const size = bbox.getSize(new THREE.Vector3());
       const radius = Math.max(size.x, size.z) * 0.55;
-      ring.scale.set(radius, radius, 1);
+      const ringScale = radius / 0.35;
+      ring.scale.set(ringScale, ringScale, 1);
     }
 
     setPlacedList((prev) =>
