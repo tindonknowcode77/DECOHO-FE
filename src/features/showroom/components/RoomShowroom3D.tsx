@@ -21,6 +21,8 @@ import {
   Trash2,
   RotateCw,
   Move,
+  ArrowUp,
+  ArrowDown,
   CheckCircle2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -112,7 +114,7 @@ export default function RoomShowroom3D() {
   const isDraggingRef = useRef<boolean>(false);
   const draggedObjectRef = useRef<THREE.Object3D | null>(null);
   const dragOffsetRef = useRef<THREE.Vector3>(new THREE.Vector3());
-  const floorPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const floorPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.05));
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseCoordsRef = useRef<THREE.Vector2>(new THREE.Vector2());
 
@@ -483,14 +485,15 @@ export default function RoomShowroom3D() {
         const model = gltf.scene;
         const instanceId = `placed-${Date.now()}`;
 
-        // Đặt tỉ lệ mặc định vừa vặn (0.22 để cân đối tỉ lệ trong phòng)
-        const initialScale = 0.22;
+        // Đặt tỉ lệ mặc định vừa vặn (0.28 để cân đối tỉ lệ trong phòng)
+        const initialScale = 0.28;
         model.scale.set(initialScale, initialScale, initialScale);
 
-        // Căn chỉnh đáy chạm sàn y = 0
+        // Nâng cao độ lên trên mặt sàn gỗ phòng (+0.05) để không bị chìm đệm xuống sàn
         const bbox = new THREE.Box3().setFromObject(model);
         const minY = bbox.min.y;
-        model.position.set(0, -minY, 0);
+        const initialY = -minY + 0.05;
+        model.position.set(0, initialY, 0);
 
         // Lưu metadata
         model.userData = {
@@ -507,7 +510,7 @@ export default function RoomShowroom3D() {
           productId: product.id,
           name: product.name,
           modelUrl: product.modelUrl,
-          position: [0, -minY, 0],
+          position: [0, initialY, 0],
           rotationY: 0,
           scale: initialScale,
         };
@@ -566,10 +569,10 @@ export default function RoomShowroom3D() {
     targetObj.scale.set(newScale, newScale, newScale);
     targetObj.userData.scale = newScale;
 
-    // Giữ đáy chân đồ vật luôn chạm đúng mặt sàn y = 0
+    // Giữ đáy chân đồ vật luôn chạm đúng mặt sàn gỗ phòng (+0.05)
     const bbox = new THREE.Box3().setFromObject(targetObj);
     const deltaY = bbox.min.y;
-    targetObj.position.y -= deltaY;
+    targetObj.position.y -= (deltaY - 0.05);
 
     // Cập nhật vòng tròn chọn
     const ring = selectionRingRef.current;
@@ -584,6 +587,36 @@ export default function RoomShowroom3D() {
       prev.map((item) =>
         item.instanceId === selectedInstanceId
           ? { ...item, scale: newScale, position: [targetObj.position.x, targetObj.position.y, targetObj.position.z] }
+          : item,
+      ),
+    );
+  };
+
+  // HÀM: Nâng lên / Hạ xuống cao độ Y thủ công
+  const handleElevateSelected = (deltaY: number) => {
+    if (!selectedInstanceId) return;
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!furnitureGroup) return;
+
+    const targetObj = furnitureGroup.children.find(
+      (c) => c.userData?.instanceId === selectedInstanceId,
+    );
+    if (!targetObj) return;
+
+    targetObj.position.y += deltaY;
+
+    // Cập nhật lại mặt phẳng floorPlane theo cao độ mới
+    floorPlaneRef.current.constant = -targetObj.position.y;
+
+    const ring = selectionRingRef.current;
+    if (ring) {
+      ring.position.y = Math.max(0.02, targetObj.position.y);
+    }
+
+    setPlacedList((prev) =>
+      prev.map((item) =>
+        item.instanceId === selectedInstanceId
+          ? { ...item, position: [targetObj.position.x, targetObj.position.y, targetObj.position.z] }
           : item,
       ),
     );
@@ -730,6 +763,29 @@ export default function RoomShowroom3D() {
                   >
                     <Plus size={13} />
                     <span>Phóng to</span>
+                  </button>
+
+                  <div className="h-4 w-px bg-[#ded6c9]" />
+
+                  {/* Nút Nâng lên / Hạ xuống cao độ */}
+                  <button
+                    type="button"
+                    onClick={() => handleElevateSelected(0.04)}
+                    title="Nâng giường nổi lên trên mặt sàn (+4cm)"
+                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
+                  >
+                    <ArrowUp size={13} />
+                    <span>Nâng lên</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleElevateSelected(-0.04)}
+                    title="Hạ giường xuống thấp (-4cm)"
+                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
+                  >
+                    <ArrowDown size={13} />
+                    <span>Hạ xuống</span>
                   </button>
 
                   <div className="h-4 w-px bg-[#ded6c9]" />
