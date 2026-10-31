@@ -55,6 +55,16 @@ const AVAILABLE_FURNITURE: AvailableProduct[] = [
     dimensions: "200 x 180 x 85 cm",
     material: "Gỗ sồi tự nhiên, đầu giường bọc nệm",
   },
+  {
+    id: "desk-wooden-minimal",
+    name: "Bàn làm việc gỗ Minimal",
+    category: "Bàn ghế",
+    price: 6800000,
+    modelUrl: "https://res.cloudinary.com/djzzwjznn/raw/upload/v1793449853/decoho/furniture/wooden-desk-1793449848354.glb",
+    thumbnailUrl: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=600&q=80",
+    dimensions: "120 x 60 x 75 cm",
+    material: "Gỗ sồi tự nhiên hoàn thiện mờ, ngăn kéo âm",
+  },
 ];
 
 export type PlacedFurniture = {
