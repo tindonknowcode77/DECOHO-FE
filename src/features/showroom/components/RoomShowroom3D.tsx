@@ -207,21 +207,6 @@ export default function RoomShowroom3D() {
     scene.add(furnitureGroup);
     furnitureGroupRef.current = furnitureGroup;
 
-    // Vòng tròn báo hiệu món đồ đang chọn (Selection Ring)
-    const ringGeo = new THREE.RingGeometry(0.35, 0.4, 32);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x2e6f5e,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8,
-    });
-    const selectionRing = new THREE.Mesh(ringGeo, ringMat);
-    selectionRing.position.set(0, 0.02, 0);
-    selectionRing.visible = false;
-    scene.add(selectionRing);
-    selectionRingRef.current = selectionRing;
-
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -355,12 +340,6 @@ export default function RoomShowroom3D() {
           draggedObjectRef.current.position.x = newX;
           draggedObjectRef.current.position.z = newZ;
 
-          // Cập nhật vòng tròn chọn
-          if (selectionRing) {
-            selectionRing.position.x = newX;
-            selectionRing.position.z = newZ;
-          }
-
           // Cập nhật state
           const instId = draggedObjectRef.current.userData.instanceId;
           setPlacedList((prev) =>
@@ -431,38 +410,9 @@ export default function RoomShowroom3D() {
     };
   }, [activeShowroom?.environmentModelUrl, autoRotate]);
 
-  // Cập nhật vòng tròn chỉ điểm khi thay đổi selectedInstanceId
+  // Cập nhật khi thay đổi selectedInstanceId
   useEffect(() => {
-    const ring = selectionRingRef.current;
-    const furnitureGroup = furnitureGroupRef.current;
-    if (!ring || !furnitureGroup) return;
-
-    if (!selectedInstanceId) {
-      ring.visible = false;
-      return;
-    }
-
-    const targetObj = furnitureGroup.children.find(
-      (c) => c.userData?.instanceId === selectedInstanceId,
-    );
-
-    if (targetObj) {
-      ring.visible = true;
-      ring.position.x = targetObj.position.x;
-      ring.position.z = targetObj.position.z;
-
-      // Đo kích thước để chỉnh bán kính vòng tròn ôm sát đáy món đồ
-      const bbox = new THREE.Box3().setFromObject(targetObj);
-      if (!bbox.isEmpty()) {
-        const size = bbox.getSize(new THREE.Vector3());
-        const radius = Math.max(size.x, size.z) * 0.55;
-        // ringGeo có bán kính gốc là 0.35, tỉ lệ scale = radius / 0.35
-        const ringScale = radius / 0.35;
-        ring.scale.set(ringScale, ringScale, 1);
-      }
-    } else {
-      ring.visible = false;
-    }
+    // Không dùng vòng tròn xanh nữa
   }, [selectedInstanceId]);
 
   // HÀM: Thêm sản phẩm vào căn phòng 3D
@@ -574,15 +524,6 @@ export default function RoomShowroom3D() {
     const deltaY = bbox.min.y;
     targetObj.position.y -= (deltaY - 0.05);
 
-    // Cập nhật vòng tròn chọn
-    const ring = selectionRingRef.current;
-    if (ring) {
-      const size = bbox.getSize(new THREE.Vector3());
-      const radius = Math.max(size.x, size.z) * 0.55;
-      const ringScale = radius / 0.35;
-      ring.scale.set(ringScale, ringScale, 1);
-    }
-
     setPlacedList((prev) =>
       prev.map((item) =>
         item.instanceId === selectedInstanceId
@@ -607,11 +548,6 @@ export default function RoomShowroom3D() {
 
     // Cập nhật lại mặt phẳng floorPlane theo cao độ mới
     floorPlaneRef.current.constant = -targetObj.position.y;
-
-    const ring = selectionRingRef.current;
-    if (ring) {
-      ring.position.y = Math.max(0.02, targetObj.position.y);
-    }
 
     setPlacedList((prev) =>
       prev.map((item) =>
