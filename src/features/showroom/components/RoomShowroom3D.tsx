@@ -21,8 +21,10 @@ import {
   Trash2,
   RotateCw,
   Move,
-  ArrowUp,
-  ArrowDown,
+  Compass,
+  Grid,
+  Layers,
+  Eye,
   CheckCircle2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -31,6 +33,9 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import type { Showroom } from "../types";
+
+// Cao độ chuẩn của bề mặt sàn gỗ căn phòng mẫu
+const FLOOR_Y = 0.055;
 
 // Danh mục sản phẩm 3D có thể kéo thả vào phòng
 export type AvailableProduct = {
@@ -42,6 +47,7 @@ export type AvailableProduct = {
   thumbnailUrl: string;
   dimensions: string;
   material: string;
+  suggestedScale: number;
 };
 
 const AVAILABLE_FURNITURE: AvailableProduct[] = [
@@ -54,6 +60,7 @@ const AVAILABLE_FURNITURE: AvailableProduct[] = [
     thumbnailUrl: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=600&q=80",
     dimensions: "200 x 180 x 85 cm",
     material: "Gỗ sồi tự nhiên, đầu giường bọc nệm",
+    suggestedScale: 0.36, // Chiếm ~35% diện tích phòng chuẩn Coohom
   },
   {
     id: "desk-wooden-minimal",
@@ -64,6 +71,7 @@ const AVAILABLE_FURNITURE: AvailableProduct[] = [
     thumbnailUrl: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=600&q=80",
     dimensions: "120 x 60 x 75 cm",
     material: "Gỗ sồi tự nhiên hoàn thiện mờ, ngăn kéo âm",
+    suggestedScale: 0.28,
   },
 ];
 
@@ -80,9 +88,9 @@ export type PlacedFurniture = {
 const fallbackShowrooms: Showroom[] = [
   {
     _id: "6ae3671bda91875ce3b84a0d",
-    title: "Phòng mẫu nội thất 3D (Tripo3D AI)",
+    title: "Phòng mẫu nội thất 3D (Coohom Style)",
     description:
-      "Không gian nội thất hiện đại được tạo tự động bởi Tripo3D AI. Trải nghiệm xoay 360°, bấm chọn và kéo thả giường ngủ hoặc các món đồ vào phòng.",
+      "Không gian nội thất hiện đại với kích thước và tỉ lệ chuẩn. Trải nghiệm xoay 360°, đổi góc nhìn mặt bằng từ trên xuống, kéo thả và sắp đặt giường ngủ, bàn làm việc tự do.",
     thumbnailUrl:
       "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80",
     environmentModelUrl:
@@ -104,6 +112,8 @@ export default function RoomShowroom3D() {
   const [loadProgress, setLoadProgress] = useState<number>(0);
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<"perspective" | "topdown">("perspective");
 
   // Danh sách đồ đã đặt trong phòng & món đồ đang chọn
   const [placedList, setPlacedList] = useState<PlacedFurniture[]>([]);
@@ -117,14 +127,14 @@ export default function RoomShowroom3D() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const furnitureGroupRef = useRef<THREE.Group | null>(null);
-  const selectionRingRef = useRef<THREE.Mesh | null>(null);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const resetCameraRef = useRef<(() => void) | null>(null);
 
   // Tương tác kéo thả trên sàn (Drag)
   const isDraggingRef = useRef<boolean>(false);
   const draggedObjectRef = useRef<THREE.Object3D | null>(null);
   const dragOffsetRef = useRef<THREE.Vector3>(new THREE.Vector3());
-  const floorPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.05));
+  const floorPlaneRef = useRef<THREE.Plane>(new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLOOR_Y));
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseCoordsRef = useRef<THREE.Vector2>(new THREE.Vector2());
 
@@ -182,8 +192,8 @@ export default function RoomShowroom3D() {
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.05, 1000);
-    camera.position.set(6, 4.5, 8);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.05, 1000);
+    camera.position.set(2.4, 2.0, 2.6);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -191,26 +201,33 @@ export default function RoomShowroom3D() {
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.08;
     rendererRef.current = renderer;
 
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
     // Lights
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b8a6, 2.6);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb8beaf, 2.5);
     scene.add(hemiLight);
 
     const ambLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambLight);
 
-    const sun1 = new THREE.DirectionalLight(0xffffff, 2.4);
-    sun1.position.set(6, 12, 7);
+    const sun1 = new THREE.DirectionalLight(0xffffff, 2.6);
+    sun1.position.set(5, 10, 6);
     scene.add(sun1);
 
     const sun2 = new THREE.DirectionalLight(0xfff7ea, 1.6);
-    sun2.position.set(-7, 8, -6);
+    sun2.position.set(-6, 8, -5);
     scene.add(sun2);
+
+    // Lưới thiết kế kiến trúc CAD (Floor Design Grid like Coohom)
+    const gridHelper = new THREE.GridHelper(3.2, 32, 0x2e6f5e, 0xded6c9);
+    gridHelper.position.set(0, FLOOR_Y + 0.001, 0);
+    gridHelper.visible = showGrid;
+    scene.add(gridHelper);
+    gridHelperRef.current = gridHelper;
 
     // Group chứa đồ nội thất kéo thả
     const furnitureGroup = new THREE.Group();
@@ -220,10 +237,10 @@ export default function RoomShowroom3D() {
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = 0.06;
     controls.maxPolarAngle = Math.PI * 0.92;
-    controls.minDistance = 0.5;
-    controls.maxDistance = 60;
+    controls.minDistance = 0.6;
+    controls.maxDistance = 30;
     controls.autoRotate = autoRotate;
     controls.autoRotateSpeed = 0.8;
     controlsRef.current = controls;
@@ -239,8 +256,8 @@ export default function RoomShowroom3D() {
     const roomModelGroup = new THREE.Group();
     scene.add(roomModelGroup);
 
-    let defaultCamPos = new THREE.Vector3(6, 4.5, 8);
-    let defaultCamTarget = new THREE.Vector3(0, 0, 0);
+    let defaultCamPos = new THREE.Vector3(2.4, 2.0, 2.6);
+    let defaultCamTarget = new THREE.Vector3(0, 0.2, 0);
 
     loader.load(
       activeShowroom.environmentModelUrl,
@@ -254,10 +271,10 @@ export default function RoomShowroom3D() {
           const center = bbox.getCenter(new THREE.Vector3());
           const size = bbox.getSize(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z);
-          const distance = Math.max(maxDim * 1.5, 3.5);
+          const distance = Math.max(maxDim * 1.6, 2.4);
 
           controls.target.copy(center);
-          camera.position.set(center.x + distance * 0.8, center.y + distance * 0.55, center.z + distance * 0.8);
+          camera.position.set(center.x + distance * 0.75, center.y + distance * 0.65, center.z + distance * 0.85);
           controls.update();
 
           defaultCamPos.copy(camera.position);
@@ -281,6 +298,7 @@ export default function RoomShowroom3D() {
     );
 
     resetCameraRef.current = () => {
+      setViewMode("perspective");
       camera.position.copy(defaultCamPos);
       controls.target.copy(defaultCamTarget);
       controls.update();
@@ -306,7 +324,7 @@ export default function RoomShowroom3D() {
       if (furnitureGroup.children.length > 0) {
         const intersects = raycasterRef.current.intersectObjects(furnitureGroup.children, true);
         if (intersects.length > 0) {
-          // Tìm root Object3D của item trong furnitureGroup
+          // Tìm root container Object3D của item trong furnitureGroup
           let rootObj: THREE.Object3D | null = intersects[0].object;
           while (rootObj && rootObj.parent !== furnitureGroup) {
             rootObj = rootObj.parent;
@@ -344,10 +362,15 @@ export default function RoomShowroom3D() {
         raycasterRef.current.setFromCamera(mouseCoordsRef.current, camera);
         const planeIntersect = new THREE.Vector3();
         if (raycasterRef.current.ray.intersectPlane(floorPlaneRef.current, planeIntersect)) {
-          const newX = planeIntersect.x - dragOffsetRef.current.x;
-          const newZ = planeIntersect.z - dragOffsetRef.current.z;
+          const rawX = planeIntersect.x - dragOffsetRef.current.x;
+          const rawZ = planeIntersect.z - dragOffsetRef.current.z;
+
+          // Giới hạn đồ vật không trượt ra khỏi sàn phòng (-0.38m đến +0.38m)
+          const newX = Math.max(-0.38, Math.min(0.38, rawX));
+          const newZ = Math.max(-0.38, Math.min(0.38, rawZ));
 
           draggedObjectRef.current.position.x = newX;
+          draggedObjectRef.current.position.y = FLOOR_Y; // Luôn neo chuẩn trên bề mặt sàn
           draggedObjectRef.current.position.z = newZ;
 
           // Cập nhật state
@@ -355,13 +378,13 @@ export default function RoomShowroom3D() {
           setPlacedList((prev) =>
             prev.map((item) =>
               item.instanceId === instId
-                ? { ...item, position: [newX, item.position[1], newZ] }
+                ? { ...item, position: [newX, FLOOR_Y, newZ] }
                 : item,
             ),
           );
         }
       } else {
-        // Thay đổi con trỏ chuột thành pointer khi rê vào đồ vật
+        // Thay đổi con trỏ chuột thành grab khi rê vào đồ vật
         raycasterRef.current.setFromCamera(mouseCoordsRef.current, camera);
         if (furnitureGroup.children.length > 0) {
           const hits = raycasterRef.current.intersectObjects(furnitureGroup.children, true);
@@ -418,14 +441,42 @@ export default function RoomShowroom3D() {
       renderer.dispose();
       if (container) container.innerHTML = "";
     };
-  }, [activeShowroom?.environmentModelUrl, autoRotate]);
+  }, [activeShowroom?.environmentModelUrl, autoRotate, showGrid]);
 
-  // Cập nhật khi thay đổi selectedInstanceId
-  useEffect(() => {
-    // Không dùng vòng tròn xanh nữa
-  }, [selectedInstanceId]);
+  // CHUYỂN ĐỔI CHẾ ĐỘ XEM (VIEW MODES LIKE COOHOM)
+  const handleChangeViewMode = (mode: "perspective" | "topdown") => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
 
-  // HÀM: Thêm sản phẩm vào căn phòng 3D
+    setViewMode(mode);
+
+    if (mode === "topdown") {
+      // Góc nhìn mặt bằng từ trên xuống thẳng góc (Top-down floor plan view như Coohom)
+      camera.position.set(0.001, 3.2, 0.001);
+      controls.target.set(0, FLOOR_Y, 0);
+      controls.update();
+      showToast("Chế độ Mặt bằng (Top-down) như Coohom");
+    } else {
+      // Góc nhìn 3D phối cảnh nghiêng (Perspective 3D)
+      camera.position.set(2.4, 2.0, 2.6);
+      controls.target.set(0, 0.2, 0);
+      controls.update();
+      showToast("Chế độ 3D Phối cảnh không gian");
+    }
+  };
+
+  // Toggle lưới CAD thiết kế
+  const handleToggleGrid = () => {
+    setShowGrid((prev) => {
+      const next = !prev;
+      if (gridHelperRef.current) gridHelperRef.current.visible = next;
+      showToast(next ? "Đã bật lưới mặt sàn CAD" : "Đã ẩn lưới sàn");
+      return next;
+    });
+  };
+
+  // HÀM: Thêm sản phẩm vào căn phòng 3D (Chuẩn hóa tâm & đáy chạm sàn chuẩn Coohom)
   const handleAddFurnitureToRoom = async (product: AvailableProduct) => {
     const scene = sceneRef.current;
     const furnitureGroup = furnitureGroupRef.current;
@@ -442,35 +493,52 @@ export default function RoomShowroom3D() {
     loader.load(
       product.modelUrl,
       (gltf) => {
-        const model = gltf.scene;
+        const rawModel = gltf.scene;
         const instanceId = `placed-${Date.now()}`;
 
-        // Đặt tỉ lệ mặc định vừa vặn (0.28 để cân đối tỉ lệ trong phòng)
-        const initialScale = 0.28;
-        model.scale.set(initialScale, initialScale, initialScale);
+        // 1. Tính toán Bounding Box gốc của model để căn chỉnh đáy và tâm
+        rawModel.updateMatrixWorld(true);
+        const rawBox = new THREE.Box3().setFromObject(rawModel);
+        const rawCenter = rawBox.getCenter(new THREE.Vector3());
+        const rawMin = rawBox.min;
 
-        // Nâng cao độ lên trên mặt sàn gỗ phòng (+0.05) để không bị chìm đệm xuống sàn
-        const bbox = new THREE.Box3().setFromObject(model);
-        const minY = bbox.min.y;
-        const initialY = -minY + 0.05;
-        model.position.set(0, initialY, 0);
+        // 2. Dịch chuyển rawModel bên trong sao cho:
+        //    - Đáy (min.y) nằm đúng tại y = 0
+        //    - Tâm X và Z nằm tại (0, 0) để khi xoay sẽ quay tròn quanh tâm chính xác
+        rawModel.position.set(-rawCenter.x, -rawMin.y, -rawCenter.z);
+
+        // 3. Đưa rawModel vào một wrapper Group riêng
+        const itemContainer = new THREE.Group();
+        itemContainer.add(rawModel);
+
+        // 4. Đặt scale chuẩn tương quan theo Coohom:
+        //    Phòng rộng ~1.0m, giường ~36% phòng, bàn làm việc ~28% phòng
+        const initialScale = product.suggestedScale ?? 0.35;
+        itemContainer.scale.set(initialScale, initialScale, initialScale);
+
+        // 5. Đặt itemContainer lên đúng cao độ mặt sàn gỗ phòng (FLOOR_Y)
+        //    Đặt lệch nhẹ nếu đã có món khác trong phòng để không chồng lên nhau
+        const offsetMultiplier = placedList.length;
+        const posX = offsetMultiplier % 2 === 0 ? -0.08 : 0.12;
+        const posZ = offsetMultiplier === 0 ? -0.05 : 0.10;
+        itemContainer.position.set(posX, FLOOR_Y, posZ);
 
         // Lưu metadata
-        model.userData = {
+        itemContainer.userData = {
           instanceId,
           productId: product.id,
           name: product.name,
           scale: initialScale,
         };
 
-        furnitureGroup.add(model);
+        furnitureGroup.add(itemContainer);
 
         const newPlaced: PlacedFurniture = {
           instanceId,
           productId: product.id,
           name: product.name,
           modelUrl: product.modelUrl,
-          position: [0, initialY, 0],
+          position: [posX, FLOOR_Y, posZ],
           rotationY: 0,
           scale: initialScale,
         };
@@ -478,7 +546,7 @@ export default function RoomShowroom3D() {
         setPlacedList((prev) => [...prev, newPlaced]);
         setSelectedInstanceId(instanceId);
         setIsAddingModel(false);
-        showToast(`Đã thêm ${product.name}! Nhấp giữ chuột để kéo di chuyển.`);
+        showToast(`Đã thêm ${product.name}! Kéo chuột để di chuyển trên sàn.`);
       },
       undefined,
       (err) => {
@@ -512,7 +580,7 @@ export default function RoomShowroom3D() {
     );
   };
 
-  // HÀM: Chỉnh kích thước (Scale) riêng từng sản phẩm
+  // HÀM: Chỉnh kích thước (Scale) - Đáy luôn neo chặt trên sàn FLOOR_Y
   const handleScaleSelected = (factor: number) => {
     if (!selectedInstanceId) return;
     const furnitureGroup = furnitureGroupRef.current;
@@ -524,45 +592,18 @@ export default function RoomShowroom3D() {
     if (!targetObj) return;
 
     const currentScale = targetObj.scale.x;
-    // Giới hạn scale từ 0.15 đến 1.5
-    const newScale = Math.min(1.5, Math.max(0.15, currentScale * factor));
+    // Giới hạn scale từ 0.20 đến 0.65 để luôn giữ tỉ lệ thẩm mỹ chuẩn với căn phòng
+    const newScale = Math.min(0.65, Math.max(0.20, currentScale * factor));
     targetObj.scale.set(newScale, newScale, newScale);
     targetObj.userData.scale = newScale;
 
-    // Giữ đáy chân đồ vật luôn chạm đúng mặt sàn gỗ phòng (+0.05)
-    const bbox = new THREE.Box3().setFromObject(targetObj);
-    const deltaY = bbox.min.y;
-    targetObj.position.y -= (deltaY - 0.05);
+    // Đáy của itemContainer luôn ở y = 0 trong local space, nên targetObj.position.y = FLOOR_Y giữ đáy trên mặt sàn gỗ
+    targetObj.position.y = FLOOR_Y;
 
     setPlacedList((prev) =>
       prev.map((item) =>
         item.instanceId === selectedInstanceId
-          ? { ...item, scale: newScale, position: [targetObj.position.x, targetObj.position.y, targetObj.position.z] }
-          : item,
-      ),
-    );
-  };
-
-  // HÀM: Nâng lên / Hạ xuống cao độ Y thủ công
-  const handleElevateSelected = (deltaY: number) => {
-    if (!selectedInstanceId) return;
-    const furnitureGroup = furnitureGroupRef.current;
-    if (!furnitureGroup) return;
-
-    const targetObj = furnitureGroup.children.find(
-      (c) => c.userData?.instanceId === selectedInstanceId,
-    );
-    if (!targetObj) return;
-
-    targetObj.position.y += deltaY;
-
-    // Cập nhật lại mặt phẳng floorPlane theo cao độ mới
-    floorPlaneRef.current.constant = -targetObj.position.y;
-
-    setPlacedList((prev) =>
-      prev.map((item) =>
-        item.instanceId === selectedInstanceId
-          ? { ...item, position: [targetObj.position.x, targetObj.position.y, targetObj.position.z] }
+          ? { ...item, scale: newScale, position: [targetObj.position.x, FLOOR_Y, targetObj.position.z] }
           : item,
       ),
     );
@@ -633,13 +674,13 @@ export default function RoomShowroom3D() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#ded6c9] bg-[#f2efe6] px-3 py-1 text-xs font-bold text-[#2e6f5e]">
                 <Sparkles size={14} className="text-[#2e6f5e]" />
-                TRIPO3D INTERACTIVE ROOM PLANNER
+                COOHOM-STYLE 3D ROOM PLANNER
               </div>
               <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#254f43] sm:text-4xl lg:text-5xl">
                 Bố trí nội thất 3D vào căn phòng
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#646a61] sm:text-base">
-                Nhấp vào món đồ nội thất bất kỳ để đưa vào phòng ➔ Bấm giữ chuột để kéo di chuyển và xoay hướng tùy thích trên sàn nhà.
+                Kéo thả giường ngủ, bàn ghế vào phòng · Tỉ lệ tương quan chuẩn xác · Hỗ trợ chuyển đổi góc nhìn 3D và Mặt bằng (Top-down) chuyên nghiệp.
               </p>
             </div>
           </div>
@@ -655,7 +696,7 @@ export default function RoomShowroom3D() {
               {/* 3D Canvas */}
               <div
                 ref={canvasContainerRef}
-                className="relative h-[500px] w-full touch-none sm:h-[620px] lg:h-[700px]"
+                className="relative h-[520px] w-full touch-none sm:h-[640px] lg:h-[720px]"
               />
 
               {/* Toast Thông báo */}
@@ -668,7 +709,7 @@ export default function RoomShowroom3D() {
 
               {/* Bảng điều khiển món đồ đang được chọn (Floating Active Object HUD) */}
               {selectedItemData && (
-                <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-[#ded6c9] bg-white/95 p-2 shadow-lg backdrop-blur-md">
+                <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-[#ded6c9] bg-white/95 p-2 shadow-lg backdrop-blur-md animate-in fade-in">
                   <div className="flex items-center gap-2 px-2 text-xs font-bold text-[#254f43]">
                     <Move size={15} className="text-[#2e6f5e]" />
                     <span className="max-w-[140px] truncate">{selectedItemData.name}</span>
@@ -685,6 +726,17 @@ export default function RoomShowroom3D() {
                   >
                     <RotateCw size={13} />
                     <span>Xoay 45°</span>
+                  </button>
+
+                  {/* Nút xoay 90° */}
+                  <button
+                    type="button"
+                    onClick={() => handleRotateSelected(90)}
+                    title="Xoay vuông góc 90 độ"
+                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
+                  >
+                    <RotateCw size={13} />
+                    <span>Xoay 90°</span>
                   </button>
 
                   <div className="h-4 w-px bg-[#ded6c9]" />
@@ -713,29 +765,6 @@ export default function RoomShowroom3D() {
 
                   <div className="h-4 w-px bg-[#ded6c9]" />
 
-                  {/* Nút Nâng lên / Hạ xuống cao độ */}
-                  <button
-                    type="button"
-                    onClick={() => handleElevateSelected(0.04)}
-                    title="Nâng giường nổi lên trên mặt sàn (+4cm)"
-                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
-                  >
-                    <ArrowUp size={13} />
-                    <span>Nâng lên</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleElevateSelected(-0.04)}
-                    title="Hạ giường xuống thấp (-4cm)"
-                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
-                  >
-                    <ArrowDown size={13} />
-                    <span>Hạ xuống</span>
-                  </button>
-
-                  <div className="h-4 w-px bg-[#ded6c9]" />
-
                   {/* Nút Xóa */}
                   <button
                     type="button"
@@ -748,12 +777,54 @@ export default function RoomShowroom3D() {
                 </div>
               )}
 
-              {/* Floating Controls Bar ở góc dưới */}
+              {/* Thanh Chế Độ Xem & Công Cụ Coohom Style ở góc dưới */}
               <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-                <div className="rounded-xl border border-[#ded6c9]/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-[#254f43] shadow-sm backdrop-blur-md">
-                  💡 Nhấp giữ chuột vào món đồ để kéo trượt trên sàn · Kéo khoảng trống để xoay phòng
+                {/* Chế độ xem Coohom: 3D / Mặt bằng (Top-down) */}
+                <div className="flex items-center gap-1.5 rounded-2xl border border-[#ded6c9]/90 bg-white/95 p-1.5 shadow-md backdrop-blur-md pointer-events-auto">
+                  <button
+                    type="button"
+                    onClick={() => handleChangeViewMode("perspective")}
+                    className={`flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition ${
+                      viewMode === "perspective"
+                        ? "bg-[#2e6f5e] text-white shadow-sm"
+                        : "text-[#254f43] hover:bg-[#f0ede4]"
+                    }`}
+                  >
+                    <Box size={14} />
+                    <span>3D Phối cảnh</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleChangeViewMode("topdown")}
+                    className={`flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition ${
+                      viewMode === "topdown"
+                        ? "bg-[#2e6f5e] text-white shadow-sm"
+                        : "text-[#254f43] hover:bg-[#f0ede4]"
+                    }`}
+                  >
+                    <Layers size={14} />
+                    <span>Mặt bằng (Top-down)</span>
+                  </button>
+
+                  <div className="h-4 w-px bg-[#ded6c9]" />
+
+                  <button
+                    type="button"
+                    onClick={handleToggleGrid}
+                    title="Bật/Tắt Lưới sàn thiết kế CAD"
+                    className={`flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold transition ${
+                      showGrid
+                        ? "bg-[#e8f1ec] text-[#2e6f5e]"
+                        : "text-[#646a61] hover:bg-[#f0ede4]"
+                    }`}
+                  >
+                    <Grid size={13} />
+                    <span className="hidden sm:inline">Lưới sàn</span>
+                  </button>
                 </div>
 
+                {/* Các nút công cụ bổ trợ */}
                 <div className="flex items-center gap-1.5 pointer-events-auto">
                   <button
                     type="button"
@@ -762,7 +833,7 @@ export default function RoomShowroom3D() {
                     className={`flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition shadow-sm backdrop-blur-md ${
                       autoRotate
                         ? "border-[#2e6f5e] bg-[#2e6f5e] text-white"
-                        : "border-[#ded6c9] bg-white/90 text-[#254f43] hover:bg-white"
+                        : "border-[#ded6c9] bg-white/95 text-[#254f43] hover:bg-white"
                     }`}
                   >
                     {autoRotate ? <Pause size={14} /> : <Play size={14} />}
@@ -772,8 +843,8 @@ export default function RoomShowroom3D() {
                   <button
                     type="button"
                     onClick={() => resetCameraRef.current?.()}
-                    title="Đặt lại góc nhìn trung tâm"
-                    className="grid h-10 w-10 place-items-center rounded-xl border border-[#ded6c9] bg-white/90 text-[#254f43] shadow-sm backdrop-blur-md transition hover:bg-white"
+                    title="Đặt lại góc nhìn chuẩn"
+                    className="grid h-10 w-10 place-items-center rounded-xl border border-[#ded6c9] bg-white/95 text-[#254f43] shadow-sm backdrop-blur-md transition hover:bg-white"
                   >
                     <RotateCcw size={16} />
                   </button>
@@ -782,7 +853,7 @@ export default function RoomShowroom3D() {
                     type="button"
                     onClick={handleToggleFullscreen}
                     title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-                    className="grid h-10 w-10 place-items-center rounded-xl border border-[#ded6c9] bg-white/90 text-[#254f43] shadow-sm backdrop-blur-md transition hover:bg-white"
+                    className="grid h-10 w-10 place-items-center rounded-xl border border-[#ded6c9] bg-white/95 text-[#254f43] shadow-sm backdrop-blur-md transition hover:bg-white"
                   >
                     {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                   </button>
@@ -821,6 +892,29 @@ export default function RoomShowroom3D() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Bảng Thông số Không gian chuẩn Coohom (Floor Info Card) */}
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#ded6c9] bg-white/90 px-5 py-3 shadow-sm">
+              <div className="flex items-center gap-6 text-xs text-[#646a61]">
+                <div>
+                  <span className="font-semibold">Khu vực phòng:</span>{" "}
+                  <strong className="text-[#254f43]">~25 m² (Tỉ lệ chuẩn 1:1)</strong>
+                </div>
+                <div className="hidden sm:block h-3 w-px bg-[#ded6c9]" />
+                <div>
+                  <span className="font-semibold">Chiều cao trần:</span>{" "}
+                  <strong className="text-[#254f43]">2800 mm</strong>
+                </div>
+                <div className="hidden sm:block h-3 w-px bg-[#ded6c9]" />
+                <div>
+                  <span className="font-semibold">Đang bố trí:</span>{" "}
+                  <strong className="text-[#2e6f5e]">{placedList.length} món đồ</strong>
+                </div>
+              </div>
+              <div className="text-[11px] font-medium text-[#708164]">
+                💡 Bấm giữ chuột để kéo di chuyển trên sàn · Nhấp góc ngoài để xoay phòng
+              </div>
             </div>
           </div>
 
@@ -872,6 +966,9 @@ export default function RoomShowroom3D() {
                           </h3>
                           <p className="text-xs font-bold text-[#2e6f5e]">
                             {prod.price.toLocaleString("vi-VN")} ₫
+                          </p>
+                          <p className="text-[11px] text-[#80897b]">
+                            {prod.dimensions}
                           </p>
                         </div>
                       </div>
@@ -980,3 +1077,4 @@ export default function RoomShowroom3D() {
     </main>
   );
 }
+
