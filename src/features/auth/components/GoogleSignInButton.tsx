@@ -134,6 +134,15 @@ export default function GoogleSignInButton({
           onboardingCompleted: Boolean(profile.user.onboardingCompleted),
         });
         router.replace(["admin", "super_admin", "staff"].includes(role) ? "/admin" : role === "supplier" ? "/store" : profile.user.onboardingCompleted ? "/" : "/onboarding");
+        
+        if (typeof window !== "undefined") {
+          const searchParams = new URLSearchParams(window.location.search);
+          const mobileRedirect = searchParams.get("mobileRedirect");
+          if (mobileRedirect) {
+            window.location.href = `${mobileRedirect}?accessToken=${encodeURIComponent(profile.accessToken)}&refreshToken=${encodeURIComponent(profile.refreshToken || "")}`;
+            return;
+          }
+        }
         router.refresh();
       } catch (error) {
         setIsVerifying(false);
