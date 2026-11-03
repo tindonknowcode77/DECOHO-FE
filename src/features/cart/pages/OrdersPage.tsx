@@ -328,13 +328,6 @@ export default function OrdersPage() {
                       >
                         Xem chi tiết
                       </Link>
-                      {order.status === "DELIVERED" && (
-                        <button
-                          className="rounded-md border border-[#2f6f5e] bg-[#eef6f2] px-4 py-2 text-sm font-bold text-[#2f6f5e] transition hover:bg-[#d5ede4]"
-                        >
-                          Đánh giá sản phẩm
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>

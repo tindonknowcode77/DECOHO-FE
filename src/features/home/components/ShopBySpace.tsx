@@ -33,17 +33,17 @@ export default function ShopBySpace() {
 
             <div className="mt-6 flex flex-wrap gap-2">
               {spaces.map((space) => (
-                <button
+                <Link
                   className={`rounded-full border px-4 py-2 text-xs font-bold transition ${
                     space.active
-                      ? "border-[#2f6f5e] bg-[#2f6f5e] text-white"
-                      : "border-[#ded6c9] bg-white text-[#2f6f5e] hover:border-[#2f6f5e]"
+                      ? "border-[#2f6f5e] bg-[#2f6f5e] text-white shadow-sm"
+                      : "border-[#ded6c9] bg-white text-[#2f6f5e] hover:border-[#2f6f5e] hover:bg-[#f7f3ec]"
                   }`}
+                  href={`/products?search=${encodeURIComponent(space.label)}`}
                   key={space.label}
-                  type="button"
                 >
                   {space.label}
-                </button>
+                </Link>
               ))}
             </div>
           </div>

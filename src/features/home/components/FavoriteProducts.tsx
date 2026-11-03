@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
-import { ArrowLeft, ArrowRight, Bookmark, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import MagneticText from "@/src/components/common/MagneticText";
 
 const products = [
@@ -78,13 +78,6 @@ export default function FavoriteProducts() {
                 sizes="200px"
                 src={product.image}
               />
-              <button
-                aria-label="Lưu sản phẩm"
-                className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 backdrop-blur transition hover:bg-white"
-                type="button"
-              >
-                <Bookmark className="h-4 w-4 text-[#2f6f5e]" />
-              </button>
               {product.badge && (
                 <span
                   className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-black text-white ${

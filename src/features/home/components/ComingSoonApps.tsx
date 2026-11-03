@@ -1,4 +1,4 @@
-import { Apple, Smartphone } from "lucide-react";
+import { Smartphone } from "lucide-react";
 import MagneticText from "@/src/components/common/MagneticText";
 
 const apps = [
@@ -56,21 +56,11 @@ export default function ComingSoonApps() {
               </p>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2f3431]"
-                type="button"
-              >
-                <Apple className="h-4 w-4" />
-                App Store
-              </button>
-              <button
-                className="inline-flex items-center gap-2 rounded-full border border-[#2f6f5e] bg-white px-4 py-2 text-xs font-bold text-[#2f6f5e] transition hover:bg-[#f7f3ec]"
-                type="button"
-              >
-                <Smartphone className="h-4 w-4" />
-                Google Play
-              </button>
+            <div className="mt-6">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#2f6f5e]/15 bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[#2f6f5e] backdrop-blur-sm">
+                <Smartphone className="h-3.5 w-3.5" />
+                Sắp có mặt trên iOS & Android
+              </span>
             </div>
 
             <div className="pointer-events-none absolute -right-6 -bottom-6 h-32 w-32 rounded-full bg-white/30 blur-2xl" />

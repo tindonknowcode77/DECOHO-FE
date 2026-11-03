@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Bookmark, ChevronDown, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import MagneticText from "@/src/components/common/MagneticText";
 
 const boards = [
@@ -26,13 +26,6 @@ export default function FeaturedMoodboards() {
             <MagneticText strength={12}>Moodboard nổi bật</MagneticText>
           </h2>
         </div>
-        <button
-          className="inline-flex items-center gap-1 rounded-full border border-[#e8e1d4] bg-white px-4 py-2 text-xs font-bold text-[#2f6f5e] transition hover:bg-[#f7f3ec]"
-          type="button"
-        >
-          Sắp xếp: Mới nhất
-          <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.4} />
-        </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -50,16 +43,6 @@ export default function FeaturedMoodboards() {
                 sizes="(min-width:1024px) 18vw,33vw"
                 src={board.image}
               />
-              <button
-                aria-label="Lưu moodboard"
-                className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 backdrop-blur transition hover:bg-white"
-                type="button"
-              >
-                <Bookmark
-                  className={`h-4 w-4 ${board.saved ? "text-[#d89b47]" : "text-[#2f6f5e]"}`}
-                  fill={board.saved ? "currentColor" : "none"}
-                />
-              </button>
             </div>
             <div className="px-1 pt-3">
               <h3 className="font-bold text-[#2f6f5e]">{board.title}</h3>

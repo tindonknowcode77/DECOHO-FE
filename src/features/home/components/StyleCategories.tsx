@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Bookmark, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import MagneticText from "@/src/components/common/MagneticText";
 
 const styles = [
@@ -69,13 +69,6 @@ export default function StyleCategories() {
                 sizes="(min-width:1024px) 16vw,33vw"
                 src={style.image}
               />
-              <button
-                aria-label="Lưu"
-                className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 backdrop-blur transition hover:bg-white"
-                type="button"
-              >
-                <Bookmark className="h-4 w-4 text-[#2f6f5e]" />
-              </button>
             </div>
             <div className="px-1 pt-3">
               <h3 className="font-bold text-[#2f6f5e]">{style.title}</h3>
