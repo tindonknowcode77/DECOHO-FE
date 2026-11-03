@@ -19,6 +19,8 @@ import {
   Plus,
   Minus,
   Trash2,
+  Copy,
+  X,
   RotateCw,
   Move,
   Compass,
@@ -128,6 +130,7 @@ export default function RoomShowroom3D() {
   const controlsRef = useRef<OrbitControls | null>(null);
   const furnitureGroupRef = useRef<THREE.Group | null>(null);
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const selectionBoxRef = useRef<THREE.BoxHelper | null>(null);
   const resetCameraRef = useRef<(() => void) | null>(null);
 
   // Tương tác kéo thả trên sàn (Drag)
@@ -228,6 +231,12 @@ export default function RoomShowroom3D() {
     gridHelper.visible = showGrid;
     scene.add(gridHelper);
     gridHelperRef.current = gridHelper;
+
+    // Khung định vị CAD ôm sát sản phẩm khi chọn (Selection BoxHelper)
+    const selectionBox = new THREE.BoxHelper(new THREE.Object3D(), 0x2e6f5e);
+    selectionBox.visible = false;
+    scene.add(selectionBox);
+    selectionBoxRef.current = selectionBox;
 
     // Group chứa đồ nội thất kéo thả
     const furnitureGroup = new THREE.Group();
@@ -372,6 +381,9 @@ export default function RoomShowroom3D() {
           draggedObjectRef.current.position.x = newX;
           draggedObjectRef.current.position.y = FLOOR_Y; // Luôn neo chuẩn trên bề mặt sàn
           draggedObjectRef.current.position.z = newZ;
+          if (selectionBoxRef.current && selectionBoxRef.current.visible) {
+            selectionBoxRef.current.setFromObject(draggedObjectRef.current);
+          }
 
           // Cập nhật state
           const instId = draggedObjectRef.current.userData.instanceId;
@@ -557,6 +569,28 @@ export default function RoomShowroom3D() {
     );
   };
 
+    // Cập nhật khung viền 3D định vị (BoxHelper) khi chọn sản phẩm
+  useEffect(() => {
+    const box = selectionBoxRef.current;
+    const group = furnitureGroupRef.current;
+    if (!box || !group) return;
+
+    if (!selectedInstanceId) {
+      box.visible = false;
+      return;
+    }
+
+    const target = group.children.find(
+      (c) => c.userData?.instanceId === selectedInstanceId,
+    );
+    if (target) {
+      box.setFromObject(target);
+      box.visible = true;
+    } else {
+      box.visible = false;
+    }
+  }, [selectedInstanceId, placedList]);
+
   // HÀM: Xoay món đồ đang chọn
   const handleRotateSelected = (angleDeg: number) => {
     if (!selectedInstanceId) return;
@@ -570,6 +604,9 @@ export default function RoomShowroom3D() {
 
     const rad = (angleDeg * Math.PI) / 180;
     targetObj.rotation.y += rad;
+    if (selectionBoxRef.current) {
+      selectionBoxRef.current.setFromObject(targetObj);
+    }
 
     setPlacedList((prev) =>
       prev.map((item) =>
@@ -599,6 +636,9 @@ export default function RoomShowroom3D() {
 
     // Đáy của itemContainer luôn ở y = 0 trong local space, nên targetObj.position.y = FLOOR_Y giữ đáy trên mặt sàn gỗ
     targetObj.position.y = FLOOR_Y;
+    if (selectionBoxRef.current) {
+      selectionBoxRef.current.setFromObject(targetObj);
+    }
 
     setPlacedList((prev) =>
       prev.map((item) =>
@@ -607,6 +647,16 @@ export default function RoomShowroom3D() {
           : item,
       ),
     );
+  };
+
+    // HÀM: Nhân bản món đồ đang chọn
+  const handleDuplicateSelected = () => {
+    if (!selectedItemData) return;
+    const prod = AVAILABLE_FURNITURE.find((p) => p.id === selectedItemData.productId);
+    if (prod) {
+      handleAddFurnitureToRoom(prod);
+      showToast(`Đã nhân bản ${prod.name}`);
+    }
   };
 
   // HÀM: Xóa món đồ khỏi phòng
@@ -709,71 +759,126 @@ export default function RoomShowroom3D() {
 
               {/* Bảng điều khiển món đồ đang được chọn (Floating Active Object HUD) */}
               {selectedItemData && (
-                <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-[#ded6c9] bg-white/95 p-2 shadow-lg backdrop-blur-md animate-in fade-in">
-                  <div className="flex items-center gap-2 px-2 text-xs font-bold text-[#254f43]">
-                    <Move size={15} className="text-[#2e6f5e]" />
-                    <span className="max-w-[140px] truncate">{selectedItemData.name}</span>
+                <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ded6c9]/95 bg-white/95 px-3.5 py-2.5 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 sm:left-6 sm:right-auto sm:max-w-2xl">
+                  {/* Thông tin món đồ */}
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const prod = AVAILABLE_FURNITURE.find((p) => p.id === selectedItemData.productId);
+                      return prod?.thumbnailUrl ? (
+                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[#ded6c9] bg-white shadow-xs">
+                          <Image
+                            src={prod.thumbnailUrl}
+                            alt={selectedItemData.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ) : null;
+                    })()}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-[#2e6f5e] animate-pulse" />
+                        <h4 className="max-w-[140px] truncate text-xs font-bold text-[#254f43] sm:max-w-[180px]">
+                          {selectedItemData.name}
+                        </h4>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        {(() => {
+                          const prod = AVAILABLE_FURNITURE.find((p) => p.id === selectedItemData.productId);
+                          return (
+                            <>
+                              {prod && (
+                                <span className="text-[11px] font-bold text-[#2e6f5e]">
+                                  {prod.price.toLocaleString("vi-VN")} ₫
+                                </span>
+                              )}
+                              <span className="rounded-md bg-[#f2efe6] px-1.5 py-0.2 text-[10px] font-semibold text-[#708164]">
+                                Tỉ lệ {Math.round((selectedItemData.scale / (prod?.suggestedScale || 0.35)) * 100)}%
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="h-4 w-px bg-[#ded6c9]" />
+                  {/* Nhóm công cụ thao tác nhanh */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {/* Nhóm xoay */}
+                    <div className="flex items-center rounded-xl border border-[#ded6c9] bg-[#fbf9f4] p-0.5 shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => handleRotateSelected(-45)}
+                        title="Xoay trái -45°"
+                        className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#254f43] transition hover:bg-white hover:shadow-xs active:scale-95"
+                      >
+                        <RotateCcw size={12} className="text-[#2e6f5e]" />
+                        <span>-45°</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRotateSelected(45)}
+                        title="Xoay phải +45°"
+                        className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#254f43] transition hover:bg-white hover:shadow-xs active:scale-95"
+                      >
+                        <RotateCw size={12} className="text-[#2e6f5e]" />
+                        <span>+45°</span>
+                      </button>
+                    </div>
 
-                  {/* Nút xoay 45° */}
-                  <button
-                    type="button"
-                    onClick={() => handleRotateSelected(45)}
-                    title="Xoay 45 độ"
-                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
-                  >
-                    <RotateCw size={13} />
-                    <span>Xoay 45°</span>
-                  </button>
+                    {/* Nhóm kích thước */}
+                    <div className="flex items-center rounded-xl border border-[#ded6c9] bg-[#fbf9f4] p-0.5 shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => handleScaleSelected(0.9)}
+                        title="Thu nhỏ món đồ (-10%)"
+                        className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#254f43] transition hover:bg-white hover:shadow-xs active:scale-95"
+                      >
+                        <Minus size={12} className="text-[#2e6f5e]" />
+                        <span className="hidden sm:inline">Thu nhỏ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleScaleSelected(1.1)}
+                        title="Phóng to món đồ (+10%)"
+                        className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#254f43] transition hover:bg-white hover:shadow-xs active:scale-95"
+                      >
+                        <Plus size={12} className="text-[#2e6f5e]" />
+                        <span className="hidden sm:inline">Phóng to</span>
+                      </button>
+                    </div>
 
-                  {/* Nút xoay 90° */}
-                  <button
-                    type="button"
-                    onClick={() => handleRotateSelected(90)}
-                    title="Xoay vuông góc 90 độ"
-                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
-                  >
-                    <RotateCw size={13} />
-                    <span>Xoay 90°</span>
-                  </button>
+                    {/* Nút nhân bản */}
+                    <button
+                      type="button"
+                      onClick={handleDuplicateSelected}
+                      title="Nhân bản thêm 1 chiếc tương tự"
+                      className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#fbf9f4] px-2.5 text-[11px] font-bold text-[#254f43] transition hover:bg-white hover:shadow-xs active:scale-95"
+                    >
+                      <Copy size={12} className="text-[#2e6f5e]" />
+                      <span className="hidden sm:inline">Nhân bản</span>
+                    </button>
 
-                  <div className="h-4 w-px bg-[#ded6c9]" />
+                    {/* Nút xóa */}
+                    <button
+                      type="button"
+                      onClick={handleRemoveSelected}
+                      title="Xóa món đồ này khỏi phòng"
+                      className="grid h-8 w-8 place-items-center rounded-xl border border-[#e8ceca] bg-[#fdf2f0] text-[#a34131] transition hover:bg-[#fae1dd] hover:border-[#a34131]/30 active:scale-95"
+                    >
+                      <Trash2 size={13} />
+                    </button>
 
-                  {/* Nút Thu nhỏ món đồ (-15%) */}
-                  <button
-                    type="button"
-                    onClick={() => handleScaleSelected(0.85)}
-                    title="Thu nhỏ món đồ này (-15%)"
-                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
-                  >
-                    <Minus size={13} />
-                    <span>Thu nhỏ</span>
-                  </button>
-
-                  {/* Nút Phóng to món đồ (+15%) */}
-                  <button
-                    type="button"
-                    onClick={() => handleScaleSelected(1.15)}
-                    title="Phóng to món đồ này (+15%)"
-                    className="flex h-8 items-center gap-1 rounded-xl border border-[#ded6c9] bg-[#f7f3ec] px-2.5 text-xs font-bold text-[#254f43] transition hover:bg-[#e8e4d8]"
-                  >
-                    <Plus size={13} />
-                    <span>Phóng to</span>
-                  </button>
-
-                  <div className="h-4 w-px bg-[#ded6c9]" />
-
-                  {/* Nút Xóa */}
-                  <button
-                    type="button"
-                    onClick={handleRemoveSelected}
-                    title="Xóa món đồ này khỏi phòng"
-                    className="grid h-8 w-8 place-items-center rounded-xl bg-[#fdf2f0] text-[#a34131] transition hover:bg-[#fae1dd]"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                    {/* Nút bỏ chọn */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInstanceId(null)}
+                      title="Bỏ chọn / Đóng thanh công cụ"
+                      className="grid h-8 w-8 place-items-center rounded-xl border border-transparent text-[#708164] transition hover:border-[#ded6c9] hover:bg-[#f2efe6] active:scale-95"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1020,26 +1125,48 @@ export default function RoomShowroom3D() {
                 <div className="mt-3 flex flex-col gap-2">
                   {placedList.map((item, idx) => {
                     const isSelected = item.instanceId === selectedInstanceId;
+                    const prod = AVAILABLE_FURNITURE.find((p) => p.id === item.productId);
                     return (
                       <div
                         key={item.instanceId}
-                        onClick={() => setSelectedInstanceId(item.instanceId)}
-                        className={`flex cursor-pointer items-center justify-between rounded-xl border p-2.5 transition ${
+                        onClick={() => setSelectedInstanceId(isSelected ? null : item.instanceId)}
+                        className={`flex cursor-pointer items-center justify-between gap-2 rounded-2xl border p-2.5 transition ${
                           isSelected
-                            ? "border-[#2e6f5e] bg-[#f0f6f3]"
-                            : "border-[#ded6c9] bg-[#fbf9f4] hover:bg-white"
+                            ? "border-[#2e6f5e] bg-[#f0f6f3] shadow-xs ring-2 ring-[#2e6f5e]/20"
+                            : "border-[#ded6c9] bg-[#fbf9f4] hover:border-[#2e6f5e]/40 hover:bg-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="grid h-6 w-6 place-items-center rounded-full bg-[#dfe8d3] text-[10px] font-bold text-[#2e6f5e]">
-                            {idx + 1}
-                          </span>
-                          <span className="text-xs font-bold text-[#254f43]">
-                            {item.name}
-                          </span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {prod?.thumbnailUrl ? (
+                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[#ded6c9] bg-white">
+                              <Image
+                                src={prod.thumbnailUrl}
+                                alt={item.name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-[#dfe8d3] text-xs font-bold text-[#2e6f5e]">
+                              {idx + 1}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {isSelected && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#2e6f5e] animate-pulse" />
+                              )}
+                              <h4 className="truncate text-xs font-bold text-[#254f43]">
+                                {item.name}
+                              </h4>
+                            </div>
+                            <p className="text-[10px] text-[#708164]">
+                              {prod ? `${prod.price.toLocaleString("vi-VN")} ₫` : `Món số ${idx + 1}`}
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1047,10 +1174,10 @@ export default function RoomShowroom3D() {
                               setSelectedInstanceId(item.instanceId);
                               handleRotateSelected(45);
                             }}
-                            title="Xoay 45°"
-                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#ded6c9] bg-white text-[#254f43] hover:bg-[#f0ece4]"
+                            title="Xoay +45°"
+                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#ded6c9] bg-white text-[#254f43] transition hover:bg-[#f0ece4] active:scale-95"
                           >
-                            <RotateCw size={12} />
+                            <RotateCw size={12} className="text-[#2e6f5e]" />
                           </button>
                           <button
                             type="button"
@@ -1060,7 +1187,7 @@ export default function RoomShowroom3D() {
                               handleRemoveSelected();
                             }}
                             title="Xóa"
-                            className="grid h-7 w-7 place-items-center rounded-lg bg-[#fdf2f0] text-[#a34131] hover:bg-[#f8d7d4]"
+                            className="grid h-7 w-7 place-items-center rounded-lg border border-[#e8ceca] bg-[#fdf2f0] text-[#a34131] transition hover:bg-[#fae1dd] active:scale-95"
                           >
                             <Trash2 size={12} />
                           </button>
