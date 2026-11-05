@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
+import { authenticatedFetch } from "@/src/features/auth/services/authenticatedFetch";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AdminProductsPanel from "@/src/features/products/components/AdminProductsPanel";
 import AdminMoodboardsPanel from "@/src/features/product-space/components/AdminMoodboardsPanel";
@@ -23,6 +25,7 @@ type ModuleConfig = {
   endpoint?: string;
   group: string;
   custom?: boolean;
+  href?: string;
 };
 
 const modules: ModuleConfig[] = [
@@ -33,6 +36,7 @@ const modules: ModuleConfig[] = [
   { id: "categories", label: "Danh mục", endpoint: "/categories", group: "Thương mại" },
   { id: "brands", label: "Thương hiệu", endpoint: "/brands/admin/all", group: "Thương mại" },
   { id: "orders", label: "Đơn hàng", endpoint: "/orders/admin/all", group: "Thương mại" },
+  { id: "affiliate", label: "Shopee Affiliate", href: "/admin/affiliate", group: "Thương mại" },
   { id: "payments", label: "Thanh toán", endpoint: "/payments/admin", group: "Thương mại" },
   { id: "promotions", label: "Khuyến mãi", endpoint: "/promotions/admin/all", group: "Thương mại" },
   { id: "moodboard", label: "Product Space", custom: true, group: "Không gian và AI" },
@@ -105,13 +109,9 @@ export default function AdminCenterView() {
     setLoading(true);
     setError("");
     try {
-      const token = getAccessToken();
-      const response = await fetch(`${apiBase()}${current.endpoint}`, {
+      const response = await authenticatedFetch(`${apiBase()}${current.endpoint}`, {
         cache: "no-store",
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { Accept: "application/json" },
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -167,6 +167,97 @@ export default function AdminCenterView() {
 
   const renderContent = () => {
     if (active === "community") return <AdminCommunityPanel />;
+
+    // Render Dashboard Overview
+    if (active === "dashboard") {
+      const stats = (data && typeof data === "object" && !Array.isArray(data) ? data : {}) as Record<string, any>;
+      return (
+        <div className="space-y-6">
+          {/* Shopee Affiliate Banner Quick Access */}
+          <div className="flex flex-col justify-between gap-4 rounded-2xl border border-[#ded6c9] bg-gradient-to-r from-[#2e6f5e] to-[#254f43] p-6 text-white shadow-sm sm:flex-row sm:items-center">
+            <div>
+              <span className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#dfe8d3]">
+                Module Tiếp Thị
+              </span>
+              <h2 className="mt-2 text-xl font-bold font-serif">Quản Trị Shopee Affiliate</h2>
+              <p className="mt-1 text-xs text-white/80">
+                Nhập báo cáo doanh số CSV, quản lý đơn hàng tiếp thị và đối soát hoa hồng Shopee cho DECOHO.
+              </p>
+            </div>
+            <Link
+              href="/admin/affiliate"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-bold text-[#2e6f5e] shadow-sm transition hover:bg-[#f7f3ec] active:scale-95"
+            >
+              <span>Mở Quản trị Affiliate</span>
+              <ArrowUpRight size={14} />
+            </Link>
+          </div>
+
+          {/* KPI Grid */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="rounded-2xl border border-[#ded6c9] bg-white p-5 shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#708164]">
+                Doanh thu hệ thống
+              </span>
+              <p className="mt-2 text-2xl font-black text-[#2e6f5e]">
+                {loading ? "..." : `${(stats.revenue ?? 0).toLocaleString("vi-VN")} ₫`}
+              </p>
+              <p className="mt-1 text-[11px] text-[#708164]">Tổng thu từ đơn hàng</p>
+            </div>
+
+            <div className="rounded-2xl border border-[#ded6c9] bg-white p-5 shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#708164]">
+                Tổng đơn hàng
+              </span>
+              <p className="mt-2 text-2xl font-black text-[#254f43]">
+                {loading ? "..." : (stats.totalOrders ?? 0).toLocaleString("vi-VN")}
+              </p>
+              <p className="mt-1 text-[11px] text-[#708164]">Đơn hàng trên website</p>
+            </div>
+
+            <div className="rounded-2xl border border-[#ded6c9] bg-white p-5 shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#708164]">
+                Người dùng
+              </span>
+              <p className="mt-2 text-2xl font-black text-[#254f43]">
+                {loading ? "..." : (stats.totalUsers ?? 0).toLocaleString("vi-VN")}
+              </p>
+              <p className="mt-1 text-[11px] text-[#708164]">Tài khoản đã đăng ký</p>
+            </div>
+
+            <div className="rounded-2xl border border-[#ded6c9] bg-white p-5 shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#708164]">
+                Sản phẩm
+              </span>
+              <p className="mt-2 text-2xl font-black text-[#254f43]">
+                {loading ? "..." : (stats.totalProducts ?? 0).toLocaleString("vi-VN")}
+              </p>
+              <p className="mt-1 text-[11px] text-[#708164]">Mặt hàng trong catalog</p>
+            </div>
+          </div>
+
+          {/* Sub KPIs */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase text-[#708164]">Không gian phòng</span>
+              <p className="mt-1 text-lg font-bold text-[#254f43]">{stats.totalRooms ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase text-[#708164]">Kế hoạch Decor</span>
+              <p className="mt-1 text-lg font-bold text-[#254f43]">{stats.totalDecorPlans ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase text-[#708164]">Nhà cung cấp</span>
+              <p className="mt-1 text-lg font-bold text-[#254f43]">{stats.totalSuppliers ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase text-[#708164]">Đơn mới cần xử lý</span>
+              <p className="mt-1 text-lg font-bold text-[#dca451]">{stats.newOrders ?? 0}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     if (active === "products") {
       return <AdminProductsPanel accessToken={getAccessToken() ?? undefined} />;
     }
@@ -254,20 +345,31 @@ export default function AdminCenterView() {
                 </p>
                 {modules
                   .filter((item) => item.group === group)
-                  .map((item) => (
-                    <button
-                      className={`mb-1 w-full rounded-lg px-3 py-2.5 text-left text-sm ${
-                        active === item.id
-                          ? "bg-[#dca451] font-black text-[#17211b]"
-                          : "text-white/70 hover:bg-white/10"
-                      }`}
-                      key={item.id}
-                      onClick={() => setActive(item.id)}
-                      type="button"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                  .map((item) =>
+                    item.href ? (
+                      <Link
+                        className="mb-1 flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                        href={item.href}
+                        key={item.id}
+                      >
+                        <span>{item.label}</span>
+                        <ArrowUpRight size={14} className="text-white/50" />
+                      </Link>
+                    ) : (
+                      <button
+                        className={`mb-1 w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                          active === item.id
+                            ? "bg-[#dca451] font-black text-[#17211b]"
+                            : "text-white/70 hover:bg-white/10"
+                        }`}
+                        key={item.id}
+                        onClick={() => setActive(item.id)}
+                        type="button"
+                      >
+                        {item.label}
+                      </button>
+                    ),
+                  )}
               </section>
             ))}
           </nav>
