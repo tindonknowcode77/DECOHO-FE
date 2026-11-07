@@ -17,6 +17,7 @@ import { getProducts } from "@/src/features/products/services/productService";
 import type { Product } from "@/src/features/products/types";
 import ProductCard from "@/src/features/products/components/ProductCard";
 import CatalogQuickView from "@/src/features/products/components/CatalogQuickView";
+import PendantLampRail, { LAMP_DEMO_ITEMS } from "@/src/components/ui/pendant-lamp-rail";
 import type { ProductSpace } from "@/src/features/product-space/types";
 
 type Post = {
@@ -263,38 +264,28 @@ export default function HomeExperience() {
           </div>
         </div>
         <div className="relative">
-          <div className="relative aspect-[5/4] overflow-hidden rounded-[28px] rounded-tl-[90px] sm:aspect-[6/5]">
-            <Image
-              src="/images/product-space/organic-calm.png"
-              alt="Góc cảm hứng phòng khách với ánh sáng tự nhiên và chất liệu gỗ"
-              fill
-              priority
-              sizes="(max-width: 1024px) 100vw, 55vw"
-              className="object-cover"
-            />
-            <span className="absolute right-5 top-5 rounded-full border border-white/60 bg-white/85 px-4 py-2 text-[10px] uppercase tracking-[0.17em]">
-              Góc cảm hứng · Natural living
-            </span>
-          </div>
-          <div className={`${styles.heroCaption} absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl bg-white/95 px-5 py-4 shadow-lg shadow-black/5 backdrop-blur sm:bottom-7 sm:left-7 sm:right-7`}>
-            <div>
-              <p className="text-[9px] uppercase tracking-[0.2em] text-[#8c927f]">
-                Một chút mộc, một chút yên
-              </p>
-              <p className="mt-1 font-serif text-2xl">
-                Ấm áp từ những điều giản dị
-              </p>
-            </div>
-            <div className="ml-3 hidden gap-1 sm:flex">
-              {["#e8dfcf", "#a6ad95", "#8e785f"].map((c) => (
-                <span
-                  key={c}
-                  style={{ background: c }}
-                  className="h-7 w-7 rounded-full"
-                />
-              ))}
-            </div>
-          </div>
+          <PendantLampRail
+            items={LAMP_DEMO_ITEMS}
+            eyebrow="Góc cảm hứng · Natural lighting"
+            heading="Ấm áp từ những ánh đèn giản dị"
+            caption="Lướt chuột dọc thanh treo để bật đèn, kéo trượt hoặc bấm vào đèn để chỉnh độ sáng."
+            autoplay
+            labels={{
+              close: "Đóng",
+              dimmer: "Độ sáng",
+              open: "Chỉnh độ sáng",
+            }}
+            className="rounded-[28px] rounded-tl-[72px] border border-[#e2ded3] bg-[#f4f0e6] shadow-sm"
+            action={
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-[#245b4c] hover:shadow-md"
+              >
+                <span>Khám phá đèn & nội thất</span>
+                <ArrowUpRight size={15} />
+              </Link>
+            }
+          />
         </div>
       </section>
       <div className="border-y border-[#e2e5d8] bg-[#edf0e7]">

@@ -3,7 +3,15 @@
 
 :root {
   --background: #f7f3ec;
-  --foreground: #2f6f5e;
+  --foreground: #293d32;
+  --muted-foreground: #76806f;
+  --border: #ded6c9;
+  --card: #ffffff;
+  --card-foreground: #293d32;
+  --ring: #2f6f5e;
+  --chart-1: #2f6f5e;
+  --chart-3: #e8b96a;
+  --chart-4: #f3bd60;
   --font-body: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
   --font-display: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
   --font-heading: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
@@ -14,6 +22,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
   --font-sans: var(--font-body);
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
