@@ -222,6 +222,23 @@ export default function HomeExperience() {
   const boards = useHomeData(loadBoards);
   const posts = useHomeData(loadPosts);
   const [quick, setQuick] = useState<Product | null>(null);
+
+  const lampItems = LAMP_DEMO_ITEMS.map((item) => {
+    const matched = products.data.find(
+      (p) => String(p.id ?? "") === item.productId,
+    );
+    if (!matched) return item;
+    return {
+      ...item,
+      name: matched.name || item.name,
+      tag: matched.priceVND
+        ? `${matched.priceVND.toLocaleString("vi-VN")} ₫`
+        : item.tag,
+      productImage: matched.image || item.productImage,
+      productLink: matched.productLink || item.productLink,
+    };
+  });
+
   return (
     <main ref={pageRef} className={`${styles.page} overflow-hidden bg-[#f8f6f0] text-[#293d32]`}>
       <section className="mx-auto grid max-w-[1440px] gap-8 px-5 pb-12 pt-8 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-14 lg:px-12 lg:py-14">
@@ -265,7 +282,7 @@ export default function HomeExperience() {
         </div>
         <div className="relative">
           <PendantLampRail
-            items={LAMP_DEMO_ITEMS}
+            items={lampItems}
             eyebrow="Góc cảm hứng · Natural lighting"
             heading="Ấm áp từ những ánh đèn giản dị"
             caption="Lướt chuột dọc thanh treo để bật đèn, kéo trượt hoặc bấm vào đèn để chỉnh độ sáng."

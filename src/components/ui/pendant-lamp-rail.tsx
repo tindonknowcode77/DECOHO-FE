@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 
 export interface PendantLamp {
@@ -20,6 +21,12 @@ export interface PendantLamp {
   tag?: string;
   /** Short facts listed in the detail view. */
   details?: string[];
+  /** Real product ID in DECOHO catalog. */
+  productId?: string;
+  /** Real product image thumbnail from Cloudinary. */
+  productImage?: string;
+  /** Direct Shopee affiliate buy link. */
+  productLink?: string;
 }
 
 export interface PendantLampRailLabels {
@@ -772,24 +779,65 @@ export function PendantLampRail({
       )}
 
       <div className="relative z-10 flex flex-col items-center gap-3 px-6 pb-8 pt-3 text-center">
-        <div id={`${uid}-caption`} aria-live="polite" className="min-h-[4.25rem]">
-          <p className="text-sm font-medium">
-            {current ? current.name : caption}
-            {current?.tag && <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full border border-border px-2 py-0.5 align-middle text-[11px] font-medium tabular-nums text-muted-foreground">{current.tag}</span>}
-          </p>
-          {current?.description && <p className="mx-auto mt-1 max-w-[46ch] text-balance text-[13px] leading-relaxed text-muted-foreground">{current.description}</p>}
+        <div id={`${uid}-caption`} aria-live="polite" className="min-h-[4.75rem]">
+          {current ? (
+            <div className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-2xl border border-border bg-card/85 px-4 py-2.5 text-left shadow-xs backdrop-blur-xs">
+              {current.productImage && (
+                <img
+                  src={current.productImage}
+                  alt={current.name}
+                  className="size-12 shrink-0 rounded-xl border border-border object-cover"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-bold text-foreground">
+                    {current.name}
+                  </p>
+                  {current.tag && (
+                    <span className="inline-flex items-center rounded-full bg-[#eef2e7] px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-[#2f6f5e]">
+                      {current.tag}
+                    </span>
+                  )}
+                </div>
+                {current.description && (
+                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                    {current.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="pt-2 text-sm font-medium text-muted-foreground">{caption}</p>
+          )}
         </div>
-        <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <span aria-hidden="true" />
-          <div className="justify-self-center">{action}</div>
-          <div className="justify-self-start">
-            {current && litIndex !== null && (
-              <button type="button" data-open onClick={() => open(litIndex)} aria-label={`${labels.open}: ${current.name}`} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--lamp-accent)]" />
-                {labels.open}
-              </button>
-            )}
-          </div>
+        <div className="flex flex-wrap items-center justify-center gap-2.5">
+          {current?.productId ? (
+            <Link
+              href={`/products/${current.productId}`}
+              className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:-translate-y-px hover:bg-[#245b4c]"
+            >
+              <span>Xem sản phẩm</span>
+            </Link>
+          ) : (
+            <div>{action}</div>
+          )}
+          {current?.productLink && (
+            <a
+              href={current.productLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#2f6f5e]/30 bg-white px-4 py-2 text-xs font-semibold text-[#2f6f5e] shadow-xs transition hover:bg-[#eef2e7]"
+            >
+              <span>Mua trên Shopee ↗</span>
+            </a>
+          )}
+          {current && litIndex !== null && (
+            <button type="button" data-open onClick={() => open(litIndex)} aria-label={`${labels.open}: ${current.name}`} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-white/70 px-3.5 py-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--lamp-accent)]" />
+              {labels.open}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1026,12 +1074,48 @@ function Detail({ uid, item, index, total, labels, reduced, dim, failed, onFail,
             />
           </div>
           {item.tag && (
-            <p className="flex items-center justify-center gap-2 sm:justify-start">
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-medium tabular-nums text-card-foreground shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm font-bold tabular-nums text-card-foreground shadow-sm">
                 <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--lamp-accent)]" />
                 {item.tag}
               </span>
-            </p>
+              {item.productId && (
+                <Link
+                  href={`/products/${item.productId}`}
+                  onClick={onClose}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#2f6f5e] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#245b4c]"
+                >
+                  <span>Xem chi tiết sản phẩm</span>
+                </Link>
+              )}
+              {item.productLink && (
+                <a
+                  href={item.productLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#2f6f5e]/30 bg-white px-4 py-1.5 text-xs font-semibold text-[#2f6f5e] shadow-sm transition hover:bg-[#eef2e7]"
+                >
+                  <span>Mua ngay trên Shopee ↗</span>
+                </a>
+              )}
+            </div>
+          )}
+          {item.productImage && (
+            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card/80 p-3 text-left">
+              <img
+                src={item.productImage}
+                alt={item.name}
+                className="size-14 shrink-0 rounded-xl border border-border object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Ảnh sản phẩm thực tế
+                </p>
+                <p className="truncate text-xs font-bold text-foreground">
+                  {item.name}
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1043,81 +1127,105 @@ function Detail({ uid, item, index, total, labels, reduced, dim, failed, onFail,
 export const LAMP_DEMO_ITEMS: PendantLamp[] = [
   {
     id: "dome-enamel",
-    name: "Đèn thả vòm tráng men · Forest",
-    tag: "1.850.000 ₫",
+    productId: "6ae33590f9df260a0b6cfb65",
+    name: "Đèn Thả Trần Bàn Ăn Bauhaus",
+    tag: "685.420 ₫",
     drop: 0.62,
-    description: "Chao thép tráng men xanh rừng bóng mượt, lòng trắng phản chiếu ánh sáng ấm áp.",
-    details: ["E27 · LED dây tóc 4 W", "Đường kính Ø 38 cm", "Dây dù bọc vải 1.5 m"],
+    description: "Đèn thả trần phong cách Bauhaus tối giản, tạo điểm nhấn ấm cúng cho bàn ăn & phòng khách.",
+    details: ["Danh mục: Đèn thả trần", "Ánh sáng ấm dịu", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1793275239/decoho/products/ougldq7lrvx7fk8d9wn0.webp",
+    productLink: "https://s.shopee.vn/6VOtBHsYbE",
     image: "https://cdn.21st.dev/assets/mirror/fc/fcfdfbf3d62f14d97eb23453aa9fe6772f7c09b521226442621e4f187d79b4d6.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/2d/2d2990c7f5d56e69848237695a204baf6a366d180facb94c62b78cdc3e37dd13.webp",
   },
   {
     id: "glass-globe",
-    name: "Đèn cầu thủy tinh · Clear",
-    tag: "2.150.000 ₫",
+    productId: "6ae3304df9df260a0b6cfada",
+    name: "Đèn trần cổ điển",
+    tag: "863.000 ₫",
     drop: 0.9,
-    description: "Thủy tinh thổi thủ công trong suốt lộ bóng dây tóc cổ điển và đui đồng nguyên bản.",
-    details: ["E27 · LED dây tóc 4 W", "Quả cầu Ø 25 cm", "Đui đồng thau"],
+    description: "Đèn trần phong cách cổ điển sang trọng, ánh sáng vàng ấm tôn lên đường nét nội thất.",
+    details: ["Danh mục: Đèn trần", "Thủy tinh & kim loại", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1793273898/decoho/products/dwglcdh098anxy2asljx.webp",
+    productLink: "https://s.shopee.vn/3VlHbm3ygR",
     image: "https://cdn.21st.dev/assets/mirror/ba/ba2f12a44156865baeb4c1173a7d320384edc5156dcaf1d4e44e684ae780ba57.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/a5/a55502eb9cf6cac0bd52969eb61bb546a478e861f3568aad6875e4dad5c03f6e.webp",
   },
   {
     id: "cone-brass",
-    name: "Đèn chóp đồng xước · Brushed",
-    tag: "2.490.000 ₫",
+    productId: "6adb6a48a448fd9321cf428d",
+    name: "Đèn treo thả trần phong cách cổ điển",
+    tag: "249.000 ₫",
     drop: 0.74,
-    description: "Thiết kế chóp cao bằng đồng xước tập trung vùng sáng ấm cho bàn ăn hoặc góc đọc sách.",
-    details: ["GU10 · LED 5 W", "Ø 22 × 34 cm", "Đồng xước tự nhiên"],
+    description: "Đèn treo thả trần kiểu dáng cổ điển, gom vùng sáng ấm áp cho góc đọc sách và bàn trà.",
+    details: ["Danh mục: Đèn treo thả trần", "Thiết kế cổ điển", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792764462/decoho/products/wkh7trbzipxxpwdnoto0.webp",
+    productLink: "https://s.shopee.vn/3g4YFNYVm2",
     image: "https://cdn.21st.dev/assets/mirror/96/968b92c5f3adc4a3f45d627f339fa2c4017a70a0d57f7c68b8a0c5b4ace6aef3.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/cc/cc2aa1c7f32e04bc950f63274f28986c573a8ad2c27f84eef148191a1178d424.webp",
   },
   {
     id: "rattan-weave",
-    name: "Đèn mây đan thủ công · Natural",
-    tag: "1.450.000 ₫",
+    productId: "6ad983abb0c4d04dfb65f9f9",
+    name: "Đèn Mây Treo",
+    tag: "210.000 ₫",
     drop: 1,
-    description: "Đan tay từ mây tự nhiên tạo hiệu ứng bóng nắng đan xen mộc mạc, thư thái.",
-    details: ["E27 · LED 6 W", "Chuông rộng Ø 45 cm", "Mây tre tự nhiên"],
+    description: "Đèn mây đan thủ công tự nhiên, tạo hiệu ứng ánh sáng đan xen mộc mạc, gần gũi.",
+    details: ["Danh mục: Đèn trần", "Chất liệu mây tự nhiên", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792639905/decoho/products/gqr1j3ownrpfi4hhwao7.webp",
+    productLink: "https://s.shopee.vn/5q98YM4rnF",
     image: "https://cdn.21st.dev/assets/mirror/12/1237597f711ee8334bad09432954cf04fe8cc104877dece6d0986441e59030a9.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/39/394b02f1dff0096ebace53699c42c4d817dfffd5aff943d888454a83036ce1fb.webp",
   },
   {
     id: "paper-lantern",
-    name: "Đèn lồng giấy Washi · Kyoto",
-    tag: "1.250.000 ₫",
+    productId: "6adb6694a448fd9321cf41b3",
+    name: "Đèn Nấm - Đèn thả trần tre tròn 2 lớp",
+    tag: "300.000 ₫",
     drop: 0.68,
-    description: "Giấy Washi truyền thống bọc trên khung tre mảnh, lan tỏa ánh sáng dịu nhẹ đều khắp phòng.",
-    details: ["E27 · LED 4 W", "Cầu Ø 40 cm", "Khung tre uốn thủ công"],
+    description: "Đèn thả trần khung tre tròn 2 lớp dáng nấm, tán sáng mềm mại cho phòng ngủ & phòng khách.",
+    details: ["Danh mục: Đèn thả trần", "Khung tre 2 lớp", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792763531/decoho/products/ykk3a0ap12uedjr4i3jo.webp",
+    productLink: "https://s.shopee.vn/50ZvppTR4A",
     image: "https://cdn.21st.dev/assets/mirror/dd/dd85e367f381884fa9147495c1025af4faed8a2f7ec1bc3cd82bbdc9a3c2815b.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/a9/a9e6b40b11b3abca1a39acd32489b66f6094f3ecb5361862c16a1d36599ad60c.webp",
   },
   {
     id: "concrete-cone",
-    name: "Đèn bê tông đúc · Ash",
-    tag: "2.650.000 ₫",
+    productId: "6adaca4d0d8c75708ef6758b",
+    name: "Đèn Nấm Thả Trần",
+    tag: "200.000 ₫",
     drop: 0.86,
-    description: "Bê tông xám đúc nguyên khối mang nét tối giản hiện đại, mặt trong tán sáng dịu.",
-    details: ["E27 · LED 6 W", "Chao rộng Ø 40 cm", "Bê tông mịn"],
+    description: "Đèn thả trần dáng nấm hiện đại, phom chao rộng giúp phân bổ ánh sáng êm dịu.",
+    details: ["Danh mục: Đèn thả trần", "Thiết kế tối giản", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792723530/decoho/products/eopuyehfxngvevan8ybf.webp",
+    productLink: "https://s.shopee.vn/6AltDyOzhl",
     image: "https://cdn.21st.dev/assets/mirror/a8/a89caec23d33213a849f40b76789ead7c88f0c2d91eb7e91e60987c72e566032.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/b1/b17f53b4eb8ff9d544bc2ce66802e46c7134d760cd225f9059aec2f7799ffbb7.webp",
   },
   {
     id: "fluted-glass",
-    name: "Đèn thủy tinh sọc · Opal",
-    tag: "1.920.000 ₫",
+    productId: "6adabeda0d8c75708ef672a9",
+    name: "Đèn ốp trần tràn viền",
+    tag: "131.489 ₫",
     drop: 0.58,
-    description: "Thủy tinh mờ gân sọc dọc làm mềm nguồn sáng thành cột sáng thanh lịch.",
-    details: ["E27 · LED 4 W", "Ø 18 × 22 cm", "Thủy tinh Opal"],
+    description: "Đèn trần tràn viền gọn gàng, phù hợp căn hộ hiện đại với hiệu suất chiếu sáng cao.",
+    details: ["Danh mục: Đèn trần", "Kiểu dáng tràn viền", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792720563/decoho/products/eb1f5xxxtrfleuesm8s9.webp",
+    productLink: "https://s.shopee.vn/BUg4wlps1",
     image: "https://cdn.21st.dev/assets/mirror/14/14f8418ed6724766526e9d3efb7130163b8f6bc8cd784452ea4afdcaa980d818.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/14/141699616e79db6eeb2667ff7dcd106822e1cb408dd4ea2c7fe5c42fa52b957f.webp",
   },
   {
     id: "copper-bell",
-    name: "Đèn chuông đồng đỏ · Polished",
-    tag: "3.690.000 ₫",
+    productId: "6ae853fa9b2181304066c2a9",
+    name: "Đèn Cây Đứng Hình Nấm",
+    tag: "440.000 ₫",
     drop: 0.8,
-    description: "Bề mặt đồng đỏ đánh bóng sang trọng kết hợp lòng tráng men trắng phản quang.",
-    details: ["E27 · LED 6 W", "Chuông Ø 36 cm", "Đồng đỏ đánh bóng"],
+    description: "Đèn decor chao vòm hình nấm sang trọng, mang lại bầu không khí ấm áp cho góc sofa.",
+    details: ["Danh mục: Đèn decor", "Chao vòm phản quang", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1793610743/decoho/products/hqdq0rbavm5jpoesesig.webp",
+    productLink: "https://s.shopee.vn/9V2inio8nJ",
     image: "https://cdn.21st.dev/assets/mirror/3d/3d6d7c813c8d408fff25a92204f49cfcfa3cdf445e27b21b350c666177380c47.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/bf/bf643df2bd7d8eb4af9aeeffa53c5ff6dca49f702b88bde2a584697ca82aa862.webp",
   },
