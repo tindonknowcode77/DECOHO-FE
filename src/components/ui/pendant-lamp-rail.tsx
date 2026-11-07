@@ -776,37 +776,6 @@ export function PendantLampRail({
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col items-center gap-3 px-6 pb-8 pt-3 text-center">
-        <div id={`${uid}-caption`} aria-live="polite" className="min-h-[4.75rem]">
-          {current ? (
-            <div className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-2xl border border-border bg-card/85 px-4 py-2.5 text-left shadow-xs backdrop-blur-xs">
-              {current.productImage && (
-                <img
-                  src={current.productImage}
-                  alt={current.name}
-                  className="size-12 shrink-0 rounded-xl border border-border object-cover"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-bold text-foreground">
-                    {current.name}
-                  </p>
-                  {current.tag && (
-                    <span className="inline-flex items-center rounded-full bg-[#eef2e7] px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-[#2f6f5e]">
-                      {current.tag}
-                    </span>
-                  )}
-                </div>
-                {current.description && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                    {current.description}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="pt-2 text-sm font-medium text-muted-foreground">{caption}</p>
       {(caption || action) && (
         <div className="relative z-10 flex flex-col items-center gap-3.5 px-6 pb-8 pt-3 text-center">
           {caption && (
@@ -816,35 +785,6 @@ export function PendantLampRail({
           )}
           {action && <div className="flex flex-wrap items-center justify-center gap-2.5">{action}</div>}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          {current?.productId ? (
-            <Link
-              href={`/products/${current.productId}`}
-              className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:-translate-y-px hover:bg-[#245b4c]"
-            >
-              <span>Xem sản phẩm</span>
-            </Link>
-          ) : (
-            <div>{action}</div>
-          )}
-          {current?.productLink && (
-            <a
-              href={current.productLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#2f6f5e]/30 bg-white px-4 py-2 text-xs font-semibold text-[#2f6f5e] shadow-xs transition hover:bg-[#eef2e7]"
-            >
-              <span>Mua trên Shopee ↗</span>
-            </a>
-          )}
-          {current && litIndex !== null && (
-            <button type="button" data-open onClick={() => open(litIndex)} aria-label={`${labels.open}: ${current.name}`} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-white/70 px-3.5 py-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--lamp-accent)]" />
-              {labels.open}
-            </button>
-          )}
-        </div>
-      </div>
       )}
 
       {openIndex !== null && items[openIndex] && (
