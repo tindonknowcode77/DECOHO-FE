@@ -241,69 +241,29 @@ export default function HomeExperience() {
 
   return (
     <main ref={pageRef} className={`${styles.page} overflow-hidden bg-[#f8f6f0] text-[#293d32]`}>
-      <section className="mx-auto grid max-w-[1440px] gap-8 px-5 pb-12 pt-8 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-14 lg:px-12 lg:py-14">
-        <div className="py-3 lg:py-8">
-          <p className="mb-6 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#798a69]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#b59566]" />
-            Decorate your home. Define your style.
-          </p>
-          <h1 className="text-[44px] font-semibold leading-[1.08] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
-            Nhà là nơi
-            <br />
-            bạn được là
-            <br />
-            <span className="font-serif font-normal italic text-[#65805b]">
-              chính mình.
-            </span>
-          </h1>
-          <p className="mt-6 max-w-sm text-sm leading-7 text-[#7a8271]">
-            Từ một góc nhỏ đến cả tổ ấm. Cùng DECOHO tìm cảm hứng, chọn nội thất
-            và tạo nên không gian mang dấu ấn của bạn.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+      <section className="mx-auto w-full max-w-[1440px] px-4 pb-10 pt-6 sm:px-8 lg:px-12 lg:py-10">
+        <PendantLampRail
+          items={lampItems}
+          eyebrow="DECOHO · Góc cảm hứng chiếu sáng"
+          heading="Ấm áp từ những ánh đèn giản dị"
+          caption="Lướt chuột dọc thanh treo để bật đèn, kéo trượt hoặc bấm vào đèn để chỉnh độ sáng và mua ngay."
+          autoplay
+          labels={{
+            close: "Đóng",
+            dimmer: "Độ sáng",
+            open: "Chỉnh độ sáng",
+          }}
+          className="w-full rounded-[32px] border border-[#e2ded3] bg-[#f4f0e6] shadow-sm"
+          action={
             <Link
-              href="/product-space"
-              className="inline-flex items-center gap-5 rounded-full bg-[#2f6f5e] px-6 py-3.5 text-sm font-medium text-white hover:bg-[#245b4c]"
+              href="/products"
+              className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-[#245b4c] hover:shadow-md"
             >
-              Khám phá cảm hứng
-              <ArrowUpRight size={17} />
+              <span>Khám phá đèn & nội thất</span>
+              <ArrowUpRight size={15} />
             </Link>
-          </div>
-          <div className="mt-10 flex items-center gap-3 border-t border-[#e0e3d6] pt-5">
-            <Leaf size={24} strokeWidth={1.2} className="text-[#7e916c]" />
-            <p className="text-xs leading-5 text-[#879079]">
-              Ít hơn một chút. Đúng với bạn hơn một chút.
-              <br />
-              <span className="text-[#536849]">
-                Bắt đầu từ điều bạn yêu thích.
-              </span>
-            </p>
-          </div>
-        </div>
-        <div className="relative">
-          <PendantLampRail
-            items={lampItems}
-            eyebrow="Góc cảm hứng · Natural lighting"
-            heading="Ấm áp từ những ánh đèn giản dị"
-            caption="Lướt chuột dọc thanh treo để bật đèn, kéo trượt hoặc bấm vào đèn để chỉnh độ sáng."
-            autoplay
-            labels={{
-              close: "Đóng",
-              dimmer: "Độ sáng",
-              open: "Chỉnh độ sáng",
-            }}
-            className="rounded-[28px] rounded-tl-[72px] border border-[#e2ded3] bg-[#f4f0e6] shadow-sm"
-            action={
-              <Link
-                href="/products"
-                className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-[#245b4c] hover:shadow-md"
-              >
-                <span>Khám phá đèn & nội thất</span>
-                <ArrowUpRight size={15} />
-              </Link>
-            }
-          />
-        </div>
+          }
+        />
       </section>
       <div className="border-y border-[#e2e5d8] bg-[#edf0e7]">
         <div className="mx-auto grid max-w-7xl gap-6 px-6 py-7 sm:grid-cols-3">

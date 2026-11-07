@@ -55,7 +55,7 @@ export interface PendantLampRailProps extends React.ComponentProps<"section"> {
 }
 
 const ASPECT = 2 / 3;
-const MAX_H = 200;
+const MAX_H = 230;
 const MIN_WIDE_H = 78;
 const CAROUSEL_H = 224;
 const FIT = 1.1;
@@ -751,9 +751,7 @@ export function PendantLampRail({
               >
                 <span aria-hidden="true" className="absolute left-1/2 top-0 -translate-x-1/2 rounded-b-[1px]" style={{ width: Math.max(3, geo.cordW * 2.4), height: Math.max(3, geo.adapter * 0.45), background: METAL_X }} />
                 <span aria-hidden="true" data-cord className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: cord }}>
-                  {failed[i]
-                    ? <span className="absolute inset-0 origin-top" style={{ background: CORD_BG, transform: `scaleX(${CORD_W})` }} />
-                    : <CordPhoto item={item} height={geo.h} shift={`${cord}px`} stretch={cord / (BAND_H * geo.h)} />}
+                  <span className="absolute inset-0 origin-top" style={{ background: CORD_BG, transform: `scaleX(${CORD_W})` }} />
                 </span>
                 <span
                   ref={(node) => { photos.current[i] = node; }}
@@ -1026,16 +1024,7 @@ function Detail({ uid, item, index, total, labels, reduced, dim, failed, onFail,
       <div className="relative grid w-full max-w-4xl items-center gap-6 pt-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] sm:gap-12">
         <div data-dimmer-scene className="relative flex justify-center" style={{ ["--dim" as string]: dim.toFixed(2), ["--lit" as string]: dim.toFixed(2), ["--lamp-glow" as string]: item.glow }}>
           <div ref={figureRef} data-figure className="relative aspect-[2/3] h-[min(40vh,300px)] origin-top sm:h-[min(60vh,440px)]">
-            {failed ? (
-              <span aria-hidden="true" data-cord className="pointer-events-none absolute inset-x-0 origin-top" style={{ top: "-60vh", height: "calc(60vh + 2px)", background: CORD_BG, transform: `scaleX(${CORD_W})` }} />
-            ) : (
-              <>
-                <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 origin-top" style={{ top: "-60vh", bottom: "300%", background: CORD_BG, transform: `scaleX(${CORD_W})` }} />
-                <span aria-hidden="true" data-cord className="pointer-events-none absolute inset-x-0 overflow-hidden" style={{ top: "-200%", height: "200%" }}>
-                  <CordPhoto item={item} height="50%" shift="200%" stretch={2 / BAND_H} />
-                </span>
-              </>
-            )}
+            <span aria-hidden="true" data-cord className="pointer-events-none absolute inset-x-0 origin-top" style={{ top: "-60vh", height: "calc(60vh + 2px)", background: CORD_BG, transform: `scaleX(${CORD_W})` }} />
             <span aria-hidden="true" data-detail-pool className="pointer-events-none absolute rounded-full [mix-blend-mode:var(--blend)]" style={{ left: "-48%", width: "196%", top: "40%", height: "96%", background: POOL_BG, opacity: "calc(var(--dim) * var(--pool-k))" }} />
             <span aria-hidden="true" data-detail-beam className="pointer-events-none absolute [mix-blend-mode:var(--blend)]" style={{ left: "-100%", width: "300%", top: "30%", height: "150%", opacity: "calc(var(--dim) * var(--beam-k))", background: `conic-gradient(from 140deg at 50% 0%, transparent 0deg, ${BEAM_GLOW} 24deg, ${BEAM_GLOW} 56deg, transparent 80deg)`, WebkitMaskImage: "linear-gradient(to bottom, transparent 27%, black 40%, black 62%, transparent)", maskImage: "linear-gradient(to bottom, transparent 27%, black 40%, black 62%, transparent)" }} />
             <div ref={swayRef} className="absolute inset-0 origin-top" style={{ ["--bloom-r" as string]: "18px" }}>
