@@ -244,9 +244,6 @@ export default function HomeExperience() {
       <section className="w-full">
         <PendantLampRail
           items={lampItems}
-          eyebrow="DECOHO · Góc cảm hứng chiếu sáng"
-          heading="Ấm áp từ những ánh đèn giản dị"
-          caption="Lướt chuột dọc thanh treo để bật đèn, kéo trượt hoặc bấm vào đèn để chỉnh độ sáng và mua ngay."
           autoplay
           labels={{
             close: "Đóng",
@@ -254,15 +251,6 @@ export default function HomeExperience() {
             open: "Chỉnh độ sáng",
           }}
           className="w-full bg-transparent"
-          action={
-            <Link
-              href="/products"
-              className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-[#245b4c] hover:shadow-md"
-            >
-              <span>Khám phá đèn & nội thất</span>
-              <ArrowUpRight size={15} />
-            </Link>
-          }
         />
       </section>
       <div className="border-y border-[#e2e5d8] bg-[#edf0e7]">
