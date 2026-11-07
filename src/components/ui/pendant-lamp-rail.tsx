@@ -776,68 +776,16 @@ export function PendantLampRail({
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col items-center gap-3 px-6 pb-8 pt-3 text-center">
-        <div id={`${uid}-caption`} aria-live="polite" className="min-h-[4.75rem]">
-          {current ? (
-            <div className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-2xl border border-border bg-card/85 px-4 py-2.5 text-left shadow-xs backdrop-blur-xs">
-              {current.productImage && (
-                <img
-                  src={current.productImage}
-                  alt={current.name}
-                  className="size-12 shrink-0 rounded-xl border border-border object-cover"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-bold text-foreground">
-                    {current.name}
-                  </p>
-                  {current.tag && (
-                    <span className="inline-flex items-center rounded-full bg-[#eef2e7] px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-[#2f6f5e]">
-                      {current.tag}
-                    </span>
-                  )}
-                </div>
-                {current.description && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                    {current.description}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="pt-2 text-sm font-medium text-muted-foreground">{caption}</p>
+      {(caption || action) && (
+        <div className="relative z-10 flex flex-col items-center gap-3.5 px-6 pb-8 pt-3 text-center">
+          {caption && (
+            <p id={`${uid}-caption`} className="pt-1 text-sm font-medium text-muted-foreground">
+              {caption}
+            </p>
           )}
+          {action && <div className="flex flex-wrap items-center justify-center gap-2.5">{action}</div>}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          {current?.productId ? (
-            <Link
-              href={`/products/${current.productId}`}
-              className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:-translate-y-px hover:bg-[#245b4c]"
-            >
-              <span>Xem sản phẩm</span>
-            </Link>
-          ) : (
-            <div>{action}</div>
-          )}
-          {current?.productLink && (
-            <a
-              href={current.productLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#2f6f5e]/30 bg-white px-4 py-2 text-xs font-semibold text-[#2f6f5e] shadow-xs transition hover:bg-[#eef2e7]"
-            >
-              <span>Mua trên Shopee ↗</span>
-            </a>
-          )}
-          {current && litIndex !== null && (
-            <button type="button" data-open onClick={() => open(litIndex)} aria-label={`${labels.open}: ${current.name}`} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-white/70 px-3.5 py-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--lamp-accent)]" />
-              {labels.open}
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {openIndex !== null && items[openIndex] && (
         <Detail
@@ -1114,8 +1062,8 @@ function Detail({ uid, item, index, total, labels, reduced, dim, failed, onFail,
 }
 
 /* 1. ĐÈN ĐÁM MÂY KHI TẮT:
-   Dây xám mảnh xuất phát từ y=0 chạm sát mép đỉnh.
-   Cụm mây bông màu trắng ngà 3D nhiều lớp tạo độ phồng. */
+   Dây xuất phát từ y=0 khớp hoàn toàn với CORD_BG (rộng 8px trên khung 400x600).
+   Cụm mây bông màu trắng ngà 3D nhiều lớp tạo độ phồng từ y=180..410. */
 const CLOUD_OFF_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
   <defs>
@@ -1125,34 +1073,34 @@ const CLOUD_OFF_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
       <feDisplacementMap in="blur" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
     <linearGradient id="cordGrad" x1="196" y1="0" x2="204" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4a4a4a"/>
-      <stop offset="50%" stop-color="#999999"/>
-      <stop offset="100%" stop-color="#333333"/>
+      <stop offset="0%" stop-color="#262626"/>
+      <stop offset="38%" stop-color="#5c5c5c"/>
+      <stop offset="100%" stop-color="#1c1c1c"/>
     </linearGradient>
-    <radialGradient id="cloudPuff" cx="45%" cy="40%" r="55%">
+    <radialGradient id="cloudPuff" cx="45%" cy="38%" r="58%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="65%" stop-color="#f1f5f9"/>
+      <stop offset="62%" stop-color="#f1f5f9"/>
       <stop offset="100%" stop-color="#cbd5e1"/>
     </radialGradient>
   </defs>
 
-  <!-- Dây treo nối thẳng từ y=0 xuống đỉnh đèn mây -->
-  <rect x="196" y="0" width="8" height="290" fill="url(#cordGrad)" />
+  <!-- Dây treo nối thẳng từ y=0 xuống đỉnh đèn mây (y=205) -->
+  <rect x="196" y="0" width="8" height="205" fill="url(#cordGrad)" />
 
   <!-- Khối đèn đám mây bông xốp đa tầng -->
   <g filter="url(#cloudSoftness)">
     <!-- Lớp bóng đổ chân mây -->
-    <ellipse cx="200" cy="380" rx="100" ry="46" fill="#94a3b8" opacity="0.35"/>
-    <ellipse cx="140" cy="370" rx="60" ry="38" fill="#94a3b8" opacity="0.3"/>
-    <ellipse cx="260" cy="370" rx="62" ry="38" fill="#94a3b8" opacity="0.3"/>
+    <ellipse cx="200" cy="340" rx="135" ry="56" fill="#94a3b8" opacity="0.38"/>
+    <ellipse cx="120" cy="328" rx="82" ry="48" fill="#94a3b8" opacity="0.32"/>
+    <ellipse cx="280" cy="328" rx="84" ry="48" fill="#94a3b8" opacity="0.32"/>
 
     <!-- Lớp thân bông trắng mềm -->
-    <circle cx="140" cy="350" r="58" fill="url(#cloudPuff)"/>
-    <circle cx="260" cy="350" r="58" fill="url(#cloudPuff)"/>
-    <circle cx="170" cy="320" r="54" fill="url(#cloudPuff)"/>
-    <circle cx="230" cy="320" r="54" fill="url(#cloudPuff)"/>
-    <circle cx="200" cy="305" r="48" fill="url(#cloudPuff)"/>
-    <ellipse cx="200" cy="355" rx="105" ry="52" fill="url(#cloudPuff)"/>
+    <circle cx="118" cy="302" r="76" fill="url(#cloudPuff)"/>
+    <circle cx="282" cy="302" r="76" fill="url(#cloudPuff)"/>
+    <circle cx="158" cy="260" r="72" fill="url(#cloudPuff)"/>
+    <circle cx="242" cy="260" r="72" fill="url(#cloudPuff)"/>
+    <circle cx="200" cy="240" r="64" fill="url(#cloudPuff)"/>
+    <ellipse cx="200" cy="312" rx="142" ry="66" fill="url(#cloudPuff)"/>
   </g>
 </svg>
 `)}`;
@@ -1167,6 +1115,11 @@ const CLOUD_ON_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
       <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="3" result="noise"/>
       <feDisplacementMap in="blur" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
+    <linearGradient id="cordGradOn" x1="196" y1="0" x2="204" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#262626"/>
+      <stop offset="38%" stop-color="#5c5c5c"/>
+      <stop offset="100%" stop-color="#1c1c1c"/>
+    </linearGradient>
     <radialGradient id="cloudWarmPuff" cx="50%" cy="48%" r="58%">
       <stop offset="0%" stop-color="#ffffff"/>
       <stop offset="55%" stop-color="#fffbeb"/>
@@ -1183,28 +1136,28 @@ const CLOUD_ON_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
     </filter>
   </defs>
 
-  <!-- Dây treo ánh sáng ấm -->
-  <rect x="196" y="0" width="8" height="290" fill="#fde68a" opacity="0.65" />
+  <!-- Dây treo giữ tông đồng bộ -->
+  <rect x="196" y="0" width="8" height="205" fill="url(#cordGradOn)" />
 
   <!-- Lớp bông mây ấm sáng khi bật đèn -->
   <g filter="url(#cloudSoftnessOn)">
-    <ellipse cx="200" cy="380" rx="100" ry="46" fill="#f59e0b" opacity="0.35"/>
-    <ellipse cx="140" cy="370" rx="60" ry="38" fill="#f59e0b" opacity="0.3"/>
-    <ellipse cx="260" cy="370" rx="62" ry="38" fill="#f59e0b" opacity="0.3"/>
-    <circle cx="140" cy="350" r="58" fill="url(#cloudWarmPuff)"/>
-    <circle cx="260" cy="350" r="58" fill="url(#cloudWarmPuff)"/>
-    <circle cx="170" cy="320" r="54" fill="url(#cloudWarmPuff)"/>
-    <circle cx="230" cy="320" r="54" fill="url(#cloudWarmPuff)"/>
-    <circle cx="200" cy="305" r="48" fill="url(#cloudWarmPuff)"/>
-    <ellipse cx="200" cy="355" rx="105" ry="52" fill="url(#cloudWarmPuff)"/>
+    <ellipse cx="200" cy="340" rx="135" ry="56" fill="#f59e0b" opacity="0.38"/>
+    <ellipse cx="120" cy="328" rx="82" ry="48" fill="#f59e0b" opacity="0.32"/>
+    <ellipse cx="280" cy="328" rx="84" ry="48" fill="#f59e0b" opacity="0.32"/>
+    <circle cx="118" cy="302" r="76" fill="url(#cloudWarmPuff)"/>
+    <circle cx="282" cy="302" r="76" fill="url(#cloudWarmPuff)"/>
+    <circle cx="158" cy="260" r="72" fill="url(#cloudWarmPuff)"/>
+    <circle cx="242" cy="260" r="72" fill="url(#cloudWarmPuff)"/>
+    <circle cx="200" cy="240" r="64" fill="url(#cloudWarmPuff)"/>
+    <ellipse cx="200" cy="312" rx="142" ry="66" fill="url(#cloudWarmPuff)"/>
   </g>
 
   <!-- Quầng sáng ấm phát ra từ trong lòng mây -->
   <g filter="url(#bloomGlow)">
-    <circle cx="200" cy="345" r="85" fill="url(#lightCore)"/>
-    <ellipse cx="200" cy="355" rx="120" ry="65" fill="url(#lightCore)"/>
-    <circle cx="150" cy="350" r="65" fill="url(#lightCore)"/>
-    <circle cx="250" cy="350" r="65" fill="url(#lightCore)"/>
+    <circle cx="200" cy="295" r="105" fill="url(#lightCore)"/>
+    <ellipse cx="200" cy="312" rx="150" ry="80" fill="url(#lightCore)"/>
+    <circle cx="135" cy="302" r="82" fill="url(#lightCore)"/>
+    <circle cx="265" cy="302" r="82" fill="url(#lightCore)"/>
   </g>
 </svg>
 `)}`;
