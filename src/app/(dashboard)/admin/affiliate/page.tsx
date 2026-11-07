@@ -2,8 +2,6 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  AlertCircle,
-  ArrowUpRight,
   CheckCircle2,
   Clock,
   DollarSign,
@@ -17,6 +15,8 @@ import {
   TrendingUp,
   Upload,
   UserCheck,
+  UserPlus,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -49,6 +49,12 @@ interface AdminOverviewData {
   }>;
 }
 
+interface SimpleUser {
+  _id: string;
+  fullName?: string;
+  email: string;
+}
+
 export default function AdminAffiliatePage() {
   const [data, setData] = useState<AdminOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,9 +66,20 @@ export default function AdminAffiliatePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any | null>(null);
 
+  // State gán người nhận thủ công cho đơn hàng
+  const [users, setUsers] = useState<SimpleUser[]>([]);
+  const [assignModalOrder, setAssignModalOrder] = useState<{
+    orderId: string;
+    itemName: string;
+    currentUserEmail?: string;
+  } | null>(null);
+  const [selectedUserIdentifier, setSelectedUserIdentifier] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
+
   const fetchOverview = useCallback(async () => {
     try {
-      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
       const res = await authenticatedFetch(`${baseUrl}/affiliate/admin-overview`);
       if (!res.ok) {
         throw new Error(`Máy chủ trả về ${res.status}`);
@@ -77,15 +94,72 @@ export default function AdminAffiliatePage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [baseUrl]);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await authenticatedFetch(`${baseUrl}/admin/users?limit=100`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : Array.isArray(json?.items) ? json.items : [];
+      setUsers(list);
+    } catch {
+      // silent
+    }
+  }, [baseUrl]);
 
   useEffect(() => {
     fetchOverview();
-  }, [fetchOverview]);
+    fetchUsers();
+  }, [fetchOverview, fetchUsers]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchOverview();
+  };
+
+  const handleOpenAssignModal = (ord: AdminOverviewData["recentOrders"][number]) => {
+    setAssignModalOrder({
+      orderId: ord.orderId,
+      itemName: ord.itemName,
+      currentUserEmail: ord.userId?.email,
+    });
+    setSelectedUserIdentifier(ord.userId?.email || "");
+  };
+
+  const handleAssignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignModalOrder || !selectedUserIdentifier.trim()) {
+      toast.warning("Vui lòng chọn hoặc nhập Email người dùng.");
+      return;
+    }
+
+    setAssigning(true);
+    try {
+      const res = await authenticatedFetch(`${baseUrl}/affiliate/admin-assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: assignModalOrder.orderId,
+          userIdentifier: selectedUserIdentifier.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message || "Không thể gán đơn hàng");
+      }
+
+      toast.success("Gán người nhận thành công!", {
+        description: json.message,
+      });
+      setAssignModalOrder(null);
+      setSelectedUserIdentifier("");
+      fetchOverview();
+    } catch (err: any) {
+      toast.error("Lỗi khi gán đơn hàng", { description: err.message });
+    } finally {
+      setAssigning(false);
+    }
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -103,7 +177,6 @@ export default function AdminAffiliatePage() {
       if (clickFile) formData.append("clickReport", clickFile);
       if (commissionFile) formData.append("commissionReport", commissionFile);
 
-      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
       const res = await authenticatedFetch(`${baseUrl}/affiliate/upload-reports`, {
         method: "POST",
         body: formData,
@@ -407,7 +480,7 @@ export default function AdminAffiliatePage() {
             Danh Sách Đơn Hàng Shopee Gần Đây
           </h2>
           <p className="text-xs text-[#708164]">
-            Theo dõi tình trạng đơn hàng, hoa hồng và tài khoản người dùng được ghi nhận
+            Theo dõi tình trạng đơn hàng, hoa hồng và gán tài khoản người dùng nhận đơn
           </p>
         </div>
 
@@ -466,16 +539,30 @@ export default function AdminAffiliatePage() {
                     </td>
                     <td className="px-6 py-4">
                       {ord.isClaimed && ord.userId ? (
-                        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#f0f6f3] px-2.5 py-1 text-[11px] font-bold text-[#2e6f5e]">
-                          <UserCheck size={12} />
-                          <span className="truncate max-w-[110px]">
-                            {ord.userId.fullName || ord.userId.email || "Đã nhận"}
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#f0f6f3] px-2.5 py-1 text-[11px] font-bold text-[#2e6f5e]">
+                            <UserCheck size={12} />
+                            <span className="truncate max-w-[110px]" title={ord.userId.email}>
+                              {ord.userId.fullName || ord.userId.email || "Đã nhận"}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAssignModal(ord)}
+                            className="rounded-lg border border-[#ded6c9] px-2 py-1 text-[10px] font-semibold text-[#646a61] hover:bg-[#f2efe6] hover:text-[#254f43]"
+                          >
+                            Đổi
+                          </button>
                         </div>
                       ) : (
-                        <span className="rounded-full bg-[#f2efe6] px-2.5 py-1 text-[11px] font-medium text-[#708164]">
-                          Chưa có người nhận
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAssignModal(ord)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[#2e6f5e]/30 bg-[#f0f6f3] px-3 py-1 text-[11px] font-bold text-[#2e6f5e] transition hover:bg-[#2e6f5e] hover:text-white"
+                        >
+                          <UserPlus size={12} />
+                          <span>Gán người nhận</span>
+                        </button>
                       )}
                     </td>
                     <td className="px-6 py-4 text-[#708164]">
@@ -488,7 +575,96 @@ export default function AdminAffiliatePage() {
           </table>
         </div>
       </div>
+
+      {/* Modal Gán Người Nhận Đơn Hàng */}
+      {assignModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="rounded-full bg-[#eef2e7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#2e6f5e]">
+                  Gán Đơn Hàng Shopee
+                </span>
+                <h3 className="mt-2 font-serif text-lg font-bold text-[#254f43]">
+                  Mã đơn: {assignModalOrder.orderId}
+                </h3>
+                <p className="mt-1 line-clamp-1 text-xs text-[#708164]">
+                  {assignModalOrder.itemName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssignModalOrder(null)}
+                className="rounded-lg p-1.5 text-[#708164] hover:bg-[#f2efe6] hover:text-[#254f43]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignSubmit} className="mt-5 space-y-4">
+              {users.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-[#254f43]">
+                    Chọn nhanh người dùng trong hệ thống
+                  </label>
+                  <select
+                    value={selectedUserIdentifier}
+                    onChange={(e) => setSelectedUserIdentifier(e.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-[#ded6c9] bg-[#fbf9f4] px-3.5 py-2.5 text-xs text-[#254f43] outline-none focus:border-[#2e6f5e]"
+                  >
+                    <option value="">-- Chọn tài khoản người dùng --</option>
+                    {users.map((u) => (
+                      <option key={u._id} value={u.email}>
+                        {u.fullName ? `${u.fullName} (${u.email})` : u.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-[#254f43]">
+                  Hoặc nhập trực tiếp Email / User ID
+                </label>
+                <input
+                  type="text"
+                  value={selectedUserIdentifier}
+                  onChange={(e) => setSelectedUserIdentifier(e.target.value)}
+                  placeholder="Ví dụ: user@gmail.com"
+                  className="mt-1.5 w-full rounded-xl border border-[#ded6c9] bg-white px-3.5 py-2.5 text-xs text-[#254f43] outline-none focus:border-[#2e6f5e]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAssignModalOrder(null)}
+                  className="rounded-xl border border-[#ded6c9] px-4 py-2.5 text-xs font-bold text-[#646a61] hover:bg-[#fbf9f4]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={assigning || !selectedUserIdentifier.trim()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#2e6f5e] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#245747] disabled:opacity-50"
+                >
+                  {assigning ? (
+                    <>
+                      <LoaderCircle size={14} className="animate-spin" />
+                      <span>Đang gán...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck size={14} />
+                      <span>Xác nhận gán đơn</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
