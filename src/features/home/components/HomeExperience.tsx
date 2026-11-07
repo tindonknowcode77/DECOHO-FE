@@ -241,7 +241,7 @@ export default function HomeExperience() {
 
   return (
     <main ref={pageRef} className={`${styles.page} overflow-hidden bg-[#f8f6f0] text-[#293d32]`}>
-      <section className="mx-auto w-full max-w-[1440px] px-4 pb-10 pt-6 sm:px-8 lg:px-12 lg:py-10">
+      <section className="w-full">
         <PendantLampRail
           items={lampItems}
           eyebrow="DECOHO · Góc cảm hứng chiếu sáng"
@@ -253,7 +253,7 @@ export default function HomeExperience() {
             dimmer: "Độ sáng",
             open: "Chỉnh độ sáng",
           }}
-          className="w-full rounded-[32px] border border-[#e2ded3] bg-[#f4f0e6] shadow-sm"
+          className="w-full bg-transparent"
           action={
             <Link
               href="/products"

@@ -59,7 +59,7 @@ const MAX_H = 230;
 const MIN_WIDE_H = 78;
 const CAROUSEL_H = 224;
 const FIT = 1.1;
-const SPREAD = 1.42;
+const SPREAD = 1.65;
 const SHADE = 0.88;
 const CORD = 0.7;
 /* Fallback cord thickness (fraction of the 2:3 frame width) when no photo is available. */
@@ -137,7 +137,7 @@ function geometry(h: number, width: number, carousel: boolean, drops: number[]):
   const metres = reach.map((r) => (r / h) * METRES);
   const overlap = cords.map((cord, i) => i < cords.length - 1 && Math.abs(cord - (cords[i + 1] ?? 0)) < h * (MOUTH - SHADE_TOP));
   const lowest = Math.max(0, ...cords) + h * 0.8;
-  const inset = carousel ? 0 : Math.max(8, Math.round(w * 0.1));
+  const inset = 0;
   const foot = w * SHADE;
   return {
     h, w, width, carousel, track, trackTop, adapter, pivot, cords, reach, metres, overlap, foot,
