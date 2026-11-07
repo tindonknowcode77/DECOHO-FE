@@ -776,6 +776,37 @@ export function PendantLampRail({
         </div>
       )}
 
+      <div className="relative z-10 flex flex-col items-center gap-3 px-6 pb-8 pt-3 text-center">
+        <div id={`${uid}-caption`} aria-live="polite" className="min-h-[4.75rem]">
+          {current ? (
+            <div className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-2xl border border-border bg-card/85 px-4 py-2.5 text-left shadow-xs backdrop-blur-xs">
+              {current.productImage && (
+                <img
+                  src={current.productImage}
+                  alt={current.name}
+                  className="size-12 shrink-0 rounded-xl border border-border object-cover"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-bold text-foreground">
+                    {current.name}
+                  </p>
+                  {current.tag && (
+                    <span className="inline-flex items-center rounded-full bg-[#eef2e7] px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-[#2f6f5e]">
+                      {current.tag}
+                    </span>
+                  )}
+                </div>
+                {current.description && (
+                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                    {current.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="pt-2 text-sm font-medium text-muted-foreground">{caption}</p>
       {(caption || action) && (
         <div className="relative z-10 flex flex-col items-center gap-3.5 px-6 pb-8 pt-3 text-center">
           {caption && (
@@ -785,6 +816,35 @@ export function PendantLampRail({
           )}
           {action && <div className="flex flex-wrap items-center justify-center gap-2.5">{action}</div>}
         </div>
+        <div className="flex flex-wrap items-center justify-center gap-2.5">
+          {current?.productId ? (
+            <Link
+              href={`/products/${current.productId}`}
+              className="inline-flex items-center gap-2 rounded-full bg-[#2f6f5e] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:-translate-y-px hover:bg-[#245b4c]"
+            >
+              <span>Xem sản phẩm</span>
+            </Link>
+          ) : (
+            <div>{action}</div>
+          )}
+          {current?.productLink && (
+            <a
+              href={current.productLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#2f6f5e]/30 bg-white px-4 py-2 text-xs font-semibold text-[#2f6f5e] shadow-xs transition hover:bg-[#eef2e7]"
+            >
+              <span>Mua trên Shopee ↗</span>
+            </a>
+          )}
+          {current && litIndex !== null && (
+            <button type="button" data-open onClick={() => open(litIndex)} aria-label={`${labels.open}: ${current.name}`} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-white/70 px-3.5 py-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--lamp-accent)]" />
+              {labels.open}
+            </button>
+          )}
+        </div>
+      </div>
       )}
 
       {openIndex !== null && items[openIndex] && (
@@ -1178,15 +1238,15 @@ export const LAMP_DEMO_ITEMS: PendantLamp[] = [
   },
   {
     id: "cloud-pendant",
-    productId: "6ad97ca4b0c4d04dfb65f7ac",
-    name: "Đèn Deco Đám Mây · Cumulus Cloud",
-    tag: "142.000 ₫",
+    productId: "6ad983abb0c4d04dfb65f9f9",
+    name: "Đèn Mây Treo",
+    tag: "210.000 ₫",
     drop: 0.85,
     glow: "#ffecb3",
     description: "Đèn thả trần hình đám mây bông bồng bềnh, tạo ánh sáng khuếch tán dịu nhẹ và ấm áp như hoàng hôn trong phòng.",
-    details: ["Danh mục: Đèn decor", "Chất liệu bông tơ polymer tán sáng", "Có sẵn trên DECOHO & Shopee"],
-    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792638111/decoho/products/czy7csyrsdtzi2c3mmfp.webp",
-    productLink: "https://s.shopee.vn/6q1fi5En8u",
+    details: ["Danh mục: Đèn trần", "Chất liệu bông tơ polymer tán sáng", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792639905/decoho/products/gqr1j3ownrpfi4hhwao7.webp",
+    productLink: "https://s.shopee.vn/5q98YM4rnF",
     image: CLOUD_OFF_SVG,
     imageOn: CLOUD_ON_SVG,
   },
@@ -1218,14 +1278,14 @@ export const LAMP_DEMO_ITEMS: PendantLamp[] = [
   },
   {
     id: "rattan-weave",
-    productId: "6ad983abb0c4d04dfb65f9f9",
-    name: "Đèn Mây Treo",
-    tag: "210.000 ₫",
+    productId: "6ad97ca4b0c4d04dfb65f7ac",
+    name: "Đèn Deco Đám Mây",
+    tag: "142.000 ₫",
     drop: 1,
-    description: "Đèn mây đan thủ công tự nhiên, tạo hiệu ứng ánh sáng đan xen mộc mạc, gần gũi.",
-    details: ["Danh mục: Đèn trần", "Chất liệu mây tự nhiên", "Có sẵn trên DECOHO & Shopee"],
-    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792639905/decoho/products/gqr1j3ownrpfi4hhwao7.webp",
-    productLink: "https://s.shopee.vn/5q98YM4rnF",
+    description: "Đèn decor thủ công tự nhiên, tạo hiệu ứng ánh sáng đan xen mộc mạc, gần gũi.",
+    details: ["Danh mục: Đèn decor", "Ánh sáng ấm áp", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792638111/decoho/products/czy7csyrsdtzi2c3mmfp.webp",
+    productLink: "https://s.shopee.vn/6q1fi5En8u",
     image: "https://cdn.21st.dev/assets/mirror/12/1237597f711ee8334bad09432954cf04fe8cc104877dece6d0986441e59030a9.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/39/394b02f1dff0096ebace53699c42c4d817dfffd5aff943d888454a83036ce1fb.webp",
   },
