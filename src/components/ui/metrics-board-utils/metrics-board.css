@@ -1,0 +1,102 @@
+.fig-metrics-board {
+  --ik-panel: #f7f4ec;
+  --ik-top: #fdfcf8;
+  --ik-front: #f3efe4;
+  --ik-side: #e8e2d3;
+  --ik-well: #e2dbca;
+  --ik-line: #7d8578;
+  --ik-detail: #c6bfb0;
+  --ik-live: #254f43;
+  --ik-ink: #6e776a;
+  --ik-ink-hi: #17211b;
+  --ik-screen: #dfe7dd;
+  --ik-screen-ink: #17211b;
+  --ik-border: #ded6c9;
+  --ik-glow: #2e6f5e;
+  --ik-glow-strength: 0.85;
+}
+
+.fig-metrics-board .range-label {
+  font-size: 6.5px;
+  letter-spacing: 0.14em;
+}
+
+.fig-metrics-board .slab {
+  transition:
+    opacity 220ms var(--ik-ease-out),
+    transform 340ms var(--ik-spring);
+  transition-delay: calc(var(--slab, 0) * 42ms);
+}
+
+.fig-metrics-board .slab[data-on="false"] {
+  opacity: 0;
+  transform: translateY(-5px);
+  pointer-events: none;
+  transition:
+    opacity 160ms var(--ik-ease-out),
+    transform 200ms var(--ik-ease-fall);
+  transition-delay: calc(var(--slab, 0) * 32ms);
+}
+
+.fig-metrics-board .slab[data-on="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fig-metrics-board .slab[data-on="true"] .ik-top {
+  fill: color-mix(in oklab, var(--ik-top), #2e6f5e 16%);
+}
+
+.fig-metrics-board .slab[data-on="true"] .ik-face {
+  fill: color-mix(in oklab, var(--ik-front), #2e6f5e 10%);
+}
+
+.fig-metrics-board .range .key {
+  font-size: 7.5px;
+  font-weight: 700;
+}
+
+.fig-metrics-board .range[data-on="true"] .key {
+  fill: var(--ik-ink-hi);
+}
+
+.fig-metrics-board .range .led {
+  fill: var(--ik-detail);
+  transition: fill var(--ik-t-state) var(--ik-ease);
+}
+
+.fig-metrics-board .range[data-on="true"] .led {
+  fill: #2e6f5e;
+}
+
+.fig-metrics-board .mb-roll-in {
+  animation: mb-roll-in 320ms var(--ik-ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--carry, 50ms));
+}
+
+.fig-metrics-board .mb-roll-out {
+  animation: mb-roll-out 280ms var(--ik-ease-out) both;
+  animation-delay: calc(var(--i, 0) * var(--carry, 50ms));
+}
+
+@keyframes mb-roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mb-roll-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-9px);
+  }
+}
