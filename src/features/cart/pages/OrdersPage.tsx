@@ -13,6 +13,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { getMyOrders, type Order, type OrderStatus } from "../services/orderApi";
+import ClaimOrderModal from "@/src/components/affiliate/ClaimOrderModal";
+import { authenticatedFetch } from "@/src/features/auth/services/authenticatedFetch";
+import { Gift, Sparkles, TrendingUp } from "lucide-react";
 import { getSessionUser, clearSessionUser } from "@/src/features/auth/services/session";
 
 function formatPrice(value: number) {
@@ -57,6 +60,34 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "ALL">("ALL");
   const [authUser, setAuthUser] = useState<ReturnType<typeof getSessionUser>>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [activeTab, setActiveTab] = useState<"DECOHO" | "SHOPEE">("DECOHO");
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [shopeeStats, setShopeeStats] = useState<any>(null);
+  const [shopeeLoading, setShopeeLoading] = useState(false);
+
+  const loadShopeeStats = async () => {
+    setShopeeLoading(true);
+    try {
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
+      const res = await authenticatedFetch(`${base}/affiliate/my-stats`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setShopeeStats(json.data);
+        }
+      }
+    } catch {
+      // silent
+    } finally {
+      setShopeeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authUser) {
+      loadShopeeStats();
+    }
+  }, [authUser]);
 
   useEffect(() => {
     setAuthUser(getSessionUser());
@@ -157,9 +188,57 @@ export default function OrdersPage() {
             </Link>
             <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Đơn hàng của tôi</h1>
             <p className="mt-2 text-sm text-[#646a61]">
-              Theo dõi và quản lý các đơn hàng đã đặt.
+              Theo dõi đơn hàng DECOHO và hoa hồng tích lũy từ đơn Shopee
             </p>
           </div>
+
+          {/* Nút Nhận Đơn Shopee */}
+          <button
+            type="button"
+            onClick={() => setShowClaimModal(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#2e6f5e] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#245747] active:scale-95"
+          >
+            <Gift className="h-4 w-4 text-[#dfe8d3]" />
+            <span>+ Nhận hoa hồng đơn Shopee</span>
+          </button>
+        </div>
+
+        {/* Tab chuyển đổi giữa Đơn DECOHO và Đơn Shopee */}
+        <div className="mt-6 flex border-b border-[#ded6c9] gap-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab("DECOHO")}
+            className={`pb-3 text-sm font-bold transition relative ${
+              activeTab === "DECOHO"
+                ? "text-[#2e6f5e]"
+                : "text-[#708164] hover:text-[#254f43]"
+            }`}
+          >
+            <span>Đơn mua DECOHO ({orders.length})</span>
+            {activeTab === "DECOHO" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2e6f5e]" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("SHOPEE")}
+            className={`pb-3 text-sm font-bold transition relative flex items-center gap-1.5 ${
+              activeTab === "SHOPEE"
+                ? "text-[#2e6f5e]"
+                : "text-[#708164] hover:text-[#254f43]"
+            }`}
+          >
+            <span>Đơn Shopee đã nhận ({shopeeStats?.totalOrders ?? 0})</span>
+            {shopeeStats?.totalCommission > 0 && (
+              <span className="rounded-full bg-[#e8f1ec] px-2 py-0.5 text-[10px] font-extrabold text-[#2e6f5e]">
+                +{Math.round(shopeeStats.totalCommission).toLocaleString("vi-VN")} ₫
+              </span>
+            )}
+            {activeTab === "SHOPEE" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2e6f5e]" />
+            )}
+          </button>
         </div>
 
         <div className="mt-6 flex flex-col gap-4 sm:flex-row">

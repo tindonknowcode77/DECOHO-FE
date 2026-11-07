@@ -32,18 +32,15 @@ function parseSessionUser(value: string | null): AuthSessionUser | null {
         registeredAt: parsed.registeredAt,
         remember: parsed.remember,
         onboardingCompleted: Boolean(parsed.onboardingCompleted),
-        role:
-          parsed.role === "user" ||
-          parsed.role === "supplier" ||
-          parsed.role === "staff" ||
-          parsed.role === "admin" ||
-          parsed.role === "super_admin"
-            ? parsed.role
-            : (parsed as { role?: string }).role === "customer"
-              ? "user"
-            : (parsed as { role?: string }).role === "store"
-              ? "supplier"
-            : undefined,
+        role: (() => {
+          const r = typeof parsed.role === "string" ? parsed.role.toLowerCase() : "";
+          if (r === "user" || r === "customer") return "user";
+          if (r === "supplier" || r === "store") return "supplier";
+          if (r === "staff") return "staff";
+          if (r === "admin") return "admin";
+          if (r === "super_admin") return "super_admin";
+          return undefined;
+        })(),
         storeId: typeof parsed.storeId === "string" ? parsed.storeId : undefined,
         storeName: typeof parsed.storeName === "string" ? parsed.storeName : undefined,
         storeStatus:

@@ -31,26 +31,12 @@ type ModuleConfig = {
 const modules: ModuleConfig[] = [
   { id: "dashboard", label: "Dashboard", endpoint: "/admin/dashboard", group: "Tổng quan" },
   { id: "users", label: "Người dùng", endpoint: "/admin/users", group: "Tài khoản" },
-  { id: "suppliers", label: "Supplier", endpoint: "/admin/suppliers", group: "Tài khoản" },
   { id: "products", label: "Sản phẩm", endpoint: "/products/admin/all", group: "Thương mại" },
-  { id: "categories", label: "Danh mục", endpoint: "/categories", group: "Thương mại" },
-  { id: "brands", label: "Thương hiệu", endpoint: "/brands/admin/all", group: "Thương mại" },
   { id: "orders", label: "Đơn hàng", endpoint: "/orders/admin/all", group: "Thương mại" },
   { id: "affiliate", label: "Shopee Affiliate", href: "/admin/affiliate", group: "Thương mại" },
-  { id: "payments", label: "Thanh toán", endpoint: "/payments/admin", group: "Thương mại" },
-  { id: "promotions", label: "Khuyến mãi", endpoint: "/promotions/admin/all", group: "Thương mại" },
   { id: "moodboard", label: "Product Space", custom: true, group: "Không gian và AI" },
   { id: "showroom", label: "Showroom 3D", endpoint: "/showrooms/admin/all", group: "Không gian và AI" },
-  { id: "scanner", label: "AI Product Scanner", endpoint: "/ai-scanner/admin/history", group: "Không gian và AI" },
-  { id: "reviews", label: "Đánh giá", endpoint: "/reviews/admin/all", group: "Chăm sóc" },
-  { id: "complaints", label: "Khiếu nại", endpoint: "/support-tickets/admin/all", group: "Chăm sóc" },
   { id: "community", label: "Diễn đàn", custom: true, group: "Nội dung" },
-  { id: "content", label: "Nội dung website", endpoint: "/website-content/admin/all", group: "Nội dung" },
-  { id: "notifications", label: "Thông báo", group: "Nội dung" },
-  { id: "reports", label: "Báo cáo thống kê", group: "Hệ thống" },
-  { id: "staff", label: "Nhân viên và phân quyền", endpoint: "/admin/users?role=STAFF", group: "Hệ thống" },
-  { id: "activity", label: "Nhật ký hoạt động", group: "Hệ thống" },
-  { id: "settings", label: "Cài đặt hệ thống", group: "Hệ thống" },
 ];
 
 function apiBase() {
@@ -65,6 +51,7 @@ function titleOf(value: Record<string, unknown>) {
   return String(
     value.title ??
       value.name ??
+      value.fullName ??
       value.code ??
       value.ticketCode ??
       value.orderCode ??
@@ -97,7 +84,8 @@ export default function AdminCenterView() {
     getServerUserSnapshot,
   );
   const user = useMemo(() => JSON.parse(userSnapshot) as AuthSessionUser | null, [userSnapshot]);
-  const canAccessAdmin = !!user && ["admin", "super_admin", "staff"].includes(user.role ?? "");
+  const userRole = (user?.role ?? "").toLowerCase();
+  const canAccessAdmin = !!user && ["admin", "super_admin", "staff"].includes(userRole);
 
   const load = useCallback(async () => {
     if (!canAccessAdmin) return;
@@ -237,18 +225,10 @@ export default function AdminCenterView() {
           </div>
 
           {/* Sub KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
               <span className="text-[10px] font-bold uppercase text-[#708164]">Không gian phòng</span>
               <p className="mt-1 text-lg font-bold text-[#254f43]">{stats.totalRooms ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
-              <span className="text-[10px] font-bold uppercase text-[#708164]">Kế hoạch Decor</span>
-              <p className="mt-1 text-lg font-bold text-[#254f43]">{stats.totalDecorPlans ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
-              <span className="text-[10px] font-bold uppercase text-[#708164]">Nhà cung cấp</span>
-              <p className="mt-1 text-lg font-bold text-[#254f43]">{stats.totalSuppliers ?? 0}</p>
             </div>
             <div className="rounded-xl border border-[#ded6c9] bg-white p-4 shadow-xs">
               <span className="text-[10px] font-bold uppercase text-[#708164]">Đơn mới cần xử lý</span>
