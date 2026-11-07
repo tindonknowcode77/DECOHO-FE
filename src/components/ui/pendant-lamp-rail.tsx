@@ -1113,6 +1113,102 @@ function Detail({ uid, item, index, total, labels, reduced, dim, failed, onFail,
   );
 }
 
+/* 1. ĐÈN ĐÁM MÂY KHI TẮT:
+   Dây xám mảnh xuất phát từ y=0 chạm sát mép đỉnh.
+   Cụm mây bông màu trắng ngà 3D nhiều lớp tạo độ phồng. */
+const CLOUD_OFF_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+  <defs>
+    <filter id="cloudSoftness" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="3" result="noise"/>
+      <feDisplacementMap in="blur" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <linearGradient id="cordGrad" x1="196" y1="0" x2="204" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4a4a4a"/>
+      <stop offset="50%" stop-color="#999999"/>
+      <stop offset="100%" stop-color="#333333"/>
+    </linearGradient>
+    <radialGradient id="cloudPuff" cx="45%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="65%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Dây treo nối thẳng từ y=0 xuống đỉnh đèn mây -->
+  <rect x="196" y="0" width="8" height="290" fill="url(#cordGrad)" />
+
+  <!-- Khối đèn đám mây bông xốp đa tầng -->
+  <g filter="url(#cloudSoftness)">
+    <!-- Lớp bóng đổ chân mây -->
+    <ellipse cx="200" cy="380" rx="100" ry="46" fill="#94a3b8" opacity="0.35"/>
+    <ellipse cx="140" cy="370" rx="60" ry="38" fill="#94a3b8" opacity="0.3"/>
+    <ellipse cx="260" cy="370" rx="62" ry="38" fill="#94a3b8" opacity="0.3"/>
+
+    <!-- Lớp thân bông trắng mềm -->
+    <circle cx="140" cy="350" r="58" fill="url(#cloudPuff)"/>
+    <circle cx="260" cy="350" r="58" fill="url(#cloudPuff)"/>
+    <circle cx="170" cy="320" r="54" fill="url(#cloudPuff)"/>
+    <circle cx="230" cy="320" r="54" fill="url(#cloudPuff)"/>
+    <circle cx="200" cy="305" r="48" fill="url(#cloudPuff)"/>
+    <ellipse cx="200" cy="355" rx="105" ry="52" fill="url(#cloudPuff)"/>
+  </g>
+</svg>
+`)}`;
+
+/* 2. ĐÈN ĐÁM MÂY KHI BẬT SÁNG:
+   Ánh sáng ấm xuyên qua lõi mây bông, phát tán ánh vàng rực rỡ và phát quang ra xung quanh. */
+const CLOUD_ON_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+  <defs>
+    <filter id="cloudSoftnessOn" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="3" result="noise"/>
+      <feDisplacementMap in="blur" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <radialGradient id="cloudWarmPuff" cx="50%" cy="48%" r="58%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#fffbeb"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </radialGradient>
+    <radialGradient id="lightCore" cx="50%" cy="55%" r="55%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="30%" stop-color="#fff8db" stop-opacity="0.95"/>
+      <stop offset="70%" stop-color="#ffd573" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.2"/>
+    </radialGradient>
+    <filter id="bloomGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+    </filter>
+  </defs>
+
+  <!-- Dây treo ánh sáng ấm -->
+  <rect x="196" y="0" width="8" height="290" fill="#fde68a" opacity="0.65" />
+
+  <!-- Lớp bông mây ấm sáng khi bật đèn -->
+  <g filter="url(#cloudSoftnessOn)">
+    <ellipse cx="200" cy="380" rx="100" ry="46" fill="#f59e0b" opacity="0.35"/>
+    <ellipse cx="140" cy="370" rx="60" ry="38" fill="#f59e0b" opacity="0.3"/>
+    <ellipse cx="260" cy="370" rx="62" ry="38" fill="#f59e0b" opacity="0.3"/>
+    <circle cx="140" cy="350" r="58" fill="url(#cloudWarmPuff)"/>
+    <circle cx="260" cy="350" r="58" fill="url(#cloudWarmPuff)"/>
+    <circle cx="170" cy="320" r="54" fill="url(#cloudWarmPuff)"/>
+    <circle cx="230" cy="320" r="54" fill="url(#cloudWarmPuff)"/>
+    <circle cx="200" cy="305" r="48" fill="url(#cloudWarmPuff)"/>
+    <ellipse cx="200" cy="355" rx="105" ry="52" fill="url(#cloudWarmPuff)"/>
+  </g>
+
+  <!-- Quầng sáng ấm phát ra từ trong lòng mây -->
+  <g filter="url(#bloomGlow)">
+    <circle cx="200" cy="345" r="85" fill="url(#lightCore)"/>
+    <ellipse cx="200" cy="355" rx="120" ry="65" fill="url(#lightCore)"/>
+    <circle cx="150" cy="350" r="65" fill="url(#lightCore)"/>
+    <circle cx="250" cy="350" r="65" fill="url(#lightCore)"/>
+  </g>
+</svg>
+`)}`;
+
 export const LAMP_DEMO_ITEMS: PendantLamp[] = [
   {
     id: "dome-enamel",
@@ -1126,6 +1222,20 @@ export const LAMP_DEMO_ITEMS: PendantLamp[] = [
     productLink: "https://s.shopee.vn/6VOtBHsYbE",
     image: "https://cdn.21st.dev/assets/mirror/fc/fcfdfbf3d62f14d97eb23453aa9fe6772f7c09b521226442621e4f187d79b4d6.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/2d/2d2990c7f5d56e69848237695a204baf6a366d180facb94c62b78cdc3e37dd13.webp",
+  },
+  {
+    id: "cloud-pendant",
+    productId: "6ad97ca4b0c4d04dfb65f7ac",
+    name: "Đèn Deco Đám Mây · Cumulus Cloud",
+    tag: "142.000 ₫",
+    drop: 0.85,
+    glow: "#ffecb3",
+    description: "Đèn thả trần hình đám mây bông bồng bềnh, tạo ánh sáng khuếch tán dịu nhẹ và ấm áp như hoàng hôn trong phòng.",
+    details: ["Danh mục: Đèn decor", "Chất liệu bông tơ polymer tán sáng", "Có sẵn trên DECOHO & Shopee"],
+    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792638111/decoho/products/czy7csyrsdtzi2c3mmfp.webp",
+    productLink: "https://s.shopee.vn/6q1fi5En8u",
+    image: CLOUD_OFF_SVG,
+    imageOn: CLOUD_ON_SVG,
   },
   {
     id: "glass-globe",
@@ -1191,19 +1301,6 @@ export const LAMP_DEMO_ITEMS: PendantLamp[] = [
     productLink: "https://s.shopee.vn/6AltDyOzhl",
     image: "https://cdn.21st.dev/assets/mirror/a8/a89caec23d33213a849f40b76789ead7c88f0c2d91eb7e91e60987c72e566032.webp",
     imageOn: "https://cdn.21st.dev/assets/mirror/b1/b17f53b4eb8ff9d544bc2ce66802e46c7134d760cd225f9059aec2f7799ffbb7.webp",
-  },
-  {
-    id: "fluted-glass",
-    productId: "6adabeda0d8c75708ef672a9",
-    name: "Đèn ốp trần tràn viền",
-    tag: "131.489 ₫",
-    drop: 0.58,
-    description: "Đèn trần tràn viền gọn gàng, phù hợp căn hộ hiện đại với hiệu suất chiếu sáng cao.",
-    details: ["Danh mục: Đèn trần", "Kiểu dáng tràn viền", "Có sẵn trên DECOHO & Shopee"],
-    productImage: "https://res.cloudinary.com/djzzwjznn/image/upload/v1792720563/decoho/products/eb1f5xxxtrfleuesm8s9.webp",
-    productLink: "https://s.shopee.vn/BUg4wlps1",
-    image: "https://cdn.21st.dev/assets/mirror/14/14f8418ed6724766526e9d3efb7130163b8f6bc8cd784452ea4afdcaa980d818.webp",
-    imageOn: "https://cdn.21st.dev/assets/mirror/14/141699616e79db6eeb2667ff7dcd106822e1cb408dd4ea2c7fe5c42fa52b957f.webp",
   },
   {
     id: "copper-bell",
