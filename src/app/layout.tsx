@@ -4,7 +4,7 @@ import PageTransition from "@/src/components/layout/PageTransition";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DECOHO | Thiết kế nội thất bằng AI",
+  title: "DECOHO",
   description:
     "DECOHO giúp phân tích không gian, gợi ý phong cách và kết nối mua sắm nội thất cho ngôi nhà Việt.",
 };
