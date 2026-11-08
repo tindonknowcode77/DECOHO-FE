@@ -40,6 +40,8 @@ type ApiProduct = {
   productLink?: string;
   isFeatured?: boolean;
   ratingAvg?: number | string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 };
 
 function getApiUrl() {
@@ -163,6 +165,8 @@ function normalizeProduct(product: ApiProduct): Product {
       "Tồn kho": `${toNumber(product.stock)} sản phẩm`,
       "Trạng thái": product.status ?? "Đang cập nhật",
     },
+    createdAt: product.createdAt ? String(product.createdAt) : undefined,
+    updatedAt: product.updatedAt ? String(product.updatedAt) : undefined,
     __raw: product,
     productLink: product.productLink,
     ecommercePlatform: product.ecommercePlatform,

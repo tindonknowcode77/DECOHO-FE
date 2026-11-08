@@ -1,7 +1,7 @@
 "use client";
 import { confirmDelete } from "@/src/components/common/confirmDelete";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   deleteProduct,
   getAdminProducts,
@@ -11,8 +11,51 @@ import ProductForm from "./ProductForm";
 
 type Props = { accessToken?: string };
 
-
 type View = { mode: "list" } | { mode: "create" } | { mode: "edit"; product: Product };
+
+function getProductTimestamp(p: Product): number {
+  if (p.createdAt) {
+    const t = new Date(p.createdAt).getTime();
+    if (!Number.isNaN(t) && t > 0) return t;
+  }
+  const raw = p.__raw as Record<string, unknown> | undefined;
+  if (raw?.createdAt) {
+    const t = new Date(String(raw.createdAt)).getTime();
+    if (!Number.isNaN(t) && t > 0) return t;
+  }
+  const idStr = String(p.id ?? raw?._id ?? "");
+  if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+    return parseInt(idStr.substring(0, 8), 16) * 1000;
+  }
+  return 0;
+}
+
+function sortByNewest(list: Product[]): Product[] {
+  return [...list].sort((a, b) => {
+    const tsA = getProductTimestamp(a);
+    const tsB = getProductTimestamp(b);
+    if (tsA !== tsB) return tsB - tsA;
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
+function formatCreatedDate(p: Product): string {
+  const ts = getProductTimestamp(p);
+  if (!ts) return "";
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+function isNewProduct(p: Product, allSorted: Product[]): boolean {
+  const ts = getProductTimestamp(p);
+  const now = Date.now();
+  if (ts > 0 && now - ts < 7 * 24 * 60 * 60 * 1000) {
+    return true;
+  }
+  const idx = allSorted.findIndex((item) => item.id === p.id);
+  return idx >= 0 && idx < 3;
+}
 
 export default function AdminProductsPanel({ accessToken }: Props) {
   const [items, setItems] = useState<Product[]>([]);
@@ -50,8 +93,9 @@ export default function AdminProductsPanel({ accessToken }: Props) {
     setError("");
     try {
       const list = await getAdminProducts(accessToken);
-      setItems(list);
-      setSelected(prev => prev.filter(id => list.some(item => item.id === id)));
+      const sorted = sortByNewest(list);
+      setItems(sorted);
+      setSelected(prev => prev.filter(id => sorted.some(item => item.id === id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được danh sách.");
     } finally {
@@ -64,17 +108,20 @@ export default function AdminProductsPanel({ accessToken }: Props) {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const filtered = items.filter((item) =>
-    [item.name, item.sku, item.category, item.brand]
-      .filter(Boolean)
-      .some((value) => value!.toLowerCase().includes(query.toLowerCase())),
-  );
+  const filtered = useMemo(() => {
+    const list = items.filter((item) =>
+      [item.name, item.sku, item.category, item.brand]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(query.toLowerCase())),
+    );
+    return sortByNewest(list);
+  }, [items, query]);
 
   if (view.mode === "create") {
     return (
       <ProductForm
         onSaved={(saved) => {
-          setItems((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)]);
+          setItems((prev) => sortByNewest([saved, ...prev.filter((p) => p.id !== saved.id)]));
           setView({ mode: "list" });
         }}
         onCancel={() => setView({ mode: "list" })}
@@ -88,7 +135,7 @@ export default function AdminProductsPanel({ accessToken }: Props) {
         initial={view.product}
         onSaved={(saved) => {
           setItems((prev) =>
-            prev.map((p) => (p.id === saved.id ? saved : p)),
+            sortByNewest(prev.map((p) => (p.id === saved.id ? saved : p))),
           );
           setView({ mode: "list" });
         }}
@@ -103,7 +150,7 @@ export default function AdminProductsPanel({ accessToken }: Props) {
         <div>
           <h2 className="text-2xl font-black text-[#17211b]">Quản lý sản phẩm</h2>
           <p className="text-xs text-[#777e77]">
-            Có {items.length} sản phẩm. Sản phẩm admin đăng sẽ tự động ở trạng thái <strong>APPROVED</strong>.
+            Có {items.length} sản phẩm (sản phẩm mới nhất luôn hiển thị đầu tiên). Sản phẩm admin đăng sẽ tự động ở trạng thái <strong>APPROVED</strong>.
           </p>
         </div>
         <button
@@ -197,9 +244,17 @@ export default function AdminProductsPanel({ accessToken }: Props) {
               </div>
 
               <div className="flex flex-1 flex-col gap-2 p-4">
-                <h3 className="line-clamp-2 font-black text-[#17211b]">{product.name}</h3>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="line-clamp-2 font-black text-[#17211b]">{product.name}</h3>
+                  {isNewProduct(product, filtered) ? (
+                    <span className="shrink-0 rounded-full border border-[#2f6f5e]/30 bg-[#eef6f2] px-2 py-0.5 text-[10px] font-bold text-[#2f6f5e]">
+                      Mới
+                    </span>
+                  ) : null}
+                </div>
                 <p className="text-xs text-[#777e77]">
                   {product.category || "—"} · {product.brand || "DECOHO"}
+                  {formatCreatedDate(product) ? ` · ${formatCreatedDate(product)}` : ""}
                 </p>
                 <div className="mt-auto flex items-end justify-between">
                   <div>
