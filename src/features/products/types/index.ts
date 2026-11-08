@@ -28,6 +28,7 @@ export type Product = {
   productLink?: string;
   ecommercePlatform?: string;
   specifications: Record<string, string>;
+  shopeeClicks?: number;
   createdAt?: string;
   updatedAt?: string;
   __raw?: Record<string, unknown>;

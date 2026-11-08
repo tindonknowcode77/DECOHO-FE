@@ -391,22 +391,21 @@ function MoodboardTab({ board }: { board: Moodboard }) {
               <button
                 aria-label={`Sản phẩm ${point.product?.name ?? point.productId}`}
                 className={`absolute -translate-x-1/2 -translate-y-1/2 transition ${
-                  isActive ? "z-10 scale-110" : "z-0 hover:scale-105"
+                  isActive ? "z-10 scale-125" : "z-0 hover:scale-125"
                 }`}
                 key={pointKey}
                 onClick={() => setActivePointId(isActive ? null : pointKey)}
                 style={{ left: `${point.x}%`, top: `${point.y}%` }}
+                title={`Sản phẩm ${point.product?.name ?? idx + 1}`}
                 type="button"
               >
                 <span
-                  className={`grid h-9 w-9 place-items-center rounded-full text-xs font-black ring-4 ring-white shadow-lg transition ${
+                  className={`block rounded-full border-2 border-white shadow-md transition ${
                     isActive
-                      ? "bg-[#d89b47] text-white"
-                      : "bg-[#2f6f5e] text-white hover:bg-[#265a4d]"
+                      ? "h-4 w-4 bg-[#79943b] ring-2 ring-[#79943b]/50"
+                      : "h-3.5 w-3.5 bg-[#ef6e61] hover:bg-[#79943b]"
                   }`}
-                >
-                  {idx + 1}
-                </span>
+                />
               </button>
             );
           })}

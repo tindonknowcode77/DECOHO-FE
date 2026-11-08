@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
+import ShopeeBuyButton from "@/src/features/affiliate/components/ShopeeBuyButton";
 import ProductImage from "../components/ProductImage";
 import { getPurchaseLink } from "../utils/purchaseLink";
 import {
@@ -148,14 +149,13 @@ export default async function ProductDetailPage({
                 />
               )}
               {purchaseLink && (
-                <a
-                  className="rounded-md bg-[#2f6f5e] px-5 py-3 text-center text-sm font-bold text-white shadow-sm transition hover:bg-[#285f51]"
+                <ShopeeBuyButton
                   href={purchaseLink.href}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {purchaseLink.label}
-                </a>
+                  label={purchaseLink.label}
+                  productId={product.id}
+                  productName={product.name}
+                  source="web_product_detail"
+                />
               )}
             </div>
 

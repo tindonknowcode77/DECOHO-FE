@@ -10,6 +10,7 @@ import { getProductById } from "@/src/features/products/services/productService"
 import type { Product } from "../types";
 import { getPurchaseLink } from "../utils/purchaseLink";
 import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
+import { trackShopeeClick } from "@/src/features/affiliate/services/trackShopeeClick";
 
 type ProductQuickViewProps = {
   product: ProductSpaceProduct | undefined;
@@ -219,6 +220,15 @@ export default function ProductQuickView({
                     href={purchaseLink.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => {
+                      const pid = String(fullProduct?.id ?? productId ?? "");
+                      trackShopeeClick({
+                        productId: pid,
+                        productName: displayProduct.name,
+                        productLink: purchaseLink.href,
+                        source: "web_quick_view",
+                      });
+                    }}
                     className="flex items-center justify-center gap-2 rounded-xl bg-[#ee4d2d] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#d73f20] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ee4d2d]"
                   >
                     <ShoppingBag className="h-5 w-5" aria-hidden="true" />

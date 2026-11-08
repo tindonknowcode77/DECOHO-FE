@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
+import { trackShopeeClick } from "@/src/features/affiliate/services/trackShopeeClick";
 
 export interface PendantLamp {
   id: string;
@@ -1030,6 +1031,14 @@ function Detail({ uid, item, index, total, labels, reduced, dim, failed, onFail,
                   href={item.productLink}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => {
+                    trackShopeeClick({
+                      productId: item.productId ?? item.id,
+                      productName: item.name,
+                      productLink: item.productLink ?? "",
+                      source: "web_pendant_lamp",
+                    });
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-full border border-[#2f6f5e]/30 bg-white px-4 py-1.5 text-xs font-semibold text-[#2f6f5e] shadow-sm transition hover:bg-[#eef2e7]"
                 >
                   <span>Mua ngay trên Shopee ↗</span>

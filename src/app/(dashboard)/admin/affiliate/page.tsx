@@ -30,6 +30,27 @@ interface AdminOverviewData {
   claimedCount: number;
   unclaimedCount: number;
   conversionRate: number;
+  recentClicks?: Array<{
+    _id: string;
+    clickId?: string;
+    clickTime?: string;
+    productName?: string;
+    targetUrl?: string;
+    clickRegion?: string;
+    subId1?: string;
+    createdAt?: string;
+    userId?: {
+      _id: string;
+      fullName?: string;
+      email?: string;
+    };
+    productId?: {
+      _id: string;
+      name?: string;
+      image?: string;
+      category?: string;
+    };
+  }>;
   recentOrders: Array<{
     _id: string;
     orderId: string;
@@ -567,6 +588,115 @@ export default function AdminAffiliatePage() {
                     </td>
                     <td className="px-6 py-4 text-[#708164]">
                       {ord.orderTime ? new Date(ord.orderTime).toLocaleDateString("vi-VN") : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Bảng Nhật Ký Click Shopee Trực Tiếp (Live Clicks) */}
+      <div className="rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-sm">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#ee4d2d] opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#ee4d2d]" />
+              </span>
+              <h2 className="text-lg font-bold text-[#254f43]">
+                Nhật Ký Click Shopee Trực Tiếp (Live Clicks)
+              </h2>
+            </div>
+            <p className="text-xs text-[#708164]">
+              Ghi nhận tự động mỗi khi khách hàng bấm nút &quot;Mua trên Shopee&quot; trên Web / Mobile
+            </p>
+          </div>
+          <span className="text-xs font-bold text-[#ee4d2d]">
+            Tổng click: {data?.totalClicks ?? 0}
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#f7f5ef] text-[11px] font-bold uppercase tracking-wider text-[#708164]">
+              <tr>
+                <th className="px-6 py-3.5">Thời gian</th>
+                <th className="px-6 py-3.5">Sản phẩm</th>
+                <th className="px-6 py-3.5">Người click</th>
+                <th className="px-6 py-3.5">Nguồn</th>
+                <th className="px-6 py-3.5">Link Shopee</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#ded6c9]/60">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-[#708164]">
+                    <div className="inline-flex items-center gap-2">
+                      <LoaderCircle size={16} className="animate-spin text-[#2e6f5e]" />
+                      <span>Đang tải nhật ký click...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : !data?.recentClicks?.length ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-[#708164]">
+                    Chưa có lượt click Shopee nào được ghi nhận gần đây.
+                  </td>
+                </tr>
+              ) : (
+                data.recentClicks.map((c) => (
+                  <tr key={c._id} className="transition hover:bg-[#fbf9f4]">
+                    <td className="px-6 py-4 text-[#708164] whitespace-nowrap">
+                      {c.clickTime || c.createdAt
+                        ? new Date(c.clickTime || c.createdAt!).toLocaleString("vi-VN")
+                        : "—"}
+                    </td>
+                    <td className="px-6 py-4 max-w-[240px]">
+                      <div className="font-bold text-[#254f43] truncate" title={c.productName || c.productId?.name}>
+                        {c.productName || c.productId?.name || "Sản phẩm nội thất"}
+                      </div>
+                      {c.productId?.category && (
+                        <div className="text-[10px] text-[#708164] uppercase font-semibold">
+                          {c.productId.category}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {c.userId ? (
+                        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#f0f6f3] px-2.5 py-1 text-[11px] font-bold text-[#2e6f5e]">
+                          <UserCheck size={12} />
+                          <span className="truncate max-w-[120px]" title={c.userId.email}>
+                            {c.userId.fullName || c.userId.email}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-[#f4f2ea] px-2 py-0.5 text-[10px] font-semibold text-[#80897b]">
+                          Khách vãng lai (Guest)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-[#708164]">
+                      <span className="rounded-md border border-[#e2ddd1] bg-[#f9f7f2] px-2 py-0.5 text-[10px] font-mono font-medium text-[#465345]">
+                        {c.clickRegion || "web"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 max-w-[160px]">
+                      {c.targetUrl ? (
+                        <a
+                          href={c.targetUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-bold text-[#ee4d2d] hover:underline truncate max-w-[150px]"
+                          title={c.targetUrl}
+                        >
+                          Shopee ↗
+                        </a>
+                      ) : (
+                        <span className="text-[#80897b]">—</span>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -271,6 +271,15 @@ export default function AdminProductsPanel({ accessToken }: Props) {
                   <span className="text-xs text-[#777e77]">Kho: {product.stock || 0}</span>
                 </div>
 
+                <div className="mt-1 flex items-center justify-end">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-[#fff1ec] px-2 py-0.5 text-xs font-bold text-[#ee4d2d]"
+                    title="Số lượt người dùng bấm Mua trên Shopee"
+                  >
+                    🖱️ {product.shopeeClicks ?? 0} click Shopee
+                  </span>
+                </div>
+
                 <div className="mt-3 flex gap-2 border-t border-[#e5dfd2] pt-3">
                   <button
                     type="button"

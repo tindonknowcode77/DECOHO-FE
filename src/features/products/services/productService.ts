@@ -167,6 +167,7 @@ function normalizeProduct(product: ApiProduct): Product {
     },
     createdAt: product.createdAt ? String(product.createdAt) : undefined,
     updatedAt: product.updatedAt ? String(product.updatedAt) : undefined,
+    shopeeClicks: toNumber((product as any).shopeeClicks),
     __raw: product,
     productLink: product.productLink,
     ecommercePlatform: product.ecommercePlatform,
