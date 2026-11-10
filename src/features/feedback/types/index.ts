@@ -45,3 +45,12 @@ export interface ProductFeedbackStats {
   };
   items: FeedbackItem[];
 }
+
+export interface PublicFeedbackResponse {
+  items: FeedbackItem[];
+  total: number;
+  averageRating: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

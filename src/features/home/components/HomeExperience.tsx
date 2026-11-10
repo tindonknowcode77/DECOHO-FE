@@ -19,6 +19,7 @@ import ProductCard from "@/src/features/products/components/ProductCard";
 import CatalogQuickView from "@/src/features/products/components/CatalogQuickView";
 import PendantLampRail, { LAMP_DEMO_ITEMS } from "@/src/components/ui/pendant-lamp-rail";
 import type { ProductSpace } from "@/src/features/product-space/types";
+import CommunityFeedbackSection from "./CommunityFeedbackSection";
 
 type Post = {
   _id: string;
@@ -443,6 +444,10 @@ export default function HomeExperience() {
             </div>
           </DataArea>
         </section>
+
+        {/* Đánh Giá & Cảm Nhận Từ Cộng Đồng */}
+        <CommunityFeedbackSection />
+
         <section className="border-t border-[#dce0d1] pt-10 text-center">
           <p className="mb-3 text-[10px] uppercase tracking-[0.25em] text-[#8b947c]">
             Không cần hoàn hảo. Chỉ cần là bạn.
