@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
 import ShopeeBuyButton from "@/src/features/affiliate/components/ShopeeBuyButton";
+import ProductReviewSection from "@/src/features/feedback/components/ProductReviewSection";
 import ProductImage from "../components/ProductImage";
 import { getPurchaseLink } from "../utils/purchaseLink";
 import {
@@ -193,6 +194,9 @@ export default async function ProductDetailPage({
           </div>
         </section>
       </section>
+
+      {/* Đánh Giá & Góp Ý Sản Phẩm */}
+      <ProductReviewSection productId={product.id} productName={product.name} />
 
       {recommendedProducts.length > 0 && (
         <section className="mx-auto mt-14 max-w-6xl">

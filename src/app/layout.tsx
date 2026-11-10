@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Navigation from "@/src/components/layout/Navigation";
 import PageTransition from "@/src/components/layout/PageTransition";
+import FloatingFeedbackButton from "@/src/features/feedback/components/FloatingFeedbackButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body className="min-h-full bg-[#f7f3ec]">
         <Navigation />
         <PageTransition>{children}</PageTransition>
+        <FloatingFeedbackButton />
       </body>
     </html>
   );
