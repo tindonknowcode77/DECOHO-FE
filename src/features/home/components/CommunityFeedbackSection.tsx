@@ -13,6 +13,8 @@ export default function CommunityFeedbackSection() {
   const [avgRating, setAvgRating] = useState<number>(5.0);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [inView, setInView] = useState<boolean>(false);
+  const sectionRef = React.useRef<HTMLElement>(null);
 
   const fetchCommunityReviews = async () => {
     try {
@@ -28,11 +30,36 @@ export default function CommunityFeedbackSection() {
   };
 
   useEffect(() => {
-    fetchCommunityReviews();
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      fetchCommunityReviews();
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          fetchCommunityReviews();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <section aria-label="Đánh giá từ cộng đồng" className="w-full">
+    <section
+      ref={sectionRef}
+      aria-label="Đánh giá từ cộng đồng"
+      className={`w-full transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}
+    >
       <div className="rounded-[28px] border border-[#ded6c9] bg-white p-6 sm:p-10 shadow-xs">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-[#ded6c9] pb-6">

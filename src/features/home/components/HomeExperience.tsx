@@ -47,16 +47,50 @@ const loadBoards = (signal: AbortSignal) =>
   loadList<ProductSpace>("product-spaces", signal);
 const loadPosts = (signal: AbortSignal) =>
   loadList<Post>("community/posts?page=1&limit=3", signal);
-function useHomeData<T>(loader: (signal: AbortSignal) => Promise<T[]>) {
+
+function useLazySection<T>(
+  loader: (signal: AbortSignal) => Promise<T[]>,
+  immediate = false,
+) {
   const [state, setState] = useState<{
     data: T[];
     loading: boolean;
     error: string;
   }>({ data: [], loading: true, error: "" });
+  const [inView, setInView] = useState(immediate);
   const [revision, setRevision] = useState(0);
+  const ref = useRef<HTMLElement>(null);
+
   useEffect(() => {
+    if (immediate) {
+      setInView(true);
+      return;
+    }
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [immediate]);
+
+  useEffect(() => {
+    if (!inView) return;
     const controller = new AbortController();
-    void loader(controller.signal)
+
+    loader(controller.signal)
       .then((data) => {
         if (!controller.signal.aborted)
           setState({ data, loading: false, error: "" });
@@ -70,11 +104,17 @@ function useHomeData<T>(loader: (signal: AbortSignal) => Promise<T[]>) {
               e instanceof Error ? e.message : "Chưa kết nối được máy chủ.",
           });
       });
+
     return () => controller.abort();
-  }, [loader, revision]);
+  }, [inView, loader, revision]);
+
   return {
+    ref,
+    inView,
     ...state,
+    loading: !inView || state.loading,
     retry: () => {
+      setInView(true);
       setState((s) => ({ ...s, loading: true, error: "" }));
       setRevision((r) => r + 1);
     },
@@ -85,6 +125,9 @@ function DataArea({
   state,
   children,
   empty,
+  skeletonCount = 3,
+  skeletonGrid = "grid gap-6 sm:grid-cols-2 lg:grid-cols-3",
+  skeletonAspect = "aspect-[4/3]",
 }: {
   state: {
     loading: boolean;
@@ -94,18 +137,22 @@ function DataArea({
   };
   children: ReactNode;
   empty: string;
+  skeletonCount?: number;
+  skeletonGrid?: string;
+  skeletonAspect?: string;
 }) {
   if (state.loading)
     return (
-      <div
-        aria-label="Đang tải nội dung"
-        className="grid grid-cols-2 gap-5 md:grid-cols-3"
-      >
-        {[1, 2, 3].map((i) => (
+      <div aria-label="Đang tải nội dung" className={skeletonGrid}>
+        {Array.from({ length: skeletonCount }).map((_, i) => (
           <div
             key={i}
-            className="h-64 animate-pulse rounded-2xl bg-[#e9e9df] motion-reduce:animate-none"
-          />
+            className="overflow-hidden rounded-2xl border border-[#e2e4d8] bg-white p-4 space-y-3 animate-pulse"
+          >
+            <div className={`w-full ${skeletonAspect} rounded-xl bg-[#e9e8df]`}></div>
+            <div className="h-4 w-3/4 rounded-md bg-[#e9e8df]"></div>
+            <div className="h-3 w-1/2 rounded-md bg-[#e9e8df]"></div>
+          </div>
         ))}
       </div>
     );
@@ -219,9 +266,9 @@ export default function HomeExperience() {
     preference.addEventListener("change", stop);
     return () => { observer.disconnect(); animations.forEach(animation => animation.cancel()); preference.removeEventListener("change", stop); };
   }, []);
-  const products = useHomeData(getProducts);
-  const boards = useHomeData(loadBoards);
-  const posts = useHomeData(loadPosts);
+  const boards = useLazySection(loadBoards, true);
+  const products = useLazySection(getProducts, false);
+  const posts = useLazySection(loadPosts, false);
   const [quick, setQuick] = useState<Product | null>(null);
 
   const lampItems = LAMP_DEMO_ITEMS.map((item) => {
@@ -297,7 +344,13 @@ export default function HomeExperience() {
         </div>
       </div>
       <div className="mx-auto max-w-[1320px] space-y-16 px-5 py-14 sm:px-8 lg:space-y-20 lg:px-12 lg:py-20">
-        <section aria-label="Moodboard trang chủ">
+        <section
+          ref={boards.ref}
+          aria-label="Moodboard trang chủ"
+          className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            boards.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <Heading
             eyebrow="Mỗi căn phòng, một câu chuyện"
             title="Cảm hứng cho không gian của bạn"
@@ -307,6 +360,9 @@ export default function HomeExperience() {
           <DataArea
             state={boards}
             empty="Chưa có moodboard công khai. Hãy quay lại để khám phá những ý tưởng mới."
+            skeletonCount={3}
+            skeletonGrid="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            skeletonAspect="aspect-[4/3]"
           >
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {boards.data.slice(0, 3).map((board) => (
@@ -338,7 +394,13 @@ export default function HomeExperience() {
             </div>
           </DataArea>
         </section>
-        <section aria-label="Sản phẩm trang chủ">
+        <section
+          ref={products.ref}
+          aria-label="Sản phẩm trang chủ"
+          className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            products.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <Heading
             eyebrow="Chi tiết nhỏ, khác biệt lớn"
             title="Tìm mảnh ghép cho tổ ấm"
@@ -348,6 +410,9 @@ export default function HomeExperience() {
           <DataArea
             state={products}
             empty="Danh mục sản phẩm đang được cập nhật."
+            skeletonCount={4}
+            skeletonGrid="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5"
+            skeletonAspect="aspect-[4/3]"
           >
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
               {products.data.slice(0, 4).map((product) => (
@@ -391,7 +456,13 @@ export default function HomeExperience() {
             </p>
           </div>
         </section>
-        <section aria-label="Cộng đồng trang chủ">
+        <section
+          ref={posts.ref}
+          aria-label="Cộng đồng trang chủ"
+          className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            posts.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
           <Heading
             eyebrow="Đẹp hơn khi cùng sẻ chia"
             title="Chuyện nhà, chuyện của chúng mình"
@@ -401,6 +472,9 @@ export default function HomeExperience() {
           <DataArea
             state={posts}
             empty="Chưa có bài viết công khai. Ghé diễn đàn để chia sẻ không gian của bạn."
+            skeletonCount={3}
+            skeletonGrid="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            skeletonAspect="aspect-[16/10]"
           >
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {posts.data.slice(0, 3).map((post) => {
