@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Patrick+Hand&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Patrick+Hand&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -12,9 +12,9 @@
   --chart-1: #2f6f5e;
   --chart-3: #e8b96a;
   --chart-4: #f3bd60;
-  --font-body: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
-  --font-display: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
-  --font-heading: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+  --font-body: var(--font-be-vietnam), "Be Vietnam Pro", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-lora), Lora, Georgia, serif;
+  --font-heading: var(--font-lora), Lora, Georgia, serif;
   --font-accent: "Patrick Hand", cursive;
   --font-hand-small: "Patrick Hand", cursive;
 }
@@ -31,6 +31,9 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --font-sans: var(--font-body);
+  --font-serif: var(--font-heading);
+  --font-display: var(--font-heading);
+  --font-heading: var(--font-heading);
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
@@ -39,7 +42,8 @@ body {
   color: var(--foreground);
   font-family: var(--font-body);
   font-feature-settings: "kern" 1, "liga" 1;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.005em;
+  line-height: 1.6;
 }
 
 h1,
@@ -48,9 +52,9 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.035em;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
@@ -58,22 +62,23 @@ button,
 input,
 select,
 textarea {
-  font: inherit;
+  font-family: var(--font-body);
 }
 
-/* Các chữ lớn dùng Calibri */
+/* Các tiêu đề lớn dùng Lora (Serif nhẹ nhàng, trí thức) */
 .text-2xl,
 .text-3xl,
 .text-4xl,
 .text-5xl,
 .text-6xl,
 .text-7xl {
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
 }
 
-.font-display { font-family: var(--font-display); }
+.font-display { font-family: var(--font-heading); }
 .font-heading { font-family: var(--font-heading); }
-.font-serif   { font-family: var(--font-display); } /* đồng nghĩa với font-display */
+.font-serif   { font-family: var(--font-heading); }
+.font-sans    { font-family: var(--font-body); }
 .font-accent { font-family: var(--font-accent); letter-spacing: -0.04em; }
 .font-hand-small { font-family: var(--font-hand-small); }
 
