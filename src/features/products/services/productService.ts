@@ -38,6 +38,7 @@ type ApiProduct = {
   styleTags?: string[];
   ecommercePlatform?: string;
   productLink?: string;
+  model3dUrl?: string;
   isFeatured?: boolean;
   ratingAvg?: number | string;
   createdAt?: string | Date;
@@ -170,6 +171,7 @@ function normalizeProduct(product: ApiProduct): Product {
     shopeeClicks: toNumber((product as any).shopeeClicks),
     __raw: product,
     productLink: product.productLink,
+    model3dUrl: product.model3dUrl,
     ecommercePlatform: product.ecommercePlatform,
   } as Product;
 }

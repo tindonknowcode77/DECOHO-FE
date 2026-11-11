@@ -75,6 +75,17 @@ const AVAILABLE_FURNITURE: AvailableProduct[] = [
     material: "Gỗ sồi tự nhiên hoàn thiện mờ, ngăn kéo âm",
     suggestedScale: 0.28,
   },
+  {
+    id: "6ae35877c250c39b342117d4",
+    name: "Bàn Học Hiện Đại Chân Trụ Tròn",
+    category: "Bàn ghế",
+    price: 366221,
+    modelUrl: "https://res.cloudinary.com/djzzwjznn/raw/upload/v1794401937/decoho/furniture/ban-hoc-chan-tru-tron-1794401933401.glb",
+    thumbnailUrl: "https://res.cloudinary.com/djzzwjznn/image/upload/v1793284208/decoho/products/prlemz516zsllko9xkkz.webp",
+    dimensions: "120 x 60 x 75 cm",
+    material: "Gỗ công nghiệp MDF phủ melamine trắng, chân trụ tròn",
+    suggestedScale: 0.28,
+  },
 ];
 
 export type PlacedFurniture = {

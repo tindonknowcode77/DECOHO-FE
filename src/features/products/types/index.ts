@@ -26,6 +26,7 @@ export type Product = {
   reviewsCount: number;
   status?: ProductStatus;
   productLink?: string;
+  model3dUrl?: string;
   ecommercePlatform?: string;
   specifications: Record<string, string>;
   shopeeClicks?: number;

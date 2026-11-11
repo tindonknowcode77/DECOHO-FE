@@ -4,6 +4,7 @@ import AddToCartButton from "@/src/features/cart/components/AddToCartButton";
 import ShopeeBuyButton from "@/src/features/affiliate/components/ShopeeBuyButton";
 import ProductReviewSection from "@/src/features/feedback/components/ProductReviewSection";
 import ProductImage from "../components/ProductImage";
+import Product3DViewer from "../components/Product3DViewer";
 import { getPurchaseLink } from "../utils/purchaseLink";
 import {
   getProductById,
@@ -58,19 +59,29 @@ export default async function ProductDetailPage({
 
         <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(390px,0.92fr)]">
           <div className="overflow-hidden rounded-lg border border-[#ded6c9] bg-white p-3 shadow-[0_12px_36px_rgba(57,45,29,.09)]">
-            <ProductImage
-              alt={product.name}
-              className="aspect-[4/3] w-full rounded-md object-cover"
-              height={760}
-              priority
-              sizes="(min-width: 1024px) 54vw, 100vw"
-              src={product.image}
-              width={920}
-            />
+            {product.model3dUrl ? (
+              <Product3DViewer
+                modelUrl={product.model3dUrl}
+                previewImage={product.image}
+                productName={product.name}
+              />
+            ) : (
+              <ProductImage
+                alt={product.name}
+                className="aspect-[4/3] w-full rounded-md object-cover"
+                height={760}
+                priority
+                sizes="(min-width: 1024px) 54vw, 100vw"
+                src={product.image}
+                width={920}
+              />
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3 px-1 pb-1 pt-4">
               <div>
                 <p className="text-xs font-bold uppercase text-[#7b7f78]">
-                  Hình ảnh sản phẩm
+                  {product.model3dUrl
+                    ? "Mô hình 3D & Hình ảnh sản phẩm"
+                    : "Hình ảnh sản phẩm"}
                 </p>
                 <p className="mt-1 text-sm font-semibold">
                   {product.brand} · {product.category}
