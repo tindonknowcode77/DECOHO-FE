@@ -3,11 +3,11 @@
 import AuthShell from "./AuthShell";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import GoogleSignInButton from "./GoogleSignInButton";
 import PasswordVisibilityButton from "./PasswordVisibilityButton";
-import { redirectToMobileIfNeeded, saveAuthTokens, saveSessionUser } from "../services/session";
+import { getAccessToken, getRefreshToken, redirectToMobileIfNeeded, saveAuthTokens, saveSessionUser } from "../services/session";
 import type { LoginFormState } from "../types";
 
 type IconName = "arrow" | "home" | "lock" | "mail" | "shield" | "spark";
@@ -47,6 +47,13 @@ export default function LoginView() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const accessToken = getAccessToken();
+    if (accessToken) {
+      redirectToMobileIfNeeded(accessToken, getRefreshToken() ?? undefined);
+    }
+  }, []);
 
   function updateField<TField extends keyof LoginFormState>(
     field: TField,

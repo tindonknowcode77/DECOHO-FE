@@ -84,6 +84,7 @@ export function saveSessionUser(user: AuthSessionUser) {
 
 export function saveAuthTokens(accessToken:string,refreshToken?:string){if(!isBrowser())return;window.localStorage.setItem(ACCESS_TOKEN_KEY,accessToken);if(refreshToken)window.localStorage.setItem(REFRESH_TOKEN_KEY,refreshToken);}
 export function getAccessToken(){return isBrowser()?window.localStorage.getItem(ACCESS_TOKEN_KEY):null;}
+export function getRefreshToken(){return isBrowser()?window.localStorage.getItem(REFRESH_TOKEN_KEY):null;}
 
 export function clearSessionUser() {
   if (!isBrowser()) {
