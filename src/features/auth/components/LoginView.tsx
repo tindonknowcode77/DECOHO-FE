@@ -7,7 +7,7 @@ import { FormEvent, useState } from "react";
 import BrandLogo from "@/src/components/common/BrandLogo";
 import GoogleSignInButton from "./GoogleSignInButton";
 import PasswordVisibilityButton from "./PasswordVisibilityButton";
-import { saveAuthTokens, saveSessionUser } from "../services/session";
+import { redirectToMobileIfNeeded, saveAuthTokens, saveSessionUser } from "../services/session";
 import type { LoginFormState } from "../types";
 
 type IconName = "arrow" | "home" | "lock" | "mail" | "shield" | "spark";
@@ -124,6 +124,9 @@ export default function LoginView() {
         role,
         onboardingCompleted,
       });
+      if (redirectToMobileIfNeeded(data.accessToken, data.refreshToken)) {
+        return;
+      }
       router.push(
         ["admin", "super_admin", "staff"].includes(role)
           ? "/admin"

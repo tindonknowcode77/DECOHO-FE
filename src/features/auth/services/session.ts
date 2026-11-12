@@ -119,3 +119,22 @@ export function subscribeSessionUser(callback: (user: AuthSessionUser | null) =>
     window.removeEventListener("storage", handleStorage);
   };
 }
+
+/**
+ * Chuyển hướng ngược về ứng dụng mobile (Expo Go / APK) nếu URL đăng nhập có tham số `mobileRedirect`.
+ * Chỉ cho phép custom scheme nội bộ (`decoho://` hoặc `exp://`) để tránh open redirect.
+ */
+export function redirectToMobileIfNeeded(accessToken: string, refreshToken?: string): boolean {
+  if (!isBrowser()) return false;
+
+  const mobileRedirect = new URLSearchParams(window.location.search).get("mobileRedirect")?.trim();
+  if (!mobileRedirect) return false;
+  if (!mobileRedirect.startsWith("decoho://") && !mobileRedirect.startsWith("exp://")) {
+    return false;
+  }
+
+  const separator = mobileRedirect.includes("?") ? "&" : "?";
+  const target = `${mobileRedirect}${separator}accessToken=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken || "")}`;
+  window.location.replace(target);
+  return true;
+}
