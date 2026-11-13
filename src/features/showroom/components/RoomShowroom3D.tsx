@@ -28,6 +28,10 @@ import {
   Layers,
   Eye,
   CheckCircle2,
+  Save,
+  FolderOpen,
+  Cloud,
+  HardDrive,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -35,6 +39,13 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import type { Showroom } from "../types";
+import {
+  deleteSavedShowroomDesign,
+  listSavedShowroomDesigns,
+  saveShowroomDesign,
+  type SavedDesignItem,
+  type SavedShowroomDesign,
+} from "../services/showroomDesignService";
 
 // Cao độ chuẩn của bề mặt sàn gỗ căn phòng mẫu
 const FLOOR_Y = 0.055;
@@ -133,6 +144,13 @@ export default function RoomShowroom3D() {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [isAddingModel, setIsAddingModel] = useState<boolean>(false);
   const [userNotification, setUserNotification] = useState<string>("");
+  const [savedDesigns, setSavedDesigns] = useState<SavedShowroomDesign[]>([]);
+  const [activeDesign, setActiveDesign] = useState<SavedShowroomDesign | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showDesignsDrawer, setShowDesignsDrawer] = useState(false);
+  const [designNameInput, setDesignNameInput] = useState("");
+  const [isSavingDesign, setIsSavingDesign] = useState(false);
+  const pendingDesignRef = useRef<SavedShowroomDesign | null>(null);
 
   // Three.js instances ref
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -182,9 +200,15 @@ export default function RoomShowroom3D() {
     }
   }, []);
 
+  const refreshSavedDesigns = useCallback(async () => {
+    const designs = await listSavedShowroomDesigns();
+    setSavedDesigns(designs);
+  }, []);
+
   useEffect(() => {
     void fetchShowrooms();
-  }, [fetchShowrooms]);
+    void refreshSavedDesigns();
+  }, [fetchShowrooms, refreshSavedDesigns]);
 
   const activeShowroom = showrooms.find((s) => s._id === selectedId) || showrooms[0];
 
@@ -499,6 +523,171 @@ export default function RoomShowroom3D() {
     });
   };
 
+  const clearPlacedFurnitureObjects = useCallback(() => {
+    const furnitureGroup = furnitureGroupRef.current;
+    if (furnitureGroup) {
+      while (furnitureGroup.children.length > 0) {
+        const child = furnitureGroup.children[0];
+        furnitureGroup.remove(child);
+        child.traverse((o: any) => {
+          o.geometry?.dispose();
+          if (o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            mats.forEach((m: any) => m?.dispose?.());
+          }
+        });
+      }
+    }
+    setPlacedList([]);
+    setSelectedInstanceId(null);
+  }, []);
+
+  const placeModelIntoRoom = useCallback((item: SavedDesignItem) => {
+    const furnitureGroup = furnitureGroupRef.current;
+    if (!furnitureGroup) return Promise.resolve();
+
+    return new Promise<void>((resolve, reject) => {
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+      const loader = new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
+
+      loader.load(
+        item.modelUrl,
+        (gltf) => {
+          const rawModel = gltf.scene;
+          rawModel.updateMatrixWorld(true);
+          const rawBox = new THREE.Box3().setFromObject(rawModel);
+          const rawCenter = rawBox.getCenter(new THREE.Vector3());
+          const rawMin = rawBox.min;
+          rawModel.position.set(-rawCenter.x, -rawMin.y, -rawCenter.z);
+
+          const itemContainer = new THREE.Group();
+          itemContainer.add(rawModel);
+          itemContainer.scale.set(item.scale, item.scale, item.scale);
+          itemContainer.position.set(item.position[0], item.position[1], item.position[2]);
+          itemContainer.rotation.y = item.rotationY;
+          itemContainer.userData = {
+            instanceId: item.instanceId,
+            productId: item.productId,
+            name: item.name,
+            scale: item.scale,
+          };
+
+          furnitureGroup.add(itemContainer);
+          dracoLoader.dispose();
+          resolve();
+        },
+        undefined,
+        (err) => {
+          dracoLoader.dispose();
+          reject(err);
+        },
+      );
+    });
+  }, []);
+
+  const applySavedDesignToScene = useCallback(async (design: SavedShowroomDesign) => {
+    clearPlacedFurnitureObjects();
+    setIsAddingModel(true);
+    showToast(`Đang mở thiết kế "${design.name}"...`);
+    try {
+      await Promise.all(design.items.map((item) => placeModelIntoRoom(item)));
+      setPlacedList(design.items.map((item) => ({ ...item })));
+      setActiveDesign(design);
+      setShowDesignsDrawer(false);
+      showToast(`Đã tải thiết kế "${design.name}" (${design.items.length} món)!`);
+    } catch {
+      showToast("Một số mô hình trong thiết kế chưa thể tải lại.");
+    } finally {
+      setIsAddingModel(false);
+    }
+  }, [clearPlacedFurnitureObjects, placeModelIntoRoom]);
+
+  useEffect(() => {
+    if (!modelLoading && pendingDesignRef.current && furnitureGroupRef.current) {
+      const pending = pendingDesignRef.current;
+      pendingDesignRef.current = null;
+      void applySavedDesignToScene(pending);
+    }
+  }, [modelLoading, applySavedDesignToScene]);
+
+  const captureCurrentDesignItems = (): SavedDesignItem[] => {
+    const furnitureGroup = furnitureGroupRef.current;
+    return placedList.map((item) => {
+      const obj = furnitureGroup?.children.find((c) => c.userData?.instanceId === item.instanceId);
+      if (!obj) return item;
+      return {
+        ...item,
+        position: [obj.position.x, obj.position.y, obj.position.z],
+        rotationY: obj.rotation.y,
+        scale: obj.scale.x,
+      };
+    });
+  };
+
+  const handleOpenSaveModal = () => {
+    if (placedList.length === 0) {
+      showToast("Hãy đặt ít nhất 1 món nội thất vào phòng trước khi lưu.");
+      return;
+    }
+    setDesignNameInput(activeDesign?.name || `${activeShowroom?.title || "Phòng 3D"} (${placedList.length} món)`);
+    setShowSaveModal(true);
+  };
+
+  const handleSaveDesign = async (saveAsNew: boolean) => {
+    const trimmedName = designNameInput.trim();
+    if (!trimmedName) {
+      showToast("Vui lòng nhập tên cho bản thiết kế.");
+      return;
+    }
+    setIsSavingDesign(true);
+    try {
+      const items = captureCurrentDesignItems();
+      const saved = await saveShowroomDesign({
+        designId: !saveAsNew ? activeDesign?._id : undefined,
+        designSource: !saveAsNew ? activeDesign?.source : undefined,
+        name: trimmedName,
+        showroomId: activeShowroom?._id || "default-room",
+        showroomName: activeShowroom?.title || "Phòng mẫu 3D",
+        items,
+      });
+      setActiveDesign(saved);
+      await refreshSavedDesigns();
+      setShowSaveModal(false);
+      showToast(
+        saved.source === "cloud"
+          ? `Đã lưu thiết kế "${saved.name}" lên tài khoản!`
+          : `Đã lưu "${saved.name}" trên trình duyệt (đăng nhập để đồng bộ).`,
+      );
+    } catch {
+      showToast("Không thể lưu thiết kế lúc này. Vui lòng thử lại.");
+    } finally {
+      setIsSavingDesign(false);
+    }
+  };
+
+  const handleSelectSavedDesign = (design: SavedShowroomDesign) => {
+    if (design.showroomId && design.showroomId !== selectedId && showrooms.some((r) => r._id === design.showroomId)) {
+      pendingDesignRef.current = design;
+      setSelectedId(design.showroomId);
+      setShowDesignsDrawer(false);
+      return;
+    }
+    void applySavedDesignToScene(design);
+  };
+
+  const handleDeleteSavedDesign = async (design: SavedShowroomDesign) => {
+    try {
+      await deleteSavedShowroomDesign(design._id, design.source);
+      if (activeDesign?._id === design._id) setActiveDesign(null);
+      await refreshSavedDesigns();
+      showToast(`Đã xóa thiết kế "${design.name}".`);
+    } catch {
+      showToast("Không thể xóa thiết kế.");
+    }
+  };
+
   // HÀM: Thêm sản phẩm vào căn phòng 3D (Chuẩn hóa tâm & đáy chạm sàn chuẩn Coohom)
   const handleAddFurnitureToRoom = async (product: AvailableProduct) => {
     const scene = sceneRef.current;
@@ -743,6 +932,24 @@ export default function RoomShowroom3D() {
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#646a61] sm:text-base">
                 Kéo thả giường ngủ, bàn ghế vào phòng · Tỉ lệ tương quan chuẩn xác · Hỗ trợ chuyển đổi góc nhìn 3D và Mặt bằng (Top-down) chuyên nghiệp.
               </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowDesignsDrawer(true)}
+                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[#ded6c9] bg-white px-4 text-xs font-bold text-[#254f43] shadow-sm transition hover:border-[#2e6f5e] hover:bg-[#f2efe6]"
+              >
+                <FolderOpen size={15} className="text-[#2e6f5e]" />
+                <span>Thiết kế đã lưu ({savedDesigns.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenSaveModal}
+                className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#2e6f5e] px-5 text-xs font-bold text-white shadow-sm transition hover:bg-[#25594b] active:scale-[0.98]"
+              >
+                <Save size={15} />
+                <span>{activeDesign ? "Lưu / Cập nhật 3D" : "Lưu thiết kế 3D"}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1212,6 +1419,118 @@ export default function RoomShowroom3D() {
           </aside>
         </div>
       </section>
+
+      {/* Modal Lưu thiết kế 3D */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#254f43]">Lưu thiết kế phòng mẫu 3D</h3>
+              <button type="button" onClick={() => setShowSaveModal(false)} className="rounded-xl p-1.5 text-[#646a61] hover:bg-[#f2efe6]">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-[#646a61]">
+              Lưu lại vị trí, góc xoay và kích thước của {placedList.length} món nội thất trong phòng "{activeShowroom?.title}".
+            </p>
+            <label className="mt-4 block text-xs font-bold text-[#254f43]">Tên bản thiết kế</label>
+            <input
+              type="text"
+              value={designNameInput}
+              onChange={(e) => setDesignNameInput(e.target.value)}
+              placeholder="Ví dụ: Phòng ngủ tối giản của tôi"
+              className="mt-1.5 h-11 w-full rounded-xl border border-[#ded6c9] bg-[#fcfaf6] px-3.5 text-sm text-[#254f43] outline-none focus:border-[#2e6f5e]"
+            />
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={isSavingDesign}
+                onClick={() => setShowSaveModal(false)}
+                className="h-10 rounded-xl border border-[#ded6c9] px-4 text-xs font-bold text-[#646a61] hover:bg-[#f2efe6]"
+              >
+                Hủy
+              </button>
+              {activeDesign && (
+                <button
+                  type="button"
+                  disabled={isSavingDesign}
+                  onClick={() => void handleSaveDesign(false)}
+                  className="h-10 rounded-xl border border-[#2e6f5e] bg-[#eef6f2] px-4 text-xs font-bold text-[#2e6f5e] hover:bg-[#dfeee7]"
+                >
+                  Cập nhật bản hiện tại
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={isSavingDesign}
+                onClick={() => void handleSaveDesign(true)}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#2e6f5e] px-5 text-xs font-bold text-white hover:bg-[#25594b] disabled:opacity-60"
+              >
+                {isSavingDesign && <LoaderCircle size={14} className="animate-spin" />}
+                <span>{activeDesign ? "Lưu thành bản mới" : "Lưu thiết kế"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Danh sách thiết kế đã lưu */}
+      {showDesignsDrawer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs">
+          <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-3xl border border-[#ded6c9] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#eee7dc] pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-[#254f43]">Thiết kế 3D đã lưu</h3>
+                <p className="text-xs text-[#646a61]">Chọn một bản thiết kế để mở lại bố cục nội thất trong phòng 3D.</p>
+              </div>
+              <button type="button" onClick={() => setShowDesignsDrawer(false)} className="rounded-xl p-1.5 text-[#646a61] hover:bg-[#f2efe6]">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
+              {savedDesigns.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#ded6c9] bg-[#fcfaf6] p-8 text-center text-sm text-[#646a61]">
+                  Chưa có thiết kế nào được lưu. Hãy thêm đồ vào phòng và bấm <strong>Lưu thiết kế 3D</strong>.
+                </div>
+              ) : (
+                savedDesigns.map((design) => (
+                  <div key={design._id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#ded6c9] bg-[#fcfaf6] p-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="truncate text-sm font-bold text-[#254f43]">{design.name}</h4>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#646a61] border border-[#ded6c9]">
+                          {design.source === "cloud" ? <Cloud size={10} className="text-[#2e6f5e]" /> : <HardDrive size={10} />}
+                          {design.source === "cloud" ? "Tài khoản" : "Trình duyệt"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-[#646a61]">
+                        {design.showroomName} · {design.items.length} món đồ · {new Date(design.updatedAt).toLocaleDateString("vi-VN")}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSavedDesign(design)}
+                        className="h-9 rounded-xl bg-[#2e6f5e] px-3.5 text-xs font-bold text-white hover:bg-[#25594b]"
+                      >
+                        Mở
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSavedDesign(design)}
+                        title="Xóa thiết kế"
+                        className="grid h-9 w-9 place-items-center rounded-xl border border-[#e8ceca] bg-[#fdf2f0] text-[#a34131] hover:bg-[#fae1dd]"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
