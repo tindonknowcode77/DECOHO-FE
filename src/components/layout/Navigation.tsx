@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import BrandLogo from "@/src/components/common/BrandLogo";
+import CommunityNotificationBell from "@/src/features/community/components/CommunityNotificationBell";
 import GlobalSearch from "./GlobalSearch";
 import {
   clearSessionUser,
@@ -201,6 +202,7 @@ export default function Navigation() {
 
             <MobileSearchButton />
 
+            {currentUser && <CommunityNotificationBell />}
 
             {currentUser ? (
               <div className="relative hidden sm:block">
