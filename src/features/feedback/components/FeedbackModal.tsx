@@ -14,9 +14,12 @@ import {
   Star,
   Clock,
   Filter,
+  ImagePlus,
+  Video,
 } from "lucide-react";
 import StarRating from "./StarRating";
-import { submitFeedback, getPublicFeedbacks } from "../services/feedbackService";
+import FeedbackMediaGallery from "./FeedbackMediaGallery";
+import { submitFeedback, getPublicFeedbacks, uploadFeedbackMedia } from "../services/feedbackService";
 import type { FeedbackType, FeedbackItem } from "../types";
 import { getSessionUser } from "@/src/features/auth/services/session";
 
@@ -117,6 +120,9 @@ export default function FeedbackModal({
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [selectedMediaFiles, setSelectedMediaFiles] = useState<
+    Array<{ file: File; previewUrl: string; type: "image" | "video" }>
+  >([]);
 
   // Community Feed State
   const [communityItems, setCommunityItems] = useState<FeedbackItem[]>([]);
@@ -177,11 +183,16 @@ export default function FeedbackModal({
 
     try {
       const submittedName = userName.trim() || "Khách trải nghiệm";
+      const uploadedMedia = selectedMediaFiles.length
+        ? await uploadFeedbackMedia(selectedMediaFiles.map((m) => m.file))
+        : [];
+
       const res = await submitFeedback({
         type,
         rating,
         content: content.trim(),
         tags: selectedTags,
+        media: uploadedMedia,
         productId,
         productName,
         userName: submittedName,
@@ -189,6 +200,8 @@ export default function FeedbackModal({
         pageUrl: typeof window !== "undefined" ? window.location.href : undefined,
       });
 
+      selectedMediaFiles.forEach((m) => URL.revokeObjectURL(m.previewUrl));
+      setSelectedMediaFiles([]);
       setJustSubmitted(true);
       if (onSuccess) onSuccess();
 
@@ -199,6 +212,7 @@ export default function FeedbackModal({
         rating,
         content: content.trim(),
         tags: selectedTags,
+        media: uploadedMedia,
         productName,
         userName: submittedName,
         createdAt: new Date().toISOString(),
@@ -415,6 +429,102 @@ export default function FeedbackModal({
                   />
                 </div>
 
+                {/* Upload ảnh & video thực tế khi nhận hàng */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-[#254f43]">
+                      Ảnh / Video thực tế khi nhận hàng (tối đa 5 tệp)
+                    </label>
+                    <span className="text-[11px] text-[#708164]">
+                      {selectedMediaFiles.length}/5
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {selectedMediaFiles.map((item, idx) => (
+                      <div
+                        key={item.previewUrl}
+                        className="relative h-16 w-16 overflow-hidden rounded-xl border border-[#ded6c9] bg-[#f7f3ec]"
+                      >
+                        {item.type === "video" ? (
+                          <>
+                            <video
+                              src={item.previewUrl}
+                              muted
+                              className="h-full w-full object-cover"
+                            />
+                            <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1 py-0.5 text-[9px] font-bold text-white">
+                              VIDEO
+                            </span>
+                          </>
+                        ) : (
+                          <img
+                            src={item.previewUrl}
+                            alt={`Preview ${idx + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            URL.revokeObjectURL(item.previewUrl);
+                            setSelectedMediaFiles((prev) =>
+                              prev.filter((_, i) => i !== idx),
+                            );
+                          }}
+                          className="absolute right-1 top-1 rounded-full bg-black/70 p-0.5 text-white hover:bg-black"
+                          aria-label="Xóa tệp"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {selectedMediaFiles.length < 5 && (
+                      <label className="inline-flex h-16 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#2f6f5e]/50 bg-[#f6faf7] px-3.5 text-xs font-semibold text-[#2f6f5e] transition hover:bg-[#eaf4ee]">
+                        <ImagePlus size={16} />
+                        <Video size={16} />
+                        <span>Chọn ảnh / video</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files ?? []);
+                            if (!files.length) return;
+                            setError("");
+                            const remaining = 5 - selectedMediaFiles.length;
+                            const picked = files.slice(0, remaining);
+                            const next: Array<{ file: File; previewUrl: string; type: "image" | "video" }> = [];
+                            for (const f of picked) {
+                              const isVideo = f.type.startsWith("video/");
+                              const maxBytes = (isVideo ? 50 : 10) * 1024 * 1024;
+                              if (f.size > maxBytes) {
+                                setError(
+                                  isVideo
+                                    ? `Video "${f.name}" vượt quá 50MB.`
+                                    : `Ảnh "${f.name}" vượt quá 10MB.`,
+                                );
+                                continue;
+                              }
+                              next.push({
+                                file: f,
+                                previewUrl: URL.createObjectURL(f),
+                                type: isVideo ? "video" : "image",
+                              });
+                            }
+                            if (next.length) {
+                              setSelectedMediaFiles((prev) => [...prev, ...next]);
+                            }
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 {/* User name & email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -618,6 +728,8 @@ export default function FeedbackModal({
                       <p className="text-xs leading-relaxed text-[#5c645a]">
                         {item.content}
                       </p>
+
+                      <FeedbackMediaGallery media={item.media} />
                     </article>
                   );
                 })}

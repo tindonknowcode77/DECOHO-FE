@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Star, MessageSquarePlus, User, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 import StarRating from "./StarRating";
+import FeedbackMediaGallery from "./FeedbackMediaGallery";
 import FeedbackModal from "./FeedbackModal";
 import { getProductFeedback } from "../services/feedbackService";
 import type { ProductFeedbackStats } from "../types";
@@ -183,6 +184,8 @@ export default function ProductReviewSection({
                   <p className="text-xs sm:text-sm leading-relaxed text-[#5c645a]">
                     {rev.content}
                   </p>
+
+                  <FeedbackMediaGallery media={rev.media} />
                 </article>
               ))}
             </div>

@@ -1,10 +1,18 @@
 export type FeedbackType = 'WEBSITE' | 'PRODUCT' | 'FEATURE' | 'BUG';
 
+export interface FeedbackMedia {
+  url: string;
+  type: 'image' | 'video';
+  publicId?: string;
+  thumbnailUrl?: string;
+}
+
 export interface FeedbackSubmission {
   type: FeedbackType;
   rating: number; // 1 - 5
   content: string;
   tags?: string[];
+  media?: FeedbackMedia[];
   productId?: string;
   productName?: string;
   userName?: string;
@@ -18,6 +26,7 @@ export interface FeedbackItem {
   rating: number;
   content: string;
   tags?: string[];
+  media?: FeedbackMedia[];
   productId?: string;
   productName?: string;
   userId?: {

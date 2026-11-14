@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { MessageSquareHeart, Star, User, Sparkles, Clock, CheckCircle2 } from "lucide-react";
 import StarRating from "@/src/features/feedback/components/StarRating";
+import FeedbackMediaGallery from "@/src/features/feedback/components/FeedbackMediaGallery";
 import FeedbackModal from "@/src/features/feedback/components/FeedbackModal";
 import { getPublicFeedbacks } from "@/src/features/feedback/services/feedbackService";
 import type { FeedbackItem } from "@/src/features/feedback/types";
@@ -157,6 +158,8 @@ export default function CommunityFeedbackSection() {
                   <p className="text-xs leading-relaxed text-[#5c645a] line-clamp-4">
                     &ldquo;{item.content}&rdquo;
                   </p>
+
+                  <FeedbackMediaGallery media={item.media} />
                 </div>
 
                 {item.productName && (

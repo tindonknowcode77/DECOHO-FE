@@ -1,8 +1,25 @@
 import { authenticatedFetch } from "@/src/features/auth/services/authenticatedFetch";
-import type { FeedbackSubmission, ProductFeedbackStats } from "../types";
+import type { FeedbackMedia, FeedbackSubmission, ProductFeedbackStats } from "../types";
 
 const getBaseUrl = () =>
   (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
+
+export async function uploadFeedbackMedia(files: File[]): Promise<FeedbackMedia[]> {
+  if (!files.length) return [];
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+
+  const res = await authenticatedFetch(`${getBaseUrl()}/feedback/upload-media`, {
+    method: "POST",
+    body: formData,
+  });
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(json?.message || `Không thể tải ảnh/video (${res.status})`);
+  }
+  return Array.isArray(json?.data) ? json.data : [];
+}
 
 export async function submitFeedback(data: FeedbackSubmission) {
   const base = getBaseUrl();
