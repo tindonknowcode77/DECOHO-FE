@@ -448,7 +448,7 @@ export default function CommunityView() {
           </div>
         </aside>
         <section className="min-w-0" aria-label="Bảng tin diễn đàn">
-          <div className="mb-5 rounded-2xl border border-[#e5e6dd] bg-white p-5">
+          <div className="sticky top-20 z-20 mb-5 rounded-2xl border border-[#e5e6dd] bg-white p-5 shadow-xs lg:top-24">
             <div className="flex items-center gap-3">
               <CommunityAvatar
                 user={{
