@@ -447,8 +447,11 @@ export default function CommunityView() {
             </Link>
           </div>
         </aside>
-        <section className="min-w-0" aria-label="Bảng tin diễn đàn">
-          <div className="mb-5 rounded-2xl border border-[#e5e6dd] bg-white p-5">
+        <section
+          className="min-w-0 lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-7rem)] lg:flex-col"
+          aria-label="Bảng tin diễn đàn"
+        >
+          <div className="mb-4 shrink-0 rounded-2xl border border-[#e5e6dd] bg-white p-5">
             <div className="flex items-center gap-3">
               <CommunityAvatar
                 user={{
@@ -475,6 +478,7 @@ export default function CommunityView() {
               </button>
             </div>
           </div>
+          <div className="min-h-0 flex-1 lg:overflow-y-auto lg:pr-1.5 [scrollbar-width:thin]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-serif text-2xl">
               {tabs.find((t) => t.id === tab)?.label}
@@ -739,6 +743,7 @@ export default function CommunityView() {
               {loading ? "Đang tải…" : error ? "Thử lại" : "Xem thêm bài viết"}
             </button>
           )}
+          </div>
         </section>
         <aside className="hidden space-y-5 xl:sticky xl:top-24 xl:block">
           <section className="rounded-2xl border border-[#e5e6dd] bg-white p-5">
