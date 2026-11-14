@@ -405,7 +405,7 @@ export default function CommunityView() {
         </div>
       </section>
       <div className="mx-auto grid max-w-[1320px] items-start gap-6 px-4 sm:px-8 lg:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-[190px_minmax(0,1fr)_270px]">
-        <aside className="lg:sticky lg:top-24">
+        <aside className="lg:sticky lg:top-36">
           <p className="mb-4 hidden px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#868d80] lg:block">
             Góc cộng đồng
           </p>
@@ -448,7 +448,7 @@ export default function CommunityView() {
           </div>
         </aside>
         <section className="min-w-0" aria-label="Bảng tin diễn đàn">
-          <div className="sticky top-20 z-20 mb-5 rounded-2xl border border-[#e5e6dd] bg-white p-5 shadow-xs lg:top-24">
+          <div className="sticky top-32 z-20 mb-5 rounded-2xl border border-[#e5e6dd] bg-white p-5 shadow-xs lg:top-36">
             <div className="flex items-center gap-3">
               <CommunityAvatar
                 user={{
@@ -740,7 +740,7 @@ export default function CommunityView() {
             </button>
           )}
         </section>
-        <aside className="hidden space-y-5 xl:sticky xl:top-24 xl:block">
+        <aside className="hidden space-y-5 xl:sticky xl:top-36 xl:block">
           <section className="rounded-2xl border border-[#e5e6dd] bg-white p-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8d9581]">
               Kết nối & cảm hứng
