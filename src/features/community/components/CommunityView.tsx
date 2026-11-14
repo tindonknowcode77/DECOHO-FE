@@ -1,6 +1,7 @@
 "use client";
 import PostOptions from "./PostOptions";
 import DeletePostButton from "./DeletePostButton";
+import CommunityStoriesBar from "./CommunityStoriesBar";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -369,40 +370,8 @@ export default function CommunityView() {
   const privateTab = tab !== "for-you" && !token;
   return (
     <main className="min-h-screen bg-[#f6f5f0] pb-16 text-[#283e32]">
-      <section className="mx-auto max-w-[1320px] px-4 pb-8 pt-7 sm:px-8 sm:pt-10">
-        <div className="relative isolate overflow-hidden rounded-[28px] bg-[#254d3d] px-7 py-10 text-white sm:px-12 sm:py-12">
-          <div className="absolute inset-y-0 right-0 -z-10 hidden w-[46%] sm:block">
-            <Image
-              src="/images/product-space/organic-calm.png"
-              alt="Góc nhà ngập ánh sáng tự nhiên"
-              fill
-              sizes="600px"
-              priority
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#254d3d] via-[#254d3d]/30 to-transparent" />
-          </div>
-          <div className="max-w-xl">
-            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#d4dfbf]">
-              DECOHO COMMUNITY
-            </p>
-            <h1 className="font-serif text-4xl leading-[1.12] sm:text-5xl">
-              Nhà đẹp hơn.
-              <br />
-              <span className="text-[#d9e4bd]">Khi cùng chia sẻ.</span>
-            </h1>
-            <p className="mt-5 max-w-sm text-sm leading-7 text-white/75">
-              Góc nhỏ bạn yêu, ý tưởng bạn thử, câu chuyện bạn kể. Cùng nhau tạo
-              nên những không gian đáng sống.
-            </p>
-            <button
-              onClick={openPublish}
-              className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#e4edca] px-5 py-3 text-sm font-semibold text-[#284a35]"
-            >
-              <Plus size={17} /> Chia sẻ câu chuyện
-            </button>
-          </div>
-        </div>
+      <section className="mx-auto max-w-[1320px] px-4 pb-6 pt-6 sm:px-8 sm:pt-8">
+        <CommunityStoriesBar />
       </section>
       <div className="mx-auto grid max-w-[1320px] items-start gap-6 px-4 sm:px-8 lg:grid-cols-[190px_minmax(0,1fr)] xl:grid-cols-[190px_minmax(0,1fr)_270px]">
         <aside className="lg:sticky lg:top-36">
