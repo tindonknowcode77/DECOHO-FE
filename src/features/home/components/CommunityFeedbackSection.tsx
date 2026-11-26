@@ -5,8 +5,13 @@ import { MessageSquareHeart, Star, User, Sparkles, Clock, CheckCircle2 } from "l
 import StarRating from "@/src/features/feedback/components/StarRating";
 import FeedbackMediaGallery from "@/src/features/feedback/components/FeedbackMediaGallery";
 import FeedbackModal from "@/src/features/feedback/components/FeedbackModal";
+import { InfiniteMovingCards } from "@/src/components/ui/infinite-moving-cards";
 import { getPublicFeedbacks } from "@/src/features/feedback/services/feedbackService";
 import type { FeedbackItem } from "@/src/features/feedback/types";
+
+type FeedbackMovingCardItem = FeedbackItem & {
+  id: string;
+};
 
 export default function CommunityFeedbackSection() {
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
@@ -19,7 +24,7 @@ export default function CommunityFeedbackSection() {
 
   const fetchCommunityReviews = async () => {
     try {
-      const data = await getPublicFeedbacks({ limit: 6 });
+      const data = await getPublicFeedbacks({ limit: 12 });
       setFeedbacks(data.items || []);
       setTotalCount(data.total || 0);
       setAvgRating(data.averageRating || 5.0);
@@ -117,58 +122,68 @@ export default function CommunityFeedbackSection() {
             </p>
           </div>
         ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {feedbacks.map((item) => (
-              <article
-                key={item._id}
-                className="flex flex-col justify-between rounded-2xl border border-[#ded6c9] bg-[#fbf9f4] p-5 shadow-xs transition hover:border-[#2f6f5e]/50 hover:bg-white"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef6f2] text-[#2f6f5e]">
-                        <User size={15} />
+          <div className="mt-6">
+            <InfiniteMovingCards<FeedbackMovingCardItem>
+              items={feedbacks.map((item) => ({
+                ...item,
+                id: item._id,
+              }))}
+              direction="left"
+              speed="normal"
+              pauseOnHover
+              gap={16}
+              showGradientMask
+              renderItem={(item) => (
+                <article
+                  className="flex h-full min-h-[210px] w-[320px] sm:w-[356px] flex-col justify-between rounded-2xl border border-[#ded6c9] bg-[#fbf9f4] p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:border-[#2f6f5e]/50 hover:bg-white"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef6f2] text-[#2f6f5e]">
+                          <User size={15} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-[#17211b]">
+                            {item.userName || "Khách trải nghiệm"}
+                          </p>
+                          <p className="text-[10px] text-[#708164]">
+                            {new Date(item.createdAt).toLocaleDateString("vi-VN")}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-[#17211b]">
-                          {item.userName || "Khách trải nghiệm"}
-                        </p>
-                        <p className="text-[10px] text-[#708164]">
-                          {new Date(item.createdAt).toLocaleDateString("vi-VN")}
-                        </p>
-                      </div>
+
+                      <StarRating value={item.rating} size={13} />
                     </div>
 
-                    <StarRating value={item.rating} size={13} />
+                    {item.tags && item.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {item.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-white border border-[#e2ddd1] px-2 py-0.5 text-[10px] font-semibold text-[#5c645a]"
+                          >
+                            ✓ {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-xs leading-relaxed text-[#5c645a] line-clamp-4">
+                      &ldquo;{item.content}&rdquo;
+                    </p>
+
+                    <FeedbackMediaGallery media={item.media} />
                   </div>
 
-                  {item.tags && item.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {item.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-white border border-[#e2ddd1] px-2 py-0.5 text-[10px] font-semibold text-[#5c645a]"
-                        >
-                          ✓ {tag}
-                        </span>
-                      ))}
-                    </div>
+                  {item.productName && (
+                    <p className="mt-3 pt-3 border-t border-[#ded6c9]/60 text-[11px] font-medium text-[#2f6f5e] truncate">
+                      Về sản phẩm: {item.productName}
+                    </p>
                   )}
-
-                  <p className="text-xs leading-relaxed text-[#5c645a] line-clamp-4">
-                    &ldquo;{item.content}&rdquo;
-                  </p>
-
-                  <FeedbackMediaGallery media={item.media} />
-                </div>
-
-                {item.productName && (
-                  <p className="mt-3 pt-3 border-t border-[#ded6c9]/60 text-[11px] font-medium text-[#2f6f5e] truncate">
-                    Về sản phẩm: {item.productName}
-                  </p>
-                )}
-              </article>
-            ))}
+                </article>
+              )}
+            />
           </div>
         )}
       </div>
