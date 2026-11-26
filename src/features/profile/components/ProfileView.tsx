@@ -17,13 +17,19 @@ import {
   ArrowRight,
   BadgeCheck,
   Bookmark,
+  Box,
+  Calendar,
+  Camera,
   Check,
   ChevronRight,
   CircleUserRound,
+  Cloud,
   Compass,
+  Edit3,
   Eye,
   EyeOff,
   Frame,
+  HardDrive,
   Heart,
   Home,
   ImageIcon,
@@ -33,6 +39,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  MessageSquare,
   Package,
   Palette,
   Phone,
@@ -40,7 +47,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Star,
   Trash2,
   Upload,
   UserRound,
@@ -49,12 +55,13 @@ import {
 } from "lucide-react";
 import {
   clearSessionUser,
+  getAccessToken,
   getSessionUser,
   saveSessionUser,
   subscribeSessionUser,
 } from "@/src/features/auth/services/session";
+import { authenticatedFetch } from "@/src/features/auth/services/authenticatedFetch";
 import type { AuthSessionUser } from "@/src/features/auth/types";
-import { initialCartItems } from "@/src/features/cart/mock/cartItems";
 import {
   getStoredCartItems,
   subscribeCartItems,
@@ -69,9 +76,12 @@ import {
   type SavedMoodboard,
   type WishlistProduct,
 } from "@/src/features/profile/services/wishlistStorage";
+import { loadFavoritesFromBackend } from "@/src/features/profile/services/favoritesBackend";
 import {
-  loadFavoritesFromBackend,
-} from "@/src/features/profile/services/favoritesBackend";
+  deleteSavedShowroomDesign,
+  listSavedShowroomDesigns,
+  type SavedShowroomDesign,
+} from "@/src/features/showroom/services/showroomDesignService";
 import {
   avatarOptions,
   favoriteMaterials,
@@ -84,6 +94,7 @@ type ProfileTab =
   | "overview"
   | "wishlist"
   | "saved-moodboards"
+  | "saved-3d"
   | "account"
   | "preferences";
 
@@ -115,8 +126,8 @@ const roleDetails = {
     label: "Nhân viên DECOHO",
   },
   user: {
-    actionHref: "/product-space",
-    actionLabel: "Mở Moodboard",
+    actionHref: "/community",
+    actionLabel: "Góc cộng đồng",
     label: "Thành viên DECOHO",
   },
   supplier: {
@@ -125,6 +136,10 @@ const roleDetails = {
     label: "Nhà cung cấp",
   },
 } as const;
+
+function getApiBaseUrl() {
+  return (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(/\/$/, "");
+}
 
 function isImageAvatar(value: string) {
   return (
@@ -137,12 +152,14 @@ function isImageAvatar(value: string) {
 
 function AvatarPreview({
   avatar,
+  name,
   className,
 }: {
   avatar: string;
+  name?: string;
   className: string;
 }) {
-  const AvatarIcon = avatarIcons[avatar] ?? CircleUserRound;
+  const AvatarIcon = avatarIcons[avatar];
 
   if (isImageAvatar(avatar)) {
     const safeAvatar = avatar.replace(/["\\\n\r]/g, "");
@@ -156,9 +173,25 @@ function AvatarPreview({
     );
   }
 
+  if (AvatarIcon) {
+    return (
+      <span className={`${className} grid place-items-center`}>
+        <AvatarIcon aria-hidden="true" className="h-[44%] w-[44%]" />
+      </span>
+    );
+  }
+
+  const initials = (name || "DE")
+    .trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map((part) => part[0] ?? "")
+    .join("")
+    .toUpperCase();
+
   return (
-    <span className={`${className} grid place-items-center`}>
-      <AvatarIcon aria-hidden="true" className="h-[42%] w-[42%]" />
+    <span className={`${className} grid place-items-center font-serif font-bold`}>
+      {initials || <CircleUserRound aria-hidden="true" className="h-[44%] w-[44%]" />}
     </span>
   );
 }
@@ -168,12 +201,14 @@ function formatVND(value: number | undefined) {
   return new Intl.NumberFormat("vi-VN").format(value) + " ₫";
 }
 
-function formatDate(value: number) {
+function formatDate(value: number | string) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "Gần đây";
   return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
-  }).format(new Date(value));
+  }).format(d);
 }
 
 function createProfileFromSession(sessionUser: AuthSessionUser): UserProfile {
@@ -182,8 +217,11 @@ function createProfileFromSession(sessionUser: AuthSessionUser): UserProfile {
     : null;
   const joinedDate =
     registeredDate && !Number.isNaN(registeredDate.getTime())
-      ? new Intl.DateTimeFormat("vi-VN").format(registeredDate)
-      : profileUser.joinedDate;
+      ? new Intl.DateTimeFormat("vi-VN", {
+          month: "2-digit",
+          year: "numeric",
+        }).format(registeredDate)
+      : "";
 
   return {
     address: sessionUser.address ?? "",
@@ -194,7 +232,8 @@ function createProfileFromSession(sessionUser: AuthSessionUser): UserProfile {
     joinedDate,
     name: sessionUser.name,
     phone: sessionUser.phone ?? "",
-    preferredStyle: sessionUser.preferredStyle ?? profileUser.preferredStyle,
+    preferredStyle:
+      sessionUser.preferredStyle || preferredStyles[0]?.id || "japandi",
   };
 }
 
@@ -226,7 +265,17 @@ async function createAvatarDataUrl(file: File) {
   canvas.height = size;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Trình duyệt không thể xử lý ảnh này.");
-  context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    size,
+    size,
+  );
   return canvas.toDataURL("image/jpeg", 0.84);
 }
 
@@ -240,17 +289,21 @@ export default function ProfileView() {
   const [name, setName] = useState(profileUser.name);
   const [phone, setPhone] = useState(profileUser.phone);
   const [address, setAddress] = useState(profileUser.address);
-  const [selectedStyle, setSelectedStyle] = useState(profileUser.preferredStyle);
+  const [selectedStyle, setSelectedStyle] = useState(
+    preferredStyles[0]?.id ?? "japandi",
+  );
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>(
     profileUser.favoriteMaterials,
   );
   const [avatar, setAvatar] = useState(profileUser.avatar);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [formError, setFormError] = useState("");
   const [wishlist, setWishlist] = useState<WishlistProduct[]>([]);
   const [savedMoods, setSavedMoods] = useState<SavedMoodboard[]>([]);
+  const [savedDesigns, setSavedDesigns] = useState<SavedShowroomDesign[]>([]);
   const [showPhone, setShowPhone] = useState(false);
 
   const applySessionUser = useCallback(
@@ -263,28 +316,80 @@ export default function ProfileView() {
       setName(nextProfile.name);
       setPhone(nextProfile.phone);
       setAddress(nextProfile.address);
-      setSelectedStyle(nextProfile.preferredStyle);
+      setSelectedStyle(
+        nextProfile.preferredStyle || preferredStyles[0]?.id || "japandi",
+      );
       setSelectedMaterials(nextProfile.favoriteMaterials);
       setAvatar(nextProfile.avatar);
     },
     [],
   );
 
+  // Đồng bộ dữ liệu thật từ GET /users/me
+  const syncProfileFromBackend = useCallback(async () => {
+    const token = getAccessToken();
+    const currentSession = getSessionUser();
+    if (!token || !currentSession) return;
+
+    try {
+      const res = await authenticatedFetch(`${getApiBaseUrl()}/users/me`, {
+        method: "GET",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data || typeof data !== "object") return;
+
+      const remoteAvatar =
+        typeof data.avatar === "string"
+          ? data.avatar
+          : data.avatar?.secureUrl || currentSession.avatar;
+      const remoteStyles = Array.isArray(data.preferences?.styles)
+        ? data.preferences.styles
+        : [];
+      const matchedStyle =
+        remoteStyles.find((s: string) =>
+          preferredStyles.some((opt) => opt.id === s.toLowerCase()),
+        )?.toLowerCase() ||
+        currentSession.preferredStyle ||
+        preferredStyles[0]?.id ||
+        "japandi";
+
+      const updatedSession: AuthSessionUser = {
+        ...currentSession,
+        _id: typeof data._id === "string" ? data._id : currentSession._id,
+        name:
+          typeof data.fullName === "string" && data.fullName.trim()
+            ? data.fullName.trim()
+            : currentSession.name,
+        phone:
+          typeof data.phone === "string"
+            ? data.phone
+            : (currentSession.phone ?? ""),
+        avatar: remoteAvatar ?? currentSession.avatar,
+        preferredStyle: matchedStyle,
+        registeredAt:
+          typeof data.createdAt === "string"
+            ? data.createdAt
+            : currentSession.registeredAt,
+      };
+
+      saveSessionUser(updatedSession);
+    } catch {
+      // Giữ nguyên dữ liệu local nếu offline
+    }
+  }, []);
+
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      applySessionUser(getSessionUser());
-      setCartCount(
-        getStoredCartItems(initialCartItems).reduce(
-          (total, item) => total + item.quantity,
-          0,
-        ),
-      );
-    }, 0);
+    applySessionUser(getSessionUser());
+    setCartCount(
+      getStoredCartItems([]).reduce((total, item) => total + item.quantity, 0),
+    );
+
     const unsubscribeSession = subscribeSessionUser(applySessionUser);
     const unsubscribeCart = subscribeCartItems(
       (items) =>
         setCartCount(items.reduce((total, item) => total + item.quantity, 0)),
-      initialCartItems,
+      [],
     );
     const unsubscribeWishlist = subscribeWishlistProducts(() =>
       setWishlist(getWishlistProducts()),
@@ -292,18 +397,20 @@ export default function ProfileView() {
     const unsubscribeMoods = subscribeSavedMoodboards(() =>
       setSavedMoods(getSavedMoodboards()),
     );
+
     setWishlist(getWishlistProducts());
     setSavedMoods(getSavedMoodboards());
     void loadFavoritesFromBackend(setWishlist);
+    void syncProfileFromBackend();
+    void listSavedShowroomDesigns().then(setSavedDesigns);
 
     return () => {
-      window.clearTimeout(timeoutId);
       unsubscribeSession();
       unsubscribeCart();
       unsubscribeWishlist();
       unsubscribeMoods();
     };
-  }, [applySessionUser]);
+  }, [applySessionUser, syncProfileFromBackend]);
 
   const selectedStyleOption = useMemo(
     () =>
@@ -320,21 +427,52 @@ export default function ProfileView() {
   );
   const completionItems = useMemo(
     () => [
-      { done: Boolean(name.trim()), label: "Họ và tên" },
-      { done: Boolean(user.email), label: "Email" },
-      { done: Boolean(phone.trim()), label: "Số điện thoại" },
-      { done: Boolean(address.trim()), label: "Địa chỉ" },
-      { done: Boolean(selectedStyle), label: "Phong cách" },
-      { done: selectedMaterials.length > 0, label: "Vật liệu" },
+      {
+        done: Boolean(name.trim()),
+        label: "Họ và tên",
+        tab: "account" as ProfileTab,
+      },
+      {
+        done: Boolean(user.email),
+        label: "Email",
+        tab: "account" as ProfileTab,
+      },
+      {
+        done: Boolean(phone.trim()),
+        label: "Số điện thoại",
+        tab: "account" as ProfileTab,
+      },
+      {
+        done: Boolean(address.trim()),
+        label: "Địa chỉ",
+        tab: "account" as ProfileTab,
+      },
+      {
+        done: Boolean(selectedStyle),
+        label: "Phong cách",
+        tab: "preferences" as ProfileTab,
+      },
+      {
+        done: selectedMaterials.length > 0,
+        label: "Vật liệu",
+        tab: "preferences" as ProfileTab,
+      },
     ],
-    [address, name, phone, selectedMaterials.length, selectedStyle, user.email],
+    [
+      address,
+      name,
+      phone,
+      selectedMaterials.length,
+      selectedStyle,
+      user.email,
+    ],
   );
   const completion = Math.round(
     (completionItems.filter((item) => item.done).length /
       completionItems.length) *
       100,
   );
-  const nextMissingItem = completionItems.find((item) => !item.done)?.label;
+  const nextMissingItem = completionItems.find((item) => !item.done);
   const normalizedMaterials = [...selectedMaterials].sort().join("|");
   const savedMaterials = [...user.favoriteMaterials].sort().join("|");
   const hasChanges =
@@ -367,7 +505,9 @@ export default function ProfileView() {
     setFormError("");
     setSaveSuccess(false);
     try {
-      setAvatar(await createAvatarDataUrl(file));
+      const dataUrl = await createAvatarDataUrl(file);
+      setAvatar(dataUrl);
+      setPendingAvatarFile(file);
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -377,13 +517,13 @@ export default function ProfileView() {
     }
   }
 
-  function saveProfile(event: FormEvent<HTMLFormElement>) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
     setSaveSuccess(false);
-    if (!name.trim()) {
+    if (!name.trim() || name.trim().length < 2) {
       setActiveTab("account");
-      setFormError("Vui lòng nhập họ và tên.");
+      setFormError("Vui lòng nhập họ và tên (tối thiểu 2 ký tự).");
       return;
     }
     if (phoneInvalid) {
@@ -395,21 +535,79 @@ export default function ProfileView() {
       setFormError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
       return;
     }
+
     setIsSaving(true);
-    window.setTimeout(() => {
+    let finalAvatar = avatar;
+
+    try {
+      const token = getAccessToken();
+      if (token) {
+        // 1. Nếu người dùng vừa tải file ảnh mới lên, đẩy lên PATCH /users/me/avatar
+        if (pendingAvatarFile) {
+          const formData = new FormData();
+          formData.append("avatar", pendingAvatarFile);
+          const avatarRes = await authenticatedFetch(
+            `${getApiBaseUrl()}/users/me/avatar`,
+            {
+              method: "PATCH",
+              body: formData,
+            },
+          );
+          if (avatarRes.ok) {
+            const avatarData = await avatarRes.json().catch(() => null);
+            const remoteUrl =
+              typeof avatarData?.avatar === "string"
+                ? avatarData.avatar
+                : avatarData?.avatar?.secureUrl;
+            if (remoteUrl) {
+              finalAvatar = remoteUrl;
+            }
+          }
+          setPendingAvatarFile(null);
+        }
+
+        // 2. Đồng bộ họ tên, số điện thoại và gu phong cách lên PATCH /users/me
+        const updatePayload: {
+          fullName: string;
+          phone?: string;
+          preferences?: { styles: string[] };
+        } = {
+          fullName: name.trim(),
+          preferences: {
+            styles: selectedStyle ? [selectedStyle] : [],
+          },
+        };
+        if (phone.trim()) {
+          updatePayload.phone = phone.trim();
+        }
+
+        await authenticatedFetch(`${getApiBaseUrl()}/users/me`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatePayload),
+        });
+      }
+
       saveSessionUser({
         ...sessionUser,
         address: address.trim(),
-        avatar,
+        avatar: finalAvatar,
         favoriteMaterials: selectedMaterials,
         name: name.trim(),
         phone: phone.trim(),
         preferredStyle: selectedStyle,
       });
-      setIsSaving(false);
       setSaveSuccess(true);
-      window.setTimeout(() => setSaveSuccess(false), 2800);
-    }, 450);
+      window.setTimeout(() => setSaveSuccess(false), 3200);
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Không thể lưu hồ sơ lúc này. Vui lòng thử lại.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function handleLogout() {
@@ -420,14 +618,20 @@ export default function ProfileView() {
   function removeWishlist(id: string) {
     toggleWishlistProduct(id);
   }
+
   function removeSavedMood(id: string) {
     toggleSavedMoodboard(id);
   }
 
+  async function removeSavedDesign(design: SavedShowroomDesign) {
+    await deleteSavedShowroomDesign(design._id, design.source);
+    setSavedDesigns((prev) => prev.filter((item) => item._id !== design._id));
+  }
+
   if (!hasCheckedSession) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-[#f5f1ea] px-5 py-12 text-[#17211b] sm:px-8">
-        <div className="mx-auto flex max-w-sm items-center justify-center gap-3 rounded-lg border border-[#ded6c9] bg-white p-6 text-sm font-semibold text-[#62685f] shadow-sm">
+      <main className="min-h-[calc(100vh-4rem)] bg-[#f6f5f0] px-5 py-12 text-[#17211b] sm:px-8">
+        <div className="mx-auto flex max-w-sm items-center justify-center gap-3 rounded-2xl border border-[#ded6c9] bg-white p-6 text-sm font-semibold text-[#62685f] shadow-xs">
           <LoaderCircle className="h-5 w-5 animate-spin text-[#2f6f5e]" />
           Đang tải hồ sơ của bạn...
         </div>
@@ -437,26 +641,28 @@ export default function ProfileView() {
 
   if (!sessionUser) {
     return (
-      <main className="min-h-[calc(100vh-4rem)] bg-[#f5f1ea] px-5 py-12 text-[#17211b] sm:px-8">
-        <section className="mx-auto max-w-lg rounded-lg border border-[#ded6c9] bg-white p-8 text-center shadow-sm">
+      <main className="min-h-[calc(100vh-4rem)] bg-[#f6f5f0] px-5 py-12 text-[#17211b] sm:px-8">
+        <section className="mx-auto max-w-lg rounded-[28px] border border-[#ded6c9] bg-white p-8 text-center shadow-xs">
           <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#edf4f0] text-[#2f6f5e]">
             <CircleUserRound className="h-8 w-8" />
           </span>
-          <h1 className="mt-5 text-3xl font-bold">Hồ sơ đang chờ bạn</h1>
+          <h1 className="mt-5 font-serif text-3xl font-bold">
+            Hồ sơ đang chờ bạn
+          </h1>
           <p className="mt-3 text-sm leading-6 text-[#62685f]">
-            Đăng nhập để cập nhật thông tin, lưu gu nội thất và đồng bộ giỏ
-            hàng trong hành trình thiết kế DECOHO.
+            Đăng nhập để cập nhật thông tin, lưu gu nội thất, quản lý bản thiết
+            kế phòng 3D và đồng bộ giỏ hàng trong hành trình DECOHO.
           </p>
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
             <Link
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#2f6f5e] px-5 text-sm font-bold text-white transition hover:bg-[#26574a]"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#2f6f5e] px-5 text-sm font-bold text-white transition hover:bg-[#26574a]"
               href="/login"
             >
               Đăng nhập
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              className="inline-flex h-12 items-center justify-center rounded-lg border border-[#d7cfc2] bg-white px-5 text-sm font-bold transition hover:bg-[#f8f5ef]"
+              className="inline-flex h-12 items-center justify-center rounded-xl border border-[#d7cfc2] bg-white px-5 text-sm font-bold transition hover:bg-[#f8f5ef]"
               href="/register"
             >
               Tạo tài khoản
@@ -469,118 +675,192 @@ export default function ProfileView() {
 
   const stats = [
     {
-      icon: ShoppingBag,
+      icon: Heart,
       label: "Sản phẩm yêu thích",
-      tint: "from-[#f8f5ef] to-[#faf6ee]",
+      sub: "Đã lưu vào bộ sưu tập",
+      tint: "bg-white hover:border-[#2f6f5e]/40",
+      iconBg: "bg-[#fff1ee] text-[#d94848]",
       value: wishlist.length,
+      onClick: () => setActiveTab("wishlist"),
     },
     {
       icon: Bookmark,
       label: "Moodboard đã lưu",
-      tint: "from-[#eef6f2] to-[#f3faf6]",
+      sub: "Ý tưởng không gian",
+      tint: "bg-white hover:border-[#2f6f5e]/40",
+      iconBg: "bg-[#eef6f2] text-[#2f6f5e]",
       value: savedMoods.length,
+      onClick: () => setActiveTab("saved-moodboards"),
     },
     {
-      icon: Package,
+      icon: Box,
+      label: "Thiết kế 3D đã lưu",
+      sub: "Phòng mẫu tự bố trí",
+      tint: "bg-white hover:border-[#2f6f5e]/40",
+      iconBg: "bg-[#fdf4e7] text-[#b46f2c]",
+      value: savedDesigns.length,
+      onClick: () => setActiveTab("saved-3d"),
+    },
+    {
+      icon: ShoppingBag,
       label: "Trong giỏ hàng",
-      tint: "from-[#fff5e4] to-[#fffaf0]",
+      sub: "Sẵn sàng thanh toán",
+      tint: "bg-white hover:border-[#2f6f5e]/40",
+      iconBg: "bg-[#f2f4eb] text-[#5c6e46]",
       value: cartCount,
+      onClick: () => router.push("/cart"),
     },
   ];
 
-  const tabItems: { id: ProfileTab; icon: LucideIcon; label: string; badge?: number }[] = [
+  const tabItems: {
+    id: ProfileTab;
+    icon: LucideIcon;
+    label: string;
+    badge?: number;
+  }[] = [
     { id: "overview", icon: Compass, label: "Tổng quan" },
-    { id: "wishlist", icon: Heart, label: "Yêu thích", badge: wishlist.length || undefined },
-    { id: "saved-moodboards", icon: Bookmark, label: "Moodboard đã lưu", badge: savedMoods.length || undefined },
-    { id: "account", icon: UserRound, label: "Tài khoản" },
-    { id: "preferences", icon: Palette, label: "Gu thiết kế" },
+    {
+      id: "wishlist",
+      icon: Heart,
+      label: "Yêu thích",
+      badge: wishlist.length || undefined,
+    },
+    {
+      id: "saved-moodboards",
+      icon: Bookmark,
+      label: "Moodboard đã lưu",
+      badge: savedMoods.length || undefined,
+    },
+    {
+      id: "saved-3d",
+      icon: Box,
+      label: "Thiết kế 3D",
+      badge: savedDesigns.length || undefined,
+    },
+    { id: "account", icon: UserRound, label: "Thông tin cá nhân" },
+    { id: "preferences", icon: Palette, label: "Gu nội thất" },
   ];
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-[#f5f1ea] to-[#ebe4d6] px-4 py-6 text-[#17211b] sm:px-8 sm:py-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Breadcrumb + Logout */}
-        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="min-h-[calc(100vh-4rem)] bg-[#f6f5f0] px-4 py-7 text-[#17211b] sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-[1320px]">
+        {/* Top Breadcrumb + Quick Actions */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase text-[#687068]">
+            <p className="flex items-center gap-2 text-xs font-semibold text-[#708164]">
               <Link className="transition hover:text-[#2f6f5e]" href="/">
                 Trang chủ
               </Link>
               <ChevronRight className="h-3.5 w-3.5" />
-              <Link className="transition hover:text-[#2f6f5e]" href="/profile">
-                Tài khoản
-              </Link>
+              <span className="text-[#283e32]">Hồ sơ cá nhân</span>
               <ChevronRight className="h-3.5 w-3.5" />
-              <span className="text-[#2f6f5e]">{tabItems.find((t) => t.id === activeTab)?.label}</span>
-            </p>
-            <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Hồ sơ của tôi</h1>
-            <p className="mt-2 text-sm text-[#62685f]">
-              Quản lý thông tin cá nhân, sản phẩm yêu thích và moodboard đã lưu.
+              <span className="font-bold text-[#2f6f5e]">
+                {tabItems.find((t) => t.id === activeTab)?.label}
+              </span>
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              className="inline-flex h-11 w-fit items-center gap-2 rounded-lg border border-[#d7cfc2] bg-white px-4 text-sm font-bold text-[#2f6f5e] transition hover:bg-[#f5f1ea]"
-              href="/products"
-            >
-              <Sparkles className="h-4 w-4" />
-              Khám phá
-            </Link>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {sessionUser._id && (
+              <Link
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7cfc2] bg-white px-4 text-xs font-bold text-[#283e32] transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
+                href={`/community/user/${sessionUser._id}`}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Tường diễn đàn của tôi
+              </Link>
+            )}
+            {role !== "user" && (
+              <Link
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#2f6f5e] px-4 text-xs font-bold text-white transition hover:bg-[#24594b]"
+                href={currentRole.actionHref}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {currentRole.actionLabel}
+              </Link>
+            )}
             <button
-              className="inline-flex h-11 w-fit items-center gap-2 rounded-lg border border-[#d7cfc2] bg-white px-4 text-sm font-bold text-[#9b3c31] transition hover:border-[#e5bdb5] hover:bg-[#fff3f0]"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[#e5cfc9] bg-white px-4 text-xs font-bold text-[#9b3c31] transition hover:bg-[#fff3f0]"
               onClick={handleLogout}
               type="button"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3.5 w-3.5" />
               Đăng xuất
             </button>
           </div>
         </div>
 
-        {/* Cover + Identity */}
-        <section className="relative min-h-[260px] overflow-hidden rounded-2xl border border-[#d7cfc2] bg-[#1c2821] shadow-md">
-          <Image
-            alt="Không gian nội thất DECOHO"
-            className="object-cover object-center"
-            fill
-            priority
-            sizes="(min-width: 1280px) 1280px, 100vw"
-            src={coverImage}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#152019]/95 via-[#152019]/70 to-[#152019]/20" />
-          <div className="relative flex min-h-[260px] flex-col justify-end gap-5 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-8">
-            <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-              <AvatarPreview
-                avatar={avatar}
-                className="h-20 w-20 shrink-0 rounded-2xl border-2 border-white/70 bg-[#edf4f0] text-[#2f6f5e] shadow-lg sm:h-24 sm:w-24"
-              />
-              <div className="min-w-0 text-white">
-                <p className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase backdrop-blur">
-                  <BadgeCheck className="h-3.5 w-3.5 text-[#f0bd68]" />
-                  {currentRole.label}
-                </p>
-                <h2 className="mt-3 truncate text-2xl font-bold sm:text-3xl">
-                  {name || user.name}
-                </h2>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/80">
+        {/* Hero Identity Card */}
+        <section className="relative isolate overflow-hidden rounded-[28px] border border-[#dce2d5] bg-[#254d3d] text-white shadow-sm">
+          <div className="absolute inset-y-0 right-0 -z-10 hidden w-[45%] sm:block">
+            <Image
+              alt="Không gian nội thất DECOHO"
+              className="object-cover object-center opacity-55"
+              fill
+              priority
+              sizes="600px"
+              src={coverImage}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#254d3d] via-[#254d3d]/70 to-transparent" />
+          </div>
+
+          <div className="flex flex-col justify-between gap-6 p-6 sm:flex-row sm:items-center sm:p-9">
+            <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="relative w-fit">
+                <AvatarPreview
+                  avatar={avatar}
+                  name={name || user.name}
+                  className="h-20 w-20 shrink-0 rounded-2xl border-2 border-white/80 bg-[#e4edca] text-2xl text-[#254d3d] shadow-md sm:h-24 sm:w-24"
+                />
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("account")}
+                  title="Đổi ảnh đại diện"
+                  className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full border-2 border-[#254d3d] bg-[#e4edca] text-[#254d3d] shadow transition hover:scale-105"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#e4edca] backdrop-blur-xs">
+                    <BadgeCheck className="h-3.5 w-3.5 text-[#f0bd68]" />
+                    {currentRole.label}
+                  </span>
+                  {selectedStyleOption && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#e4edca]/20 px-3 py-1 text-[11px] font-semibold text-[#e4edca]">
+                      <Palette className="h-3 w-3" />
+                      Gu {selectedStyleOption.label}
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="mt-2.5 truncate font-serif text-2xl font-bold sm:text-4xl">
+                  {name || user.name || "Thành viên DECOHO"}
+                </h1>
+
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs sm:text-sm text-white/85">
                   <span className="flex items-center gap-1.5">
-                    <Mail className="h-4 w-4" />
+                    <Mail className="h-4 w-4 text-[#d4dfbf]" />
                     {user.email}
                   </span>
+
                   <span className="flex items-center gap-1.5">
-                    <Phone className="h-4 w-4" />
+                    <Phone className="h-4 w-4 text-[#d4dfbf]" />
                     <span className="font-mono tracking-wide">
-                      {showPhone
-                        ? user.phone || "—"
-                        : user.phone
-                          ? user.phone.replace(/\d(?=\d{2})/g, "•")
-                          : "—"}
+                      {user.phone
+                        ? showPhone
+                          ? user.phone
+                          : user.phone.replace(/\d(?=\d{2})/g, "•")
+                        : "Chưa cập nhật SĐT"}
                     </span>
                     {user.phone && (
                       <button
-                        aria-label={showPhone ? "Ẩn số điện thoại" : "Hiện số điện thoại"}
-                        className="ml-1 grid h-6 w-6 place-items-center rounded-full bg-white/15 transition hover:bg-white/25"
+                        aria-label={
+                          showPhone ? "Ẩn số điện thoại" : "Hiện số điện thoại"
+                        }
+                        className="ml-0.5 grid h-6 w-6 place-items-center rounded-full bg-white/15 transition hover:bg-white/25"
                         onClick={() => setShowPhone((v) => !v)}
                         type="button"
                       >
@@ -592,165 +872,292 @@ export default function ProfileView() {
                       </button>
                     )}
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <BadgeCheck className="h-4 w-4 text-[#f0bd68]" />
-                    Thành viên từ {user.joinedDate}
-                  </span>
+
+                  {user.joinedDate && (
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-4 w-4 text-[#d4dfbf]" />
+                      Tham gia từ {user.joinedDate}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <Link
-              className="inline-flex h-11 w-fit items-center gap-2 rounded-lg bg-[#2f6f5e] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#26574a]"
-              href={currentRole.actionHref}
-            >
-              {currentRole.actionLabel}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab(activeTab === "account" ? "overview" : "account")
+                }
+                className="inline-flex h-11 items-center gap-2 rounded-full bg-[#e4edca] px-5 text-xs sm:text-sm font-bold text-[#254d3d] shadow-xs transition hover:bg-[#d6e4b5]"
+              >
+                <Edit3 className="h-4 w-4" />
+                {activeTab === "account" ? "Xem tổng quan" : "Chỉnh sửa hồ sơ"}
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* Stats Strip */}
-        <section className="mt-6 grid gap-4 sm:grid-cols-3">
+        {/* 4 Stats Cards */}
+        <section className="mt-6 grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-4">
           {stats.map((stat) => (
             <button
-              className={`group flex items-center gap-4 rounded-xl border border-[#d7cfc2] bg-gradient-to-br ${stat.tint} p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
+              className={`group flex items-center gap-3.5 rounded-2xl border border-[#ded6c9] ${stat.tint} p-4 sm:p-5 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md`}
               key={stat.label}
-              onClick={() => {
-                if (stat.label === "Sản phẩm yêu thích") setActiveTab("wishlist");
-                if (stat.label === "Moodboard đã lưu") setActiveTab("saved-moodboards");
-              }}
+              onClick={stat.onClick}
               type="button"
             >
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white text-[#2f6f5e] shadow-sm">
+              <span
+                className={`grid h-11 w-11 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-xl ${stat.iconBg}`}
+              >
                 <stat.icon className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className="text-2xl font-bold leading-tight">{stat.value}</p>
-                <p className="text-xs font-semibold text-[#62685f]">{stat.label}</p>
+                <p className="text-xl sm:text-2xl font-bold leading-tight text-[#17211b]">
+                  {stat.value}
+                </p>
+                <p className="truncate text-xs font-bold text-[#283e32]">
+                  {stat.label}
+                </p>
+                <p className="hidden sm:block truncate text-[11px] text-[#7a8278]">
+                  {stat.sub}
+                </p>
               </div>
-              <ArrowRight className="ml-auto h-4 w-4 text-[#9ca99f] transition group-hover:translate-x-0.5 group-hover:text-[#2f6f5e]" />
+              <ArrowRight className="ml-auto hidden sm:block h-4 w-4 shrink-0 text-[#9ca99f] transition group-hover:translate-x-0.5 group-hover:text-[#2f6f5e]" />
             </button>
           ))}
         </section>
 
-        {/* Tabs */}
-        <div className="mt-6 overflow-x-auto rounded-xl border border-[#d7cfc2] bg-white shadow-sm">
-          <div className="flex min-w-max border-b border-[#e8e1d7]">
-            {tabItems.map((tab) => (
-              <button
-                className={`relative inline-flex h-12 shrink-0 items-center gap-2 px-5 text-sm font-bold transition ${
-                  activeTab === tab.id
-                    ? "text-[#2f6f5e]"
-                    : "text-[#7a7f78] hover:text-[#2f6f5e]"
-                }`}
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setFormError("");
-                }}
-                type="button"
-              >
-                <tab.icon className="h-4 w-4" />
-                {tab.label}
-                {tab.badge !== undefined && (
-                  <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#edf4f0] px-1.5 text-[11px] font-bold text-[#2f6f5e]">
-                    {tab.badge}
-                  </span>
-                )}
-                {activeTab === tab.id && (
-                  <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-[#2f6f5e]" />
-                )}
-              </button>
-            ))}
+        {/* Main Content Box with Tabs */}
+        <div className="mt-6 overflow-hidden rounded-[24px] border border-[#ded6c9] bg-white shadow-xs">
+          {/* Navigation Tabs */}
+          <div className="overflow-x-auto border-b border-[#e8e1d7] bg-[#fbf9f4]/60 px-2 sm:px-4">
+            <div className="flex min-w-max">
+              {tabItems.map((tab) => (
+                <button
+                  className={`relative inline-flex h-13 shrink-0 items-center gap-2 px-4 sm:px-5 text-xs sm:text-sm font-bold transition ${
+                    activeTab === tab.id
+                      ? "text-[#2f6f5e]"
+                      : "text-[#6e756c] hover:text-[#2f6f5e]"
+                  }`}
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setFormError("");
+                  }}
+                  type="button"
+                >
+                  <tab.icon className="h-4 w-4" />
+                  {tab.label}
+                  {tab.badge !== undefined && (
+                    <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e8f2ec] px-1.5 text-[11px] font-bold text-[#2f6f5e]">
+                      {tab.badge}
+                    </span>
+                  )}
+                  {activeTab === tab.id && (
+                    <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-[#2f6f5e]" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Tab Content */}
+          {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
-            <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-3">
-              {/* Completion card */}
-              <section className="rounded-xl border border-[#d7cfc2] bg-white p-6 shadow-sm lg:col-span-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-bold uppercase text-[#687068]">
-                      Mức hoàn thiện hồ sơ
-                    </p>
-                    <p className="mt-2 text-4xl font-bold text-[#2f6f5e]">{completion}%</p>
-                  </div>
-                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-[#edf4f0] text-[#2f6f5e]">
-                    <ShieldCheck className="h-6 w-6" />
-                  </span>
-                </div>
-                <div
-                  aria-label={`Mức hoàn thiện hồ sơ ${completion}%`}
-                  className="mt-5 h-2 overflow-hidden rounded-full bg-[#e8e4dc]"
-                >
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#2f6f5e] to-[#75953a] transition-all"
-                    style={{ width: `${completion}%` }}
-                  />
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[#62685f]">
-                  {nextMissingItem
-                    ? `Bổ sung ${nextMissingItem.toLowerCase()} để AI hiểu bạn chính xác hơn.`
-                    : "Hồ sơ đã sẵn sàng cho các gợi ý cá nhân hóa."}
-                </p>
-
-                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {completionItems.map((item) => (
-                    <div
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold ${
-                        item.done
-                          ? "border-[#b9ddc9] bg-[#effaf3] text-[#23633e]"
-                          : "border-[#e8e1d4] bg-[#faf8f4] text-[#62685f]"
-                      }`}
-                      key={item.label}
-                    >
-                      <span
-                        className={`grid h-5 w-5 place-items-center rounded-full ${
-                          item.done
-                            ? "bg-[#2f6f5e] text-white"
-                            : "border border-[#cbc4b9] text-transparent"
-                        }`}
-                      >
-                        <Check className="h-3 w-3" />
-                      </span>
-                      {item.label}
+            <div className="space-y-6 p-5 sm:p-8">
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Completion Card */}
+                <section className="rounded-2xl border border-[#e2dcd0] bg-[#fbf9f4] p-6 lg:col-span-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#708164]">
+                        Mức độ hoàn thiện hồ sơ
+                      </p>
+                      <div className="mt-1.5 flex items-baseline gap-3">
+                        <p className="text-3xl sm:text-4xl font-bold text-[#2f6f5e]">
+                          {completion}%
+                        </p>
+                        <p className="text-xs sm:text-sm text-[#62685f]">
+                          {nextMissingItem
+                            ? `Bổ sung thêm "${nextMissingItem.label}" để cá nhân hóa gợi ý tốt hơn.`
+                            : "Hồ sơ của bạn đã hoàn thiện 100%!"}
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </section>
+                    {nextMissingItem && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(nextMissingItem.tab)}
+                        className="shrink-0 rounded-full bg-[#2f6f5e] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#24594b]"
+                      >
+                        Bổ sung ngay
+                      </button>
+                    )}
+                  </div>
 
-              {/* Quick actions */}
-              <section className="rounded-xl border border-[#d7cfc2] bg-gradient-to-br from-[#1c2821] to-[#0f1611] p-6 text-white shadow-sm">
-                <p className="text-xs font-bold uppercase text-[#efb95f]">
-                  Lối tắt
-                </p>
-                <h3 className="mt-2 text-lg font-bold">Tiếp tục thiết kế</h3>
-                <div className="mt-5 grid gap-2">
-                  {[
-                    { href: "/product-space", icon: Sparkles, label: "Khám phá Moodboard" },
-                    { href: "/showroom", icon: Compass, label: "Mở phòng mẫu 3D" },
-                    { href: "/products", icon: ShoppingBag, label: "Xem catalog sản phẩm" },
-                    { href: "/cart", icon: Package, label: "Giỏ hàng của tôi" },
-                  ].map((item) => (
+                  <div
+                    aria-label={`Mức hoàn thiện hồ sơ ${completion}%`}
+                    className="mt-4 h-2.5 overflow-hidden rounded-full bg-[#e6e1d6]"
+                  >
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#2f6f5e] to-[#79943b] transition-all duration-500"
+                      style={{ width: `${completion}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                    {completionItems.map((item) => (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(item.tab)}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition ${
+                          item.done
+                            ? "border-[#cce3d6] bg-white text-[#23633e] hover:border-[#2f6f5e]"
+                            : "border-dashed border-[#d7cfc2] bg-white/60 text-[#6e756c] hover:border-[#2f6f5e] hover:bg-white"
+                        }`}
+                        key={item.label}
+                      >
+                        <span
+                          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                            item.done
+                              ? "bg-[#2f6f5e] text-white"
+                              : "border border-[#cbc4b9] text-transparent"
+                          }`}
+                        >
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Personal Info & Style Summary */}
+                <section className="flex flex-col justify-between rounded-2xl border border-[#e2dcd0] bg-[#fbf9f4] p-6">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#708164]">
+                        Tóm tắt hồ sơ & Gu
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("preferences")}
+                        className="text-xs font-bold text-[#2f6f5e] hover:underline"
+                      >
+                        Đổi gu
+                      </button>
+                    </div>
+
+                    <div className="mt-4 space-y-3 text-xs sm:text-sm">
+                      <div className="flex items-start justify-between gap-2 border-b border-[#ebe5da] pb-2.5">
+                        <span className="text-[#6e756c]">Phong cách:</span>
+                        <span className="font-bold text-[#17211b]">
+                          {selectedStyleOption?.label || "Chưa chọn"}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-2 border-b border-[#ebe5da] pb-2.5">
+                        <span className="text-[#6e756c]">Vật liệu:</span>
+                        <span className="text-right font-semibold text-[#17211b]">
+                          {selectedMaterialNames.length > 0
+                            ? selectedMaterialNames.slice(0, 2).join(", ") +
+                              (selectedMaterialNames.length > 2
+                                ? ` +${selectedMaterialNames.length - 2}`
+                                : "")
+                            : "Chưa chọn"}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="shrink-0 text-[#6e756c]">Địa chỉ:</span>
+                        <span className="line-clamp-2 text-right font-medium text-[#17211b]">
+                          {user.address || "Chưa cập nhật địa chỉ"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-2 pt-3 border-t border-[#e2dcd0]">
                     <Link
-                      className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-                      href={item.href}
-                      key={item.href}
+                      href="/showroom"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#254d3d] px-3 py-2.5 text-xs font-bold text-white transition hover:bg-[#1d3f31]"
                     >
-                      <span className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4 text-[#efb95f]" />
-                        {item.label}
-                      </span>
-                      <ArrowRight className="h-4 w-4" />
+                      <Box className="h-3.5 w-3.5" />
+                      Phòng mẫu 3D
                     </Link>
-                  ))}
-                </div>
-              </section>
+                    <Link
+                      href="/product-space"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#d7cfc2] bg-white px-3 py-2.5 text-xs font-bold text-[#254d3d] transition hover:bg-[#f2efe8]"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Moodboards
+                    </Link>
+                  </div>
+                </section>
+              </div>
+
+              {/* Recent Saved 3D Designs Preview in Overview */}
+              {savedDesigns.length > 0 && (
+                <section className="rounded-2xl border border-[#e2dcd0] bg-white p-5 sm:p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-[#17211b]">
+                        Thiết kế phòng 3D đã lưu gần đây
+                      </h3>
+                      <p className="text-xs text-[#6e756c]">
+                        Các không gian 3D bạn đã tự bố trí nội thất
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("saved-3d")}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6f5e] hover:underline"
+                    >
+                      Xem tất cả ({savedDesigns.length})
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {savedDesigns.slice(0, 3).map((design) => (
+                      <div
+                        key={design._id}
+                        className="flex flex-col justify-between rounded-xl border border-[#e2dcd0] bg-[#fbf9f4] p-4 transition hover:border-[#2f6f5e]/50"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f2ec] px-2.5 py-0.5 text-[10px] font-bold text-[#2f6f5e]">
+                              {design.source === "cloud" ? (
+                                <Cloud className="h-3 w-3" />
+                              ) : (
+                                <HardDrive className="h-3 w-3" />
+                              )}
+                              {design.showroomName || "Phòng 3D"}
+                            </span>
+                            <span className="text-[11px] text-[#7a8278]">
+                              {formatDate(design.updatedAt)}
+                            </span>
+                          </div>
+                          <h4 className="mt-2.5 font-bold text-sm text-[#17211b]">
+                            {design.name}
+                          </h4>
+                          <p className="mt-1 text-xs text-[#62685f]">
+                            {design.items?.length ?? 0} món nội thất đã bố trí
+                          </p>
+                        </div>
+                        <Link
+                          href="/showroom"
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#2f6f5e] hover:underline"
+                        >
+                          Mở trong Phòng mẫu 3D
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
+          {/* TAB 2: WISHLIST */}
           {activeTab === "wishlist" && (
             <WishlistSection
               items={wishlist}
@@ -758,6 +1165,7 @@ export default function ProfileView() {
             />
           )}
 
+          {/* TAB 3: SAVED MOODBOARDS */}
           {activeTab === "saved-moodboards" && (
             <SavedMoodboardsSection
               items={savedMoods}
@@ -765,12 +1173,21 @@ export default function ProfileView() {
             />
           )}
 
+          {/* TAB 4: SAVED 3D ROOM DESIGNS */}
+          {activeTab === "saved-3d" && (
+            <SavedDesignsSection
+              items={savedDesigns}
+              onRemove={(design) => void removeSavedDesign(design)}
+            />
+          )}
+
+          {/* TAB 5 & 6: ACCOUNT & PREFERENCES */}
           {(activeTab === "account" || activeTab === "preferences") && (
-            <form className="" onSubmit={saveProfile}>
-              <div className="p-5 sm:p-7">
+            <form onSubmit={saveProfile}>
+              <div className="p-5 sm:p-8">
                 {formError && (
                   <div
-                    className="mb-6 flex items-start gap-3 rounded-lg border border-[#efc2bc] bg-[#fff3f0] p-4 text-sm font-semibold text-[#9b3c31]"
+                    className="mb-6 flex items-start gap-3 rounded-xl border border-[#efc2bc] bg-[#fff3f0] p-4 text-sm font-semibold text-[#9b3c31]"
                     role="alert"
                   >
                     <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -780,24 +1197,26 @@ export default function ProfileView() {
 
                 {saveSuccess && (
                   <div
-                    className="mb-6 flex items-center gap-3 rounded-lg border border-[#b9ddc9] bg-[#effaf3] p-4 text-sm font-bold text-[#23633e]"
+                    className="mb-6 flex items-center gap-3 rounded-xl border border-[#b9ddc9] bg-[#effaf3] p-4 text-sm font-bold text-[#23633e]"
                     role="status"
                   >
                     <Check className="h-4 w-4" />
-                    Hồ sơ đã được cập nhật.
+                    Hồ sơ của bạn đã được lưu và đồng bộ thành công!
                   </div>
                 )}
 
                 {activeTab === "account" ? (
                   <section>
                     <div className="mb-6">
-                      <p className="text-xs font-bold uppercase text-[#2f6f5e]">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#2f6f5e]">
                         Tài khoản DECOHO
                       </p>
-                      <h2 className="mt-2 text-2xl font-bold">Thông tin liên hệ</h2>
-                      <p className="mt-2 text-sm leading-6 text-[#62685f]">
-                        Thông tin này được dùng khi tư vấn thiết kế, khảo sát và
-                        giao sản phẩm.
+                      <h2 className="mt-1.5 text-2xl font-bold">
+                        Thông tin cá nhân & Liên hệ
+                      </h2>
+                      <p className="mt-1 text-sm leading-6 text-[#62685f]">
+                        Cập nhật họ tên, số điện thoại, địa chỉ và ảnh đại diện
+                        hiển thị trên toàn hệ thống DECOHO.
                       </p>
                     </div>
 
@@ -810,7 +1229,7 @@ export default function ProfileView() {
                           <UserRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#747a72]" />
                           <input
                             autoComplete="name"
-                            className="h-12 w-full rounded-lg border border-[#d7cfc2] bg-[#faf8f4] pl-10 pr-3 text-sm outline-none transition focus:border-[#2f6f5e] focus:bg-white focus:ring-2 focus:ring-[#2f6f5e]/10"
+                            className="h-12 w-full rounded-xl border border-[#d7cfc2] bg-[#faf8f4] pl-10 pr-3 text-sm outline-none transition focus:border-[#2f6f5e] focus:bg-white focus:ring-2 focus:ring-[#2f6f5e]/10"
                             onChange={(event) => {
                               setName(event.target.value);
                               setSaveSuccess(false);
@@ -833,7 +1252,7 @@ export default function ProfileView() {
                         <span className="relative mt-2 block">
                           <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#747a72]" />
                           <input
-                            className="h-12 w-full cursor-not-allowed rounded-lg border border-[#ddd7cc] bg-[#efede8] pl-10 pr-3 text-sm text-[#687068] outline-none"
+                            className="h-12 w-full cursor-not-allowed rounded-xl border border-[#ddd7cc] bg-[#efede8] pl-10 pr-3 text-sm text-[#687068] outline-none"
                             disabled
                             type="email"
                             value={user.email}
@@ -850,7 +1269,7 @@ export default function ProfileView() {
                           <input
                             aria-invalid={phoneInvalid}
                             autoComplete="tel"
-                            className={`h-12 w-full rounded-lg border bg-[#faf8f4] pl-10 pr-3 text-sm outline-none transition focus:bg-white focus:ring-2 ${
+                            className={`h-12 w-full rounded-xl border bg-[#faf8f4] pl-10 pr-3 text-sm outline-none transition focus:bg-white focus:ring-2 ${
                               phoneInvalid
                                 ? "border-[#c85f50] focus:ring-[#c85f50]/10"
                                 : "border-[#d7cfc2] focus:border-[#2f6f5e] focus:ring-[#2f6f5e]/10"
@@ -878,7 +1297,7 @@ export default function ProfileView() {
                         <span className="relative mt-2 block">
                           <ShieldCheck className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#747a72]" />
                           <input
-                            className="h-12 w-full cursor-not-allowed rounded-lg border border-[#ddd7cc] bg-[#efede8] pl-10 pr-3 text-sm text-[#687068] outline-none"
+                            className="h-12 w-full cursor-not-allowed rounded-xl border border-[#ddd7cc] bg-[#efede8] pl-10 pr-3 text-sm text-[#687068] outline-none"
                             disabled
                             value={currentRole.label}
                           />
@@ -894,31 +1313,29 @@ export default function ProfileView() {
                         <MapPin className="absolute left-3.5 top-4 h-4 w-4 text-[#747a72]" />
                         <textarea
                           autoComplete="street-address"
-                          className="min-h-24 w-full resize-y rounded-lg border border-[#d7cfc2] bg-[#faf8f4] py-3 pl-10 pr-3 text-sm leading-6 outline-none transition focus:border-[#2f6f5e] focus:bg-white focus:ring-2 focus:ring-[#2f6f5e]/10"
+                          className="min-h-24 w-full resize-y rounded-xl border border-[#d7cfc2] bg-[#faf8f4] py-3 pl-10 pr-3 text-sm leading-6 outline-none transition focus:border-[#2f6f5e] focus:bg-white focus:ring-2 focus:ring-[#2f6f5e]/10"
                           onChange={(event) => {
                             setAddress(event.target.value);
                             setSaveSuccess(false);
                           }}
-                          placeholder="Nhập địa chỉ của bạn"
+                          placeholder="Nhập địa chỉ nhận hàng hoặc căn hộ của bạn"
                           value={address}
                         />
                       </span>
                     </label>
 
-                    <div className="mt-6 flex items-start gap-3 rounded-lg bg-[#f0f5f2] p-4 text-sm leading-6 text-[#4e6256]">
-                      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2f6f5e]" />
-                      <p>
-                        Email đăng nhập được khóa để bảo vệ liên kết tài khoản.
-                        Các thay đổi còn lại chỉ được lưu trong phiên DECOHO của
-                        bạn.
-                      </p>
-                    </div>
-
                     <AvatarEditor
                       avatar={avatar}
+                      name={name || user.name}
                       avatarInputRef={avatarInputRef}
+                      onSelectIcon={(iconId) => {
+                        setAvatar(iconId);
+                        setPendingAvatarFile(null);
+                        setSaveSuccess(false);
+                      }}
                       onReset={() => {
-                        setAvatar(profileUser.avatar);
+                        setAvatar("");
+                        setPendingAvatarFile(null);
                         setSaveSuccess(false);
                       }}
                       onUpload={handleAvatarUpload}
@@ -927,27 +1344,32 @@ export default function ProfileView() {
                 ) : (
                   <section>
                     <div className="mb-6">
-                      <p className="text-xs font-bold uppercase text-[#b06d2d]">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#b06d2d]">
                         Cá nhân hóa đề xuất
                       </p>
-                      <h2 className="mt-2 text-2xl font-bold">Gu nội thất của bạn</h2>
-                      <p className="mt-2 text-sm leading-6 text-[#62685f]">
-                        DECOHO dùng lựa chọn này để ưu tiên không gian và sản phẩm
-                        phù hợp hơn.
+                      <h2 className="mt-1.5 text-2xl font-bold">
+                        Gu nội thất của bạn
+                      </h2>
+                      <p className="mt-1 text-sm leading-6 text-[#62685f]">
+                        DECOHO dùng lựa chọn này để ưu tiên gợi ý không gian
+                        Moodboard và sản phẩm phù hợp nhất với phong cách sống
+                        của bạn.
                       </p>
                     </div>
 
                     <fieldset>
-                      <legend className="text-sm font-bold">Phong cách chủ đạo</legend>
+                      <legend className="text-sm font-bold">
+                        Phong cách chủ đạo
+                      </legend>
                       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {preferredStyles.map((style) => {
                           const isSelected = selectedStyle === style.id;
                           return (
                             <button
                               aria-pressed={isSelected}
-                              className={`relative min-h-28 rounded-lg border p-4 text-left transition ${
+                              className={`relative min-h-28 rounded-2xl border p-4 text-left transition ${
                                 isSelected
-                                  ? "border-[#2f6f5e] bg-[#edf4f0] shadow-sm"
+                                  ? "border-[#2f6f5e] bg-[#edf4f0] shadow-xs"
                                   : "border-[#dcd5ca] bg-[#faf8f4] hover:border-[#9ca99f] hover:bg-white"
                               }`}
                               id={`profile-style-${style.id}`}
@@ -959,7 +1381,9 @@ export default function ProfileView() {
                               type="button"
                             >
                               <span className="flex items-center justify-between gap-3">
-                                <strong className="text-sm">{style.label}</strong>
+                                <strong className="text-sm">
+                                  {style.label}
+                                </strong>
                                 <span
                                   className={`grid h-6 w-6 place-items-center rounded-full border ${
                                     isSelected
@@ -980,26 +1404,30 @@ export default function ProfileView() {
                     </fieldset>
 
                     <fieldset className="mt-7">
-                      <legend className="text-sm font-bold">Vật liệu yêu thích</legend>
+                      <legend className="text-sm font-bold">
+                        Vật liệu yêu thích
+                      </legend>
                       <p className="mt-1 text-xs leading-5 text-[#687068]">
-                        Có thể chọn nhiều vật liệu.
+                        Bạn có thể chọn nhiều chất liệu yêu thích.
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {favoriteMaterials.map((material) => {
-                          const isSelected = selectedMaterials.includes(material.id);
+                          const isSelected = selectedMaterials.includes(
+                            material.id,
+                          );
                           return (
                             <button
                               aria-pressed={isSelected}
-                              className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-xs sm:text-sm font-semibold transition ${
                                 isSelected
-                                  ? "border-[#d49a49] bg-[#fff5e4] text-[#8d5b23]"
-                                  : "border-[#dcd5ca] bg-[#faf8f4] text-[#5f655e] hover:border-[#aaa196]"
+                                  ? "border-[#2f6f5e] bg-[#2f6f5e] text-white shadow-xs"
+                                  : "border-[#dcd5ca] bg-[#faf8f4] text-[#5f655e] hover:border-[#2f6f5e]/50 hover:bg-white"
                               }`}
                               key={material.id}
                               onClick={() => toggleMaterial(material.id)}
                               type="button"
                             >
-                              {isSelected && <Check className="h-4 w-4" />}
+                              {isSelected && <Check className="h-3.5 w-3.5" />}
                               {material.label}
                             </button>
                           );
@@ -1007,22 +1435,22 @@ export default function ProfileView() {
                       </div>
                     </fieldset>
 
-                    <div className="mt-7 rounded-lg bg-[#1c2821] p-5 text-white">
-                      <div className="flex items-start gap-3">
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#e6a43c] text-[#17211b]">
+                    <div className="mt-7 rounded-2xl bg-[#254d3d] p-5 text-white">
+                      <div className="flex items-start gap-3.5">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e4edca] text-[#254d3d]">
                           <Sparkles className="h-5 w-5" />
                         </span>
                         <div>
-                          <p className="text-xs font-bold uppercase text-[#efb95f]">
-                            Chân dung không gian
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-[#d4dfbf]">
+                            Chân dung không gian của bạn
                           </p>
                           <h3 className="mt-1 text-lg font-bold">
-                            {selectedStyleOption.label}
+                            {selectedStyleOption?.label}
                           </h3>
-                          <p className="mt-2 text-sm leading-6 text-white/70">
-                            {selectedStyleOption.description}
+                          <p className="mt-1.5 text-sm leading-6 text-white/80">
+                            {selectedStyleOption?.description}
                             {selectedMaterialNames.length > 0
-                              ? ` Ưu tiên ${selectedMaterialNames
+                              ? ` Ưu tiên kết hợp chất liệu ${selectedMaterialNames
                                   .slice(0, 3)
                                   .join(", ")
                                   .toLowerCase()}.`
@@ -1035,17 +1463,23 @@ export default function ProfileView() {
                 )}
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-[#e8e1d7] bg-[#faf8f4] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-                <p className="text-xs text-[#687068]">
-                  {hasChanges ? "Bạn có thay đổi chưa được lưu." : "Mọi thay đổi đã được lưu."}
+              <div className="flex flex-col gap-3 border-t border-[#e8e1d7] bg-[#faf8f4] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                <p className="text-xs font-medium text-[#687068]">
+                  {hasChanges
+                    ? "Bạn có thay đổi chưa được lưu."
+                    : "Mọi thông tin hồ sơ đã được đồng bộ."}
                 </p>
                 <button
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#2f6f5e] px-5 text-sm font-bold text-white transition hover:bg-[#26574a] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#2f6f5e] px-6 text-sm font-bold text-white transition hover:bg-[#26574a] disabled:cursor-not-allowed disabled:opacity-45"
                   disabled={!hasChanges || isSaving || phoneInvalid}
                   id="profile-save"
                   type="submit"
                 >
-                  {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {isSaving ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
                   {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
                 </button>
               </div>
@@ -1060,25 +1494,32 @@ export default function ProfileView() {
 /* ---------- Avatar editor (sub-component) ---------- */
 function AvatarEditor({
   avatar,
+  name,
   onUpload,
+  onSelectIcon,
   onReset,
   avatarInputRef,
 }: {
   avatar: string;
+  name?: string;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onSelectIcon: (iconId: string) => void;
   onReset: () => void;
   avatarInputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <section className="mt-7 rounded-xl border border-[#d7cfc2] bg-[#faf8f4] p-5">
-      <div className="flex items-center justify-between">
+    <section className="mt-7 rounded-2xl border border-[#d7cfc2] bg-[#faf8f4] p-5">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="font-bold">Ảnh đại diện</h3>
-          <p className="mt-1 text-xs text-[#687068]">JPG, PNG hoặc WEBP — tối đa 8 MB</p>
+          <h3 className="font-bold text-[#17211b]">Ảnh đại diện</h3>
+          <p className="mt-1 text-xs text-[#687068]">
+            Hỗ trợ JPG, PNG hoặc WEBP — tối đa 8 MB
+          </p>
         </div>
         <AvatarPreview
           avatar={avatar}
-          className="h-14 w-14 rounded-full bg-[#edf4f0] text-[#2f6f5e]"
+          name={name}
+          className="h-14 w-14 shrink-0 rounded-full border border-[#d7cfc2] bg-[#edf4f0] text-lg text-[#2f6f5e]"
         />
       </div>
       <input
@@ -1088,41 +1529,49 @@ function AvatarEditor({
         ref={avatarInputRef}
         type="file"
       />
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 flex flex-wrap gap-2.5">
         <button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#2f6f5e] px-3 text-xs font-bold text-white transition hover:bg-[#26574a]"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#2f6f5e] px-4 text-xs font-bold text-white transition hover:bg-[#26574a]"
           onClick={() => avatarInputRef.current?.click()}
           type="button"
         >
           <Upload className="h-4 w-4" />
-          Tải ảnh lên
+          Tải ảnh từ máy
         </button>
-        <button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d7cfc2] px-3 text-xs font-bold transition hover:bg-white"
-          onClick={onReset}
-          type="button"
-        >
-          <X className="h-4 w-4" />
-          Đặt lại
-        </button>
+        {avatar && (
+          <button
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#d7cfc2] bg-white px-4 text-xs font-bold text-[#5c645a] transition hover:bg-[#f2efe8]"
+            onClick={onReset}
+            type="button"
+          >
+            <X className="h-4 w-4" />
+            Dùng chữ viết tắt
+          </button>
+        )}
       </div>
 
-      <p className="mt-5 text-xs font-bold uppercase text-[#687068]">
-        Hoặc chọn biểu tượng
+      <p className="mt-5 text-xs font-bold uppercase tracking-wider text-[#687068]">
+        Hoặc chọn biểu tượng nội thất
       </p>
-      <div className="mt-3 grid grid-cols-6 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2.5 sm:grid-cols-6">
         {avatarOptions.map((option) => {
           const OptionIcon = avatarIcons[option.id] ?? CircleUserRound;
+          const isSelected = avatar === option.id;
           return (
             <button
               aria-label={`Chọn ${option.label}`}
-              className="grid aspect-square place-items-center rounded-lg border border-[#ddd6ca] bg-[#faf8f4] text-[#62685f] transition hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
+              aria-pressed={isSelected}
+              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-3 text-xs font-semibold transition ${
+                isSelected
+                  ? "border-[#2f6f5e] bg-[#edf4f0] text-[#2f6f5e] shadow-xs"
+                  : "border-[#ddd6ca] bg-white text-[#62685f] hover:border-[#2f6f5e] hover:text-[#2f6f5e]"
+              }`}
               key={option.id}
-              onClick={onReset}
-              title={`${option.label} - chọn để đổi`}
+              onClick={() => onSelectIcon(option.id)}
               type="button"
             >
-              <OptionIcon className="h-4 w-4" />
+              <OptionIcon className="h-5 w-5" />
+              <span className="truncate text-[11px]">{option.label}</span>
             </button>
           );
         })}
@@ -1140,18 +1589,20 @@ function WishlistSection({
   onRemove: (id: string) => void;
 }) {
   if (items.length === 0) {
-    return <EmptyState
-      icon={Heart}
-      title="Chưa có sản phẩm yêu thích"
-      description="Nhấn vào biểu tượng trái tim trên sản phẩm để lưu lại. Danh sách sẽ hiển thị tại đây."
-      ctaHref="/products"
-      ctaLabel="Khám phá sản phẩm"
-    />;
+    return (
+      <EmptyState
+        icon={Heart}
+        title="Chưa có sản phẩm yêu thích"
+        description="Nhấn vào biểu tượng trái tim trên sản phẩm để lưu lại. Danh sách sẽ hiển thị tại đây."
+        ctaHref="/products"
+        ctaLabel="Khám phá sản phẩm"
+      />
+    );
   }
 
   return (
-    <div className="p-5 sm:p-7">
-      <div className="mb-5 flex items-end justify-between gap-4">
+    <div className="p-5 sm:p-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Sản phẩm yêu thích</h2>
           <p className="mt-1 text-sm text-[#62685f]">
@@ -1159,10 +1610,10 @@ function WishlistSection({
           </p>
         </div>
         <Link
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#d7cfc2] bg-white px-4 text-xs font-bold transition hover:bg-[#f5f1ea]"
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7cfc2] bg-white px-4 text-xs font-bold transition hover:bg-[#f5f1ea]"
           href="/products"
         >
-          <Sparkles className="h-4 w-4" />
+          <Sparkles className="h-4 w-4 text-[#2f6f5e]" />
           Thêm sản phẩm
         </Link>
       </div>
@@ -1170,18 +1621,22 @@ function WishlistSection({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <article
-            className="group relative overflow-hidden rounded-xl border border-[#ded6c9] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="group relative overflow-hidden rounded-2xl border border-[#ded6c9] bg-white shadow-xs transition hover:-translate-y-0.5 hover:shadow-md"
             key={item.id}
           >
             <Link className="block" href={`/products/${item.id}`}>
-              <div className="relative h-44 overflow-hidden bg-[#eee7dc]">
+              <div className="relative h-48 overflow-hidden bg-[#eee7dc]">
                 {item.image ? (
                   <Image
                     alt={item.name}
-                    className="h-full w-full object-cover transition group-hover:scale-[1.04]"
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                     fill
                     sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
                     src={item.image}
+                    unoptimized={
+                      item.image.startsWith("data:") ||
+                      item.image.startsWith("blob:")
+                    }
                   />
                 ) : (
                   <div className="grid h-full w-full place-items-center text-[#9ca99f]">
@@ -1203,12 +1658,12 @@ function WishlistSection({
               <div className="p-4">
                 <div className="flex items-center gap-2">
                   {item.category && (
-                    <span className="rounded-full bg-[#f7f3ec] px-2 py-0.5 text-[10px] font-bold uppercase text-[#6f746d]">
+                    <span className="rounded-full bg-[#f7f3ec] px-2.5 py-0.5 text-[10px] font-bold uppercase text-[#6f746d]">
                       {item.category}
                     </span>
                   )}
                   {item.style && (
-                    <span className="rounded-full bg-[#eef6f2] px-2 py-0.5 text-[10px] font-bold uppercase text-[#2f6f5e]">
+                    <span className="rounded-full bg-[#eef6f2] px-2.5 py-0.5 text-[10px] font-bold uppercase text-[#2f6f5e]">
                       {item.style}
                     </span>
                   )}
@@ -1242,18 +1697,20 @@ function SavedMoodboardsSection({
   onRemove: (id: string) => void;
 }) {
   if (items.length === 0) {
-    return <EmptyState
-      icon={Bookmark}
-      title="Chưa lưu moodboard nào"
-      description="Nhấn biểu tượng bookmark trên các moodboard để lưu lại. Bạn có thể xem và mở lại chúng tại đây."
-      ctaHref="/product-space"
-      ctaLabel="Khám phá Moodboard"
-    />;
+    return (
+      <EmptyState
+        icon={Bookmark}
+        title="Chưa lưu moodboard nào"
+        description="Nhấn biểu tượng bookmark trên các moodboard để lưu lại. Bạn có thể xem và mở lại chúng tại đây."
+        ctaHref="/product-space"
+        ctaLabel="Khám phá Moodboard"
+      />
+    );
   }
 
   return (
-    <div className="p-5 sm:p-7">
-      <div className="mb-5 flex items-end justify-between gap-4">
+    <div className="p-5 sm:p-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Moodboard đã lưu</h2>
           <p className="mt-1 text-sm text-[#62685f]">
@@ -1261,10 +1718,10 @@ function SavedMoodboardsSection({
           </p>
         </div>
         <Link
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#d7cfc2] bg-white px-4 text-xs font-bold transition hover:bg-[#f5f1ea]"
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7cfc2] bg-white px-4 text-xs font-bold transition hover:bg-[#f5f1ea]"
           href="/product-space"
         >
-          <Compass className="h-4 w-4" />
+          <Compass className="h-4 w-4 text-[#2f6f5e]" />
           Khám phá thêm
         </Link>
       </div>
@@ -1272,21 +1729,25 @@ function SavedMoodboardsSection({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <article
-            className="group relative overflow-hidden rounded-xl border border-[#ded6c9] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="group relative overflow-hidden rounded-2xl border border-[#ded6c9] bg-white shadow-xs transition hover:-translate-y-0.5 hover:shadow-md"
             key={item.id}
           >
             <Link className="block" href={`/product-space/${item.id}`}>
-              <div className="relative h-44 overflow-hidden bg-[#eee7dc]">
+              <div className="relative h-48 overflow-hidden bg-[#eee7dc]">
                 {item.image ? (
                   <Image
                     alt={item.title}
-                    className="h-full w-full object-cover transition group-hover:scale-[1.04]"
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                     fill
                     sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
                     src={item.image}
+                    unoptimized={
+                      item.image.startsWith("data:") ||
+                      item.image.startsWith("blob:")
+                    }
                   />
                 ) : (
-                  <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#1c2821] to-[#2f6f5e] text-white/80">
+                  <div className="grid h-full w-full place-items-center bg-gradient-to-br from-[#254d3d] to-[#2f6f5e] text-white/80">
                     <Bookmark className="h-10 w-10" />
                   </div>
                 )}
@@ -1302,7 +1763,7 @@ function SavedMoodboardsSection({
                   <Trash2 className="h-4 w-4" />
                 </button>
                 {item.roomType && (
-                  <span className="absolute bottom-3 left-3 rounded-full bg-[#1c2821]/85 px-2.5 py-1 text-[10px] font-bold uppercase text-white backdrop-blur">
+                  <span className="absolute bottom-3 left-3 rounded-full bg-[#254d3d]/90 px-2.5 py-1 text-[10px] font-bold uppercase text-white backdrop-blur">
                     {item.roomType.replace(/_/g, " ")}
                   </span>
                 )}
@@ -1312,7 +1773,9 @@ function SavedMoodboardsSection({
                   {item.title}
                 </h3>
                 <div className="mt-3 flex items-center justify-between gap-2 text-xs text-[#687068]">
-                  <span className="truncate">Bởi {item.author ?? "Ẩn danh"}</span>
+                  <span className="truncate">
+                    Bởi {item.author ?? "DECOHO"}
+                  </span>
                   <span className="font-bold">{item.productCount ?? 0} SP</span>
                 </div>
                 <p className="mt-2 text-[10px] text-[#9ca99f]">
@@ -1320,6 +1783,119 @@ function SavedMoodboardsSection({
                 </p>
               </div>
             </Link>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Saved 3D Room Designs Section ---------- */
+function SavedDesignsSection({
+  items,
+  onRemove,
+}: {
+  items: SavedShowroomDesign[];
+  onRemove: (design: SavedShowroomDesign) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={Box}
+        title="Chưa có bản thiết kế phòng 3D nào"
+        description="Vào Phòng mẫu 3D, kéo thả bố trí đồ nội thất theo ý thích và bấm 'Lưu thiết kế' để lưu lại không gian của bạn."
+        ctaHref="/showroom"
+        ctaLabel="Mở Phòng mẫu 3D"
+      />
+    );
+  }
+
+  return (
+    <div className="p-5 sm:p-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold">Thiết kế phòng 3D đã lưu</h2>
+          <p className="mt-1 text-sm text-[#62685f]">
+            {items.length} phương án bố trí không gian 3D của bạn
+          </p>
+        </div>
+        <Link
+          className="inline-flex h-10 items-center gap-2 rounded-full bg-[#2f6f5e] px-4 text-xs font-bold text-white transition hover:bg-[#24594b]"
+          href="/showroom"
+        >
+          <Box className="h-4 w-4" />
+          Thiết kế phòng mới
+        </Link>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {items.map((design) => (
+          <article
+            key={design._id}
+            className="flex flex-col justify-between rounded-2xl border border-[#ded6c9] bg-[#fbf9f4] p-5 shadow-xs transition hover:-translate-y-0.5 hover:border-[#2f6f5e]/50 hover:bg-white"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f2ec] px-3 py-1 text-[11px] font-bold text-[#2f6f5e]">
+                  {design.source === "cloud" ? (
+                    <Cloud className="h-3.5 w-3.5" />
+                  ) : (
+                    <HardDrive className="h-3.5 w-3.5" />
+                  )}
+                  {design.showroomName || "Phòng mẫu 3D"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(design)}
+                  aria-label="Xóa bản thiết kế"
+                  className="grid h-8 w-8 place-items-center rounded-full text-[#9b3c31] transition hover:bg-[#fff3f0]"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              <h3 className="mt-3 text-base font-bold text-[#17211b]">
+                {design.name}
+              </h3>
+              <p className="mt-1 text-xs text-[#62685f]">
+                Đã bố trí{" "}
+                <strong className="text-[#2f6f5e]">
+                  {design.items?.length ?? 0}
+                </strong>{" "}
+                sản phẩm nội thất 3D
+              </p>
+
+              {design.items && design.items.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {design.items.slice(0, 3).map((item) => (
+                    <span
+                      key={item.instanceId}
+                      className="truncate max-w-[160px] rounded-full border border-[#e2dcd0] bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#5c645a]"
+                    >
+                      {item.name}
+                    </span>
+                  ))}
+                  {design.items.length > 3 && (
+                    <span className="rounded-full bg-[#eef2eb] px-2 py-0.5 text-[11px] font-semibold text-[#2f6f5e]">
+                      +{design.items.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between border-t border-[#e8e1d7] pt-3.5">
+              <span className="text-[11px] text-[#7a8278]">
+                Cập nhật {formatDate(design.updatedAt)}
+              </span>
+              <Link
+                href="/showroom"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#254d3d] px-3.5 py-1.5 text-xs font-bold text-white transition hover:bg-[#1c3b2f]"
+              >
+                Mở phòng 3D
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </article>
         ))}
       </div>
@@ -1342,15 +1918,15 @@ function EmptyState({
   ctaLabel: string;
 }) {
   return (
-    <div className="p-8 sm:p-12">
+    <div className="p-8 sm:p-14">
       <div className="mx-auto flex max-w-md flex-col items-center text-center">
         <span className="grid h-20 w-20 place-items-center rounded-full bg-[#edf4f0] text-[#2f6f5e]">
-          <Icon className="h-10 w-10" />
+          <Icon className="h-9 w-9" />
         </span>
         <h3 className="mt-5 text-xl font-bold">{title}</h3>
         <p className="mt-2 text-sm leading-6 text-[#62685f]">{description}</p>
         <Link
-          className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-[#2f6f5e] px-5 text-sm font-bold text-white transition hover:bg-[#26574a]"
+          className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-[#2f6f5e] px-6 text-sm font-bold text-white transition hover:bg-[#26574a]"
           href={ctaHref}
         >
           {ctaLabel}
