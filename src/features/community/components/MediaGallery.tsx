@@ -44,7 +44,9 @@ export default function MediaGallery({ media }: { media: CommunityMedia[] }) {
                 src={item.url}
                 alt={`Không gian được chia sẻ, ảnh ${index + 1}`}
                 fill
-                unoptimized
+                unoptimized={
+                  item.url.startsWith("data:") || item.url.startsWith("blob:")
+                }
                 sizes="(max-width: 768px) 100vw, 600px"
                 className="object-cover transition duration-500 hover:scale-[1.03]"
               />

@@ -163,7 +163,9 @@ function MediaItem({ media, className = "", priority, unoptimizedLarge }: { medi
         priority={priority}
         sizes={unoptimizedLarge ? "(max-width: 90vw) 100vw" : "(max-width: 1024px) 100vw, 680px"}
         src={media.url}
-        unoptimized
+        unoptimized={
+          media.url.startsWith("data:") || media.url.startsWith("blob:")
+        }
       />
     </div>
   );

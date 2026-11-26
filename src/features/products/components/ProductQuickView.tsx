@@ -154,7 +154,10 @@ export default function ProductQuickView({
                   fill
                   sizes={inline ? "(min-width: 1024px) 480px, 100vw" : "(min-width: 1024px) 50vw, 100vw"}
                   src={displayProduct.images[0]}
-                  unoptimized
+                  unoptimized={
+                    displayProduct.images[0].startsWith("data:") ||
+                    displayProduct.images[0].startsWith("blob:")
+                  }
                 />
               ) : (
                 <div className="grid h-full place-items-center text-6xl">🪑</div>

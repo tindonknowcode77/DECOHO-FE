@@ -176,9 +176,19 @@ function normalizeProduct(product: ApiProduct): Product {
   } as Product;
 }
 
+let cachedProducts: { data: Product[]; timestamp: number } | null = null;
+const PRODUCTS_CACHE_TTL_MS = 60_000;
+
 export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
+  if (
+    cachedProducts &&
+    cachedProducts.data.length > 0 &&
+    Date.now() - cachedProducts.timestamp < PRODUCTS_CACHE_TTL_MS
+  ) {
+    return cachedProducts.data;
+  }
+
   const response = await fetch(getApiUrl(), {
-    cache: "no-store",
     headers: {
       Accept: "application/json",
     },
@@ -186,6 +196,9 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
   });
 
   if (!response.ok) {
+    if (cachedProducts && cachedProducts.data.length > 0) {
+      return cachedProducts.data;
+    }
     throw new Error(`Không thể tải sản phẩm (${response.status}).`);
   }
 
@@ -195,7 +208,12 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
     throw new Error("Backend trả về dữ liệu sản phẩm không hợp lệ.");
   }
 
-  return data.map(normalizeProduct);
+  const normalized = data.map(normalizeProduct);
+  cachedProducts = {
+    data: normalized,
+    timestamp: Date.now(),
+  };
+  return normalized;
 }
 
 export async function getAdminProducts(accessToken?: string): Promise<Product[]> {

@@ -166,7 +166,10 @@ export default function GlobalSearch() {
                               fill
                               sizes="40px"
                               src={image}
-                              unoptimized
+                              unoptimized={
+                                image.startsWith("data:") ||
+                                image.startsWith("blob:")
+                              }
                             />
                           </span>
                         ) : (

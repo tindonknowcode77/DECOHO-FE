@@ -32,20 +32,15 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "res.cloudinary.com",
-        port: "",
-        pathname: "/*/image/upload/**",
+        hostname: "**",
       },
       {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "i.pinimg.com",
+        protocol: "http",
+        hostname: "**",
       },
     ],
   },

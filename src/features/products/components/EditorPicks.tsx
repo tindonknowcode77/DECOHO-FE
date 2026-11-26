@@ -77,7 +77,10 @@ export default function EditorPicks() {
                   fill
                   sizes="(min-width:1024px) 25vw,50vw"
                   src={collection.image}
-                  unoptimized
+                  unoptimized={
+                    collection.image.startsWith("data:") ||
+                    collection.image.startsWith("blob:")
+                  }
                 />
               ) : (
                 <div className="grid h-full place-items-center text-sm text-[#898d86]">

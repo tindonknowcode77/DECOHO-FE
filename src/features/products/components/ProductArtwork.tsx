@@ -24,7 +24,7 @@ export default function ProductArtwork({
         src={src}
         alt={name}
         fill
-        unoptimized
+        unoptimized={src.startsWith("data:") || src.startsWith("blob:")}
         sizes={sizes}
         onError={() => setFailedSource(src)}
         className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"

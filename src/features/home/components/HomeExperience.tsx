@@ -27,14 +27,21 @@ type Post = {
   userId?: { fullName?: string };
   media?: { url?: string; type?: string; thumbnailUrl?: string }[];
 };
-async function loadList<T>(path: string, signal: AbortSignal): Promise<T[]> {
+type CacheEntry = {
+  data: unknown[];
+  timestamp: number;
+};
+
+const HOME_CACHE_TTL_MS = 60_000;
+const homeSectionCache = new Map<string, CacheEntry>();
+
+async function loadList<T>(path: string, signal?: AbortSignal): Promise<T[]> {
   const base = (process.env.NEXT_PUBLIC_API_URL ?? "/backend-api").replace(
     /\/$/,
     "",
   );
   const response = await fetch(`${base}/${path}`, {
     signal,
-    cache: "no-store",
   });
   if (!response.ok)
     throw new Error(`Không tải được dữ liệu (${response.status}).`);
@@ -43,26 +50,34 @@ async function loadList<T>(path: string, signal: AbortSignal): Promise<T[]> {
   if (!Array.isArray(items)) throw new Error("Dữ liệu trả về chưa hợp lệ.");
   return items;
 }
-const loadBoards = (signal: AbortSignal) =>
+const loadBoards = (signal?: AbortSignal) =>
   loadList<ProductSpace>("product-spaces", signal);
-const loadPosts = (signal: AbortSignal) =>
+const loadPosts = (signal?: AbortSignal) =>
   loadList<Post>("community/posts?page=1&limit=3", signal);
 
 function useLazySection<T>(
-  loader: (signal: AbortSignal) => Promise<T[]>,
+  cacheKey: string,
+  loader: (signal?: AbortSignal) => Promise<T[]>,
   immediate = false,
 ) {
+  const cachedEntry = homeSectionCache.get(cacheKey);
+  const hasCachedData = Boolean(cachedEntry && cachedEntry.data.length > 0);
+
   const [state, setState] = useState<{
     data: T[];
     loading: boolean;
     error: string;
-  }>({ data: [], loading: true, error: "" });
-  const [inView, setInView] = useState(immediate);
+  }>(() => ({
+    data: hasCachedData ? (cachedEntry!.data as T[]) : [],
+    loading: !hasCachedData,
+    error: "",
+  }));
+  const [inView, setInView] = useState(immediate || hasCachedData);
   const [revision, setRevision] = useState(0);
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (immediate) {
+    if (immediate || hasCachedData) {
       setInView(true);
       return;
     }
@@ -84,36 +99,68 @@ function useLazySection<T>(
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [immediate]);
+  }, [immediate, hasCachedData]);
 
   useEffect(() => {
     if (!inView) return;
+
+    const currentCache = homeSectionCache.get(cacheKey);
+    const isFresh =
+      currentCache &&
+      currentCache.data.length > 0 &&
+      Date.now() - currentCache.timestamp < HOME_CACHE_TTL_MS &&
+      revision === 0;
+
+    if (isFresh) {
+      setState({
+        data: currentCache.data as T[],
+        loading: false,
+        error: "",
+      });
+      return;
+    }
+
     const controller = new AbortController();
 
     loader(controller.signal)
       .then((data) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          homeSectionCache.set(cacheKey, {
+            data,
+            timestamp: Date.now(),
+          });
           setState({ data, loading: false, error: "" });
+        }
       })
       .catch((e) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          if (currentCache && currentCache.data.length > 0) {
+            setState({
+              data: currentCache.data as T[],
+              loading: false,
+              error: "",
+            });
+            return;
+          }
           setState({
             data: [],
             loading: false,
             error:
               e instanceof Error ? e.message : "Chưa kết nối được máy chủ.",
           });
+        }
       });
 
     return () => controller.abort();
-  }, [inView, loader, revision]);
+  }, [cacheKey, inView, loader, revision]);
 
   return {
     ref,
     inView,
     ...state,
-    loading: !inView || state.loading,
+    loading: (!inView || state.loading) && state.data.length === 0,
     retry: () => {
+      homeSectionCache.delete(cacheKey);
       setInView(true);
       setState((s) => ({ ...s, loading: true, error: "" }));
       setRevision((r) => r + 1);
@@ -195,7 +242,7 @@ function Photo({
       src={src}
       alt={alt}
       fill
-      unoptimized
+      unoptimized={src.startsWith("data:") || src.startsWith("blob:")}
       sizes={sizes}
       className="object-cover transition duration-700 group-hover:scale-105"
       onError={() => setFailed(src)}
@@ -266,9 +313,9 @@ export default function HomeExperience() {
     preference.addEventListener("change", stop);
     return () => { observer.disconnect(); animations.forEach(animation => animation.cancel()); preference.removeEventListener("change", stop); };
   }, []);
-  const boards = useLazySection(loadBoards, true);
-  const products = useLazySection(getProducts, false);
-  const posts = useLazySection(loadPosts, false);
+  const boards = useLazySection("home:boards", loadBoards, true);
+  const products = useLazySection("home:products", getProducts, true);
+  const posts = useLazySection("home:posts", loadPosts, false);
   const [quick, setQuick] = useState<Product | null>(null);
 
   const lampItems = LAMP_DEMO_ITEMS.map((item) => {

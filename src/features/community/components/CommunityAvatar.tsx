@@ -22,7 +22,7 @@ export default function CommunityAvatar({
         src={src}
         width={size}
         height={size}
-        unoptimized
+        sizes={`${size}px`}
         onError={() => setFailed(src)}
         className="shrink-0 rounded-full object-cover"
         style={{ width: size, height: size }}

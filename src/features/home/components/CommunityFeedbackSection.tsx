@@ -13,21 +13,57 @@ type FeedbackMovingCardItem = FeedbackItem & {
   id: string;
 };
 
+let cachedFeedbackData: {
+  items: FeedbackItem[];
+  total: number;
+  averageRating: number;
+  timestamp: number;
+} | null = null;
+const FEEDBACK_CACHE_TTL_MS = 60_000;
+
 export default function CommunityFeedbackSection() {
-  const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const [avgRating, setAvgRating] = useState<number>(5.0);
+  const hasCache = Boolean(cachedFeedbackData);
+  const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>(
+    () => cachedFeedbackData?.items ?? [],
+  );
+  const [totalCount, setTotalCount] = useState<number>(
+    () => cachedFeedbackData?.total ?? 0,
+  );
+  const [avgRating, setAvgRating] = useState<number>(
+    () => cachedFeedbackData?.averageRating ?? 5.0,
+  );
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [inView, setInView] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(() => !hasCache);
+  const [inView, setInView] = useState<boolean>(() => hasCache);
   const sectionRef = React.useRef<HTMLElement>(null);
 
-  const fetchCommunityReviews = async () => {
+  const fetchCommunityReviews = async (forceRefresh = false) => {
+    if (
+      !forceRefresh &&
+      cachedFeedbackData &&
+      Date.now() - cachedFeedbackData.timestamp < FEEDBACK_CACHE_TTL_MS
+    ) {
+      setFeedbacks(cachedFeedbackData.items);
+      setTotalCount(cachedFeedbackData.total);
+      setAvgRating(cachedFeedbackData.averageRating);
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await getPublicFeedbacks({ limit: 12 });
-      setFeedbacks(data.items || []);
-      setTotalCount(data.total || 0);
-      setAvgRating(data.averageRating || 5.0);
+      const items = data.items || [];
+      const total = data.total || 0;
+      const averageRating = data.averageRating || 5.0;
+      cachedFeedbackData = {
+        items,
+        total,
+        averageRating,
+        timestamp: Date.now(),
+      };
+      setFeedbacks(items);
+      setTotalCount(total);
+      setAvgRating(averageRating);
     } catch {
       // fallback
     } finally {
@@ -191,7 +227,7 @@ export default function CommunityFeedbackSection() {
       <FeedbackModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchCommunityReviews}
+        onSuccess={() => fetchCommunityReviews(true)}
       />
     </section>
   );

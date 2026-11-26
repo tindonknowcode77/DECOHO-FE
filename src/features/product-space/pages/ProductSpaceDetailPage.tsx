@@ -261,7 +261,10 @@ export default function ProductSpaceDetailPage({
                     priority
                     sizes="(min-width: 1024px) 54vw, 100vw"
                     src={space.imageUrl}
-                    unoptimized
+                    unoptimized={
+                      space.imageUrl.startsWith("data:") ||
+                      space.imageUrl.startsWith("blob:")
+                    }
                   />
                 ) : (
                   <div className="grid h-full place-items-center text-sm text-[#888d85]">
@@ -412,7 +415,10 @@ export default function ProductSpaceDetailPage({
                             fill
                             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                             src={product.images[0]}
-                            unoptimized
+                            unoptimized={
+                              product.images[0].startsWith("data:") ||
+                              product.images[0].startsWith("blob:")
+                            }
                           />
                         ) : pending ? (
                           <div className="grid h-full place-items-center">
